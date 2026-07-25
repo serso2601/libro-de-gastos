@@ -2,11 +2,15 @@
 
 App personal de gastos/ingresos para uso propio en iPhone (no multiusuario, no hay backend, no hay servidor que mantener). Nace de una conversación en Claude.ai donde se armó primero como artifact de React y después se portó a una PWA estática para poder instalarla de verdad en el teléfono.
 
-## Objetivo de esta sesión
+## Estado actual del proyecto (actualizado 2026-07-25)
 
-1. Inicializar git en esta carpeta y subir el proyecto a un repo nuevo en GitHub.
-2. Activar GitHub Pages para que quede accesible en `https://<usuario>.github.io/<repo>/`.
-3. A partir de ahí, seguir iterando la app (nuevas features, ajustes de diseño, bugs) como me pida el usuario.
+- **Repo en GitHub:** https://github.com/serso2601/libro-de-gastos (público, rama `master`).
+- **App publicada (GitHub Pages):** https://serso2601.github.io/libro-de-gastos/ — se actualiza sola con cada `git push` a `master` (tarda 1-2 min en reflejarse).
+- **Git ya configurado en esta PC:** repo local inicializado, identidad de commit configurada (`user.name`/`user.email` en el repo, con email noreply de GitHub), remoto `origin` apuntando al repo de arriba. `gh` (GitHub CLI) está instalado y autenticado como `serso2601` — no hace falta volver a loguearse para pushear.
+- **Flujo normal de trabajo:** el usuario pide un cambio → se edita `index.html`/otros archivos → se hace `git add` + `git commit` + `git push` → Pages se actualiza solo. El usuario no necesita hacer nada manual salvo recargar la app en su iPhone.
+- **Cómo instala el usuario la app en su iPhone:** Safari (no Chrome) → abrir `https://serso2601.github.io/libro-de-gastos/` → botón compartir → "Añadir a pantalla de inicio".
+- **Pendiente conocido:** faltan los archivos de ícono referenciados por `manifest.json` (`icon-192.png`, `icon-512.png`, `apple-touch-icon.png`) — no existen en la carpeta ni en el repo. El ícono al instalar la PWA puede salir en blanco/genérico hasta que se generen y agreguen estos archivos.
+- El usuario no sabe usar git/GitHub y prefiere que todo el proceso técnico (commits, push, etc.) lo haga Claude directamente, explicando solo lo que el usuario necesita hacer manualmente (si algo llegara a requerir login o clics de su parte).
 
 No asumas que hay que migrar a un framework con build step (React+Vite, etc.) salvo que el usuario lo pida explícitamente — la decisión de que sea un sitio estático sin build fue intencional (ver más abajo).
 
