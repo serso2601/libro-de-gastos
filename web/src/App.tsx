@@ -25,7 +25,7 @@ function Entrar() {
         <p className="text-3xl mb-2">📒</p>
         <h1 className="font-display text-xl mb-1" style={{ color: C.tinta }}>Libro de Gastos</h1>
         <p className="text-sm mb-4" style={{ color: C.tenue }}>
-          {conexion === 'sin-conexion' ? 'No hay conexión con la PC. Revisa que Tailscale esté activo.' : 'Pega el token de la PC (está en la página de estado del servidor).'}
+          {conexion === 'sin-conexion' ? 'No hay conexión con la PC. Revisa que Tailscale esté activo.' : 'Pega el token de la PC (está en LibroDeGastos\\datos\\token.txt, en tu carpeta de usuario).'}
         </p>
         <input type="password" value={token} onChange={(e) => setToken(e.target.value)} placeholder="Token" className="w-full rounded-xl px-3 py-2.5 mb-3 outline-none text-sm"
           style={{ border: `1px solid ${C.linea}`, background: C.fondo, color: C.tinta }} />
