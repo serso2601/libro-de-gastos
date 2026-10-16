@@ -1,6 +1,6 @@
 from datetime import date
 
-from servidor.recurrencias import fechas, ocurrencia, sumar_meses, ultima_hasta
+from gastos.recurrencias import fechas, ocurrencia, sumar_meses, ultima_hasta
 
 
 def test_mensual_desde_el_31_no_se_corre():

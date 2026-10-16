@@ -1,4 +1,4 @@
-"""Arranca el servidor: `uv run python -m servidor`."""
+"""Arranca el servidor: `uv run python -m gastos`."""
 
 import argparse
 import logging
@@ -45,7 +45,7 @@ def mantenimiento(config: Config, parar: threading.Event) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Servidor local del Libro de Gastos")
-    parser.add_argument("--host", default="127.0.0.1", help="Tailscale Serve lo publica con HTTPS; 0.0.0.0 para abrirlo a la red")
+    parser.add_argument("--host", default="0.0.0.0", help="0.0.0.0 para que llegue el teléfono por Tailscale (el api filtra el resto)")
     parser.add_argument("--puerto", type=int, default=8766)
     args = parser.parse_args()
 

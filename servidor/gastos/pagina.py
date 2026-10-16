@@ -11,12 +11,10 @@ b{color:#F5F6F7;font-weight:600} .ok{color:#34D8A6} .mal{color:#F16565} a{color:
 """
 
 
-def estado(config, conteos: dict, ultimo_respaldo: str | None, web_compilada: bool) -> str:
+def estado(config, conteos: dict, ultimo_respaldo: str | None) -> str:
     hoy = date.today().isoformat()
     respaldo = (f'<span class="ok">{ultimo_respaldo}</span>' if ultimo_respaldo == hoy
                 else f'<span class="mal">{ultimo_respaldo or "ninguno todavía"}</span>')
-    web = ('<a href="/web/">Abrir la app web</a>' if web_compilada
-           else '<span class="mal">sin compilar (cd web; npm run build)</span>')
     return f"""<!doctype html><html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="30">
 <title>Estado · Libro de Gastos</title><style>{ESTILO}</style></head><body>
@@ -24,6 +22,5 @@ def estado(config, conteos: dict, ultimo_respaldo: str | None, web_compilada: bo
 <p>Datos en <b>{escape(str(config.carpeta))}</b></p></div>
 <div class="tarjeta">
 <p><b>{conteos['cuenta']}</b> cuentas · <b>{conteos['movimiento']}</b> movimientos · <b>{conteos['recurrencia']}</b> recurrencias</p>
-<p>Último respaldo: {respaldo}</p>
-<p>App web: {web}</p></div>
+<p>Último respaldo: {respaldo}</p></div>
 </body></html>"""

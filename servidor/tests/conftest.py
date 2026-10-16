@@ -3,8 +3,8 @@ from datetime import date
 import pytest
 from fastapi.testclient import TestClient
 
-from servidor.api import create_app
-from servidor.config import Config
+from gastos.api import create_app
+from gastos.config import Config
 
 
 class Reloj:

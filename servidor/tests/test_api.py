@@ -110,9 +110,16 @@ def test_orden_y_ajustes(cliente):
     assert d["moneda"] == "B/."
 
 
-def test_la_web_entra_con_cookie_y_escribe_con_su_cabecera(anonimo, config):
-    assert anonimo.post("/web/entrar", json={"token": "otro"}).status_code == 401
-    assert anonimo.post("/web/entrar", json={"token": config.token}).status_code == 200
-    assert anonimo.get("/api/datos").status_code == 200
-    assert anonimo.put("/api/movimientos/m1", json=gasto()).status_code == 401
-    assert anonimo.put("/api/movimientos/m1", json=gasto(), headers={"x-app-web": "1"}).status_code == 200
+def test_solo_atiende_a_la_pc_y_a_la_tailnet(config, reloj):
+    from fastapi.testclient import TestClient
+
+    from gastos.api import create_app, desde_red_permitida
+
+    app = create_app(config, hoy=reloj)
+    cabecera = {"Authorization": f"Bearer {config.token}"}
+    for ip, codigo in [("100.97.163.107", 200), ("127.0.0.1", 200), ("192.168.0.20", 403), ("8.8.8.8", 403)]:
+        with TestClient(app, headers=cabecera, client=(ip, 50000)) as c:
+            assert c.get("/api/datos").status_code == codigo, ip
+    assert desde_red_permitida("::ffff:100.83.177.92")
+    assert desde_red_permitida("fd7a:115c:a1e0::1")
+    assert not desde_red_permitida("no-es-una-ip")

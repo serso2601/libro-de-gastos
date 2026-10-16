@@ -5,22 +5,44 @@ Todo lo de datos va bajo /api y pide entrar (ver `autorizado`). Los ids los pone
 llegado, no se duplica nada. Así la app puede guardar sin conexión y mandar todo después.
 
 Montos en centavos (enteros) y fechas ISO, igual que en la base.
+
+Quién puede hablarle: solo esta PC y los equipos de la tailnet (ver `RED_PERMITIDA`). El servidor
+escucha en todas las interfaces para que el teléfono llegue por Tailscale, pero un pedido que
+viene de la red de la casa o de cualquier otro lado se rechaza antes de mirar el token.
 """
 
+import ipaddress
 import secrets
 import sqlite3
 from collections.abc import Iterator
 from datetime import date
 from typing import Literal
 
-from fastapi import APIRouter, Cookie, Depends, FastAPI, Header, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Request
+from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 
-from . import db, importar, pagina, recurrencias, web
+from . import db, importar, pagina, recurrencias
 from .config import Config
 
 SIN_ENTRADA = "Falta el token o no es el de este servidor"
+
+# Loopback y los rangos que Tailscale usa para sus equipos (IPv4 100.64.0.0/10, IPv6 fd7a:115c:a1e0::/48).
+RED_PERMITIDA = [ipaddress.ip_network(r) for r in ("127.0.0.0/8", "::1/128", "100.64.0.0/10", "fd7a:115c:a1e0::/48")]
+
+
+def desde_red_permitida(host: str | None) -> bool:
+    if host == "testclient":  # el cliente de las pruebas no tiene IP
+        return True
+    if host is None:
+        return False
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    if ip.version == 6 and ip.ipv4_mapped:
+        ip = ip.ipv4_mapped
+    return any(ip in red for red in RED_PERMITIDA)
 
 TipoMovimiento = Literal["gasto", "ingreso", "transferencia"]
 Hora = Field(default=None, pattern=r"^\d{2}:\d{2}$")
@@ -135,22 +157,18 @@ def create_app(config: Config | None = None, hoy=date.today) -> FastAPI:
         finally:
             con.close()
 
-    def autorizado(
-        request: Request,
-        authorization: str | None = Header(default=None),
-        x_app_web: str | None = Header(default=None),
-        sesion: str | None = Cookie(default=None, alias=web.COOKIE),
-        t: str | None = None,
-    ) -> None:
+    @app.middleware("http")
+    async def solo_la_tailnet(request: Request, siguiente):
+        if not desde_red_permitida(request.client.host if request.client else None):
+            return JSONResponse({"detail": "Este servidor solo atiende a esta PC y a la tailnet"}, status_code=403)
+        return await siguiente(request)
+
+    def autorizado(authorization: str | None = Header(default=None), t: str | None = None) -> None:
         esperado = f"Bearer {config.token}"
         if authorization and secrets.compare_digest(authorization.encode(), esperado.encode()):
             return
         if t and secrets.compare_digest(t.encode(), config.token.encode()):
             return
-        if web.cookie_valida(sesion, config.token):
-            # La cookie va sola en cualquier pedido: para escribir, la web además manda su cabecera.
-            if request.method in ("GET", "HEAD") or x_app_web == "1":
-                return
         raise HTTPException(401, SIN_ENTRADA)
 
     r = APIRouter(prefix="/api", dependencies=[Depends(autorizado)])
@@ -158,7 +176,7 @@ def create_app(config: Config | None = None, hoy=date.today) -> FastAPI:
     @app.get("/", response_class=HTMLResponse)
     def estado(con: sqlite3.Connection = Depends(conexion)):
         conteos = {t: con.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0] for t in ("cuenta", "movimiento", "recurrencia")}
-        return pagina.estado(config, conteos, db.ultimo_respaldo(config.respaldos), web.compilada())
+        return pagina.estado(config, conteos, db.ultimo_respaldo(config.respaldos))
 
     @app.get("/salud")
     def salud():
@@ -338,5 +356,4 @@ def create_app(config: Config | None = None, hoy=date.today) -> FastAPI:
         return {"app": "libro-de-gastos", "version": db.VERSION, "exportado": db.ahora(), **todo}
 
     app.include_router(r)
-    web.registrar(app, config)
     return app
