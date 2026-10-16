@@ -77,7 +77,8 @@ jobs:
         run: |
           set -eo pipefail
           WS=$(ls -d ios/*.xcworkspace | head -1)
-          ESQUEMA=$(xcodebuild -workspace "$WS" -list -json | sed -n '/^{/,$p' | jq -r '.workspace.schemes[0]')
+          # El esquema de la app se llama como su .xcodeproj; el primero de la lista puede ser un Pod (p. ej. boost).
+          ESQUEMA=$(basename "$(ls -d ios/*.xcodeproj | head -1)" .xcodeproj)
           CONFIG=$([ "$PERFIL" = "development" ] && echo Debug || echo Release)
           echo "workspace: $WS · esquema: $ESQUEMA · configuración: $CONFIG"
           xcodebuild archive -workspace "$WS" -scheme "$ESQUEMA" -configuration "$CONFIG" \
@@ -90,6 +91,7 @@ jobs:
           set -eo pipefail
           cd "$RUNNER_TEMP"
           mkdir -p Payload
+          ls app.xcarchive/Products/Applications/*.app >/dev/null || { echo "El archivo no trae la app: ¿esquema equivocado?"; exit 1; }
           cp -R app.xcarchive/Products/Applications/*.app Payload/
           zip -qry gastos.ipa Payload
           ls -lh gastos.ipa
