@@ -47,6 +47,11 @@ function Avisos() {
           </Texto>
         </View>
       )}
+      {estado === 'token-malo' && (
+        <Pressable onPress={() => router.push('/conectar')} style={{ backgroundColor: alfa(C.alerta, 0.14), borderRadius: 10, padding: 10, marginBottom: 14 }}>
+          <Texto tam={12} color={C.alerta}>🔑  La PC no reconoce el token de este teléfono. Toca para conectar de nuevo.</Texto>
+        </Pressable>
+      )}
       {aviso && (
         <Pressable onPress={cerrarAviso} style={{ backgroundColor: alfa(C.alerta, 0.14), borderRadius: 10, padding: 10, marginBottom: 14, borderWidth: 1, borderColor: C.alerta }}>
           <Texto tam={12} color={C.alerta}>{aviso} · tocar para cerrar</Texto>
