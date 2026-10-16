@@ -960,12 +960,18 @@ function ConfigView({
   accounts, categories, currency, onClose,
   onAddAccount, onEditAccount, onDeleteAccount, onMoveAccount,
   onAddCategory, onEditCategory, onDeleteCategory, onMoveCategory,
-  onSetCurrency,
+  onSetCurrency, onExport,
 }) {
   const expenseCats = categories.filter((c) => c.type === "expense");
   const incomeCats = categories.filter((c) => c.type === "income");
   const [curr, setCurr] = useState(currency);
   const [error, setError] = useState("");
+  const [exportMsg, setExportMsg] = useState("");
+
+  async function handleExport() {
+    setExportMsg("");
+    try { setExportMsg(await onExport()); } catch (e) { setExportMsg("No se pudo exportar: " + (e && e.message ? e.message : e)); }
+  }
 
   function handleDeleteAccount(id) {
     const ok = onDeleteAccount(id);
@@ -994,6 +1000,13 @@ function ConfigView({
           <input type="text" maxLength={3} value={curr} onChange={(e) => setCurr(e.target.value)} className="flex-1 rounded-xl px-3 py-2 outline-none text-sm" style={{ border: `1px solid ${COLORS.rule}`, background: COLORS.paper, color: COLORS.ink }} />
           <button onClick={() => onSetCurrency(curr.trim() || "$")} className="px-4 rounded-xl text-xs font-medium" style={{ background: COLORS.gold, color: COLORS.goldInk }}>Guardar</button>
         </div>
+      </div>
+
+      <div className="rounded-2xl p-4 mb-4" style={{ background: COLORS.card, border: `1px solid ${COLORS.rule}` }}>
+        <p className="text-xs uppercase tracking-wide mb-1" style={{ color: COLORS.inkMuted }}>Respaldo</p>
+        <p className="text-xs mb-3" style={{ color: COLORS.inkMuted }}>Saca una copia de todo (cuentas, categorías, movimientos y presupuestos) en un archivo .json.</p>
+        <button onClick={handleExport} className="w-full rounded-xl py-2.5 text-sm font-medium" style={{ background: COLORS.gold, color: COLORS.goldInk }}>Exportar mis datos</button>
+        {exportMsg && <p className="text-xs mt-2" style={{ color: COLORS.inkMuted }}>{exportMsg}</p>}
       </div>
 
       <SettingsSection title="Cuentas" onAdd={onAddAccount}>
@@ -1149,6 +1162,28 @@ function FinanceApp() {
 
   function setBudgetFor(categoryId, amount) { setBudgets((prev) => ({ ...prev, [categoryId]: amount })); }
 
+  // Respaldo: primero el menú de compartir de iOS (Guardar en Archivos, AirDrop, mail), si no se puede
+  // se copia el JSON al portapapeles, y como último recurso se descarga.
+  async function exportData() {
+    const payload = { app: "libro-de-gastos", version: 1, exportedAt: new Date().toISOString(), accounts, categories, transactions, budgets, currency };
+    const json = JSON.stringify(payload, null, 2);
+    const name = `gastos-${todayStr()}.json`;
+    const resumen = `${transactions.length} movimientos, ${accounts.length} cuentas, ${categories.length} categorías`;
+    const file = new File([json], name, { type: "application/json" });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: name }); return `Listo: ${resumen}.`; }
+      catch (e) { if (e && e.name === "AbortError") return "Cancelado."; }
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      try { await navigator.clipboard.writeText(json); return `Copiado al portapapeles (${resumen}). Pégalo en una nota.`; } catch (e) {}
+    }
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(file);
+    a.download = name;
+    a.click();
+    return `Descargado: ${resumen}.`;
+  }
+
   function addTransaction(data) {
     const base = { kind: data.kind, amount: data.amount, accountId: data.accountId, categoryId: data.categoryId, note: data.note, date: data.date, time: data.time };
     if (data.recurrence && data.recurrence !== "none") {
@@ -1216,6 +1251,7 @@ function FinanceApp() {
           onDeleteCategory={deleteCategorySafe}
           onMoveCategory={moveCategory}
           onSetCurrency={setCurrency}
+          onExport={exportData}
         />
       ) : (
         <>
