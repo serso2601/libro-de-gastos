@@ -1,93 +1,82 @@
 # Libro de Gastos — contexto del proyecto
 
-App personal de gastos/ingresos para uso propio en iPhone (no multiusuario, no hay backend, no hay servidor que mantener). Nace de una conversación en Claude.ai donde se armó primero como artifact de React y después se portó a una PWA estática para poder instalarla de verdad en el teléfono.
+App personal de gastos/ingresos para uso propio en el iPhone. Desde el **16/oct/2026** sigue el
+mismo modelo que la App Universitaria (`Documents\APP UNIVERSITARIA`): **la PC es el servidor**,
+el teléfono entra por **Tailscale**, todo gratis y sin servicios externos. Las bases de datos de las
+dos apps no tienen nada que ver; lo que se comparte es la forma de trabajar y los accesos.
 
-## Estado actual del proyecto (actualizado 2026-07-25)
+El repo es **público** (github.com/serso2601/libro-de-gastos, rama `master`): nada de datos, tokens
+ni montos reales en el repo.
 
-- **Repo en GitHub:** https://github.com/serso2601/libro-de-gastos (público, rama `master`).
-- **App publicada (GitHub Pages):** https://serso2601.github.io/libro-de-gastos/ — se actualiza sola con cada `git push` a `master` (tarda 1-2 min en reflejarse).
-- **Git ya configurado en esta PC:** repo local inicializado, identidad de commit configurada (`user.name`/`user.email` en el repo, con email noreply de GitHub), remoto `origin` apuntando al repo de arriba. `gh` (GitHub CLI) está instalado y autenticado como `serso2601` — no hace falta volver a loguearse para pushear.
-- **Flujo normal de trabajo:** el usuario pide un cambio → se edita `index.html`/otros archivos → se hace `git add` + `git commit` + `git push` → Pages se actualiza solo. El usuario no necesita hacer nada manual salvo recargar la app en su iPhone.
-- **Cómo instala el usuario la app en su iPhone:** Safari (no Chrome) → abrir `https://serso2601.github.io/libro-de-gastos/` → botón compartir → "Añadir a pantalla de inicio".
-- **Pendiente conocido:** faltan los archivos de ícono referenciados por `manifest.json` (`icon-192.png`, `icon-512.png`, `apple-touch-icon.png`) — no existen en la carpeta ni en el repo. El ícono al instalar la PWA puede salir en blanco/genérico hasta que se generen y agreguen estos archivos.
-- El usuario no sabe usar git/GitHub y prefiere que todo el proceso técnico (commits, push, etc.) lo haga Claude directamente, explicando solo lo que el usuario necesita hacer manualmente (si algo llegara a requerir login o clics de su parte).
-
-No asumas que hay que migrar a un framework con build step (React+Vite, etc.) salvo que el usuario lo pida explícitamente — la decisión de que sea un sitio estático sin build fue intencional (ver más abajo).
-
-## Stack técnico (intencional, no lo cambies sin que te lo pidan)
-
-- **Un solo archivo `index.html`** con toda la app adentro. React 18 y Babel Standalone se cargan por CDN (`<script type="text/babel">`), así que el JSX se transpila en el propio navegador — no hay paso de build ni `npm install`.
-- **Tailwind vía Play CDN** (`cdn.tailwindcss.com`) — da el JIT completo en el navegador, así que cualquier clase de Tailwind funciona sin configuración.
-- **Chart.js** (CDN) para los gráficos — se eligió por sobre `recharts` porque tiene build UMD simple y confiable vía CDN.
-- **Sin librería de íconos externa** (se sacó `lucide-react` porque no tiene build CDN práctico): hay un componente `Icon` casero que devuelve SVGs simples para los íconos geométricos (flechas, chevrons, +, x) y emoji para el resto (🗑️ ✏️ ⚙️ ⚠️ 🔁 etc). Las categorías también usan emoji elegido por el usuario.
-- **Persistencia:** `localStorage` del navegador, clave `"finance-data"`, un solo blob JSON con todo (cuentas, categorías, transacciones, presupuestos, moneda). 100% local al dispositivo, no depende de ninguna cuenta ni servicio externo.
-- **PWA real:** `manifest.json` + `sw.js` (service worker, cache-first para los assets propios) + `apple-touch-icon.png` para que "Añadir a inicio" en iOS instale un ícono propio y funcione offline.
-
-## Archivos
+## Dónde está cada cosa
 
 ```
-index.html          — toda la app (componentes React inline, ver abajo)
-manifest.json        — metadata de la PWA
-sw.js                 — service worker (cache-first)
-icon-192.png          — ícono PWA
-icon-512.png          — ícono PWA
-apple-touch-icon.png  — ícono específico de iOS (180x180, sin bordes redondeados; iOS los redondea solo)
+Desktop\PROYECTO APP DE GASTOS\        ← el repo
+├── CLAUDE.md                          ← este archivo
+├── backend\servidor\                  ← FastAPI + SQLite (uv). `uv run pytest` corre las pruebas
+│   └── servidor\  api.py · db.py · esquema.sql · recurrencias.py · importar.py · web.py · pagina.py · config.py
+├── web\                               ← la app nueva: Vite 8 + React 19 + TS + Tailwind 4. Se compila a web\dist
+│                                        (no va al repo) y el servidor la sirve en /web
+├── scripts\iniciar.ps1                ← arranca el servidor (8766) y publica con Tailscale Serve
+├── scripts\instalar-inicio.ps1        ← acceso directo en shell:startup + "Estado Libro de Gastos.url" en el escritorio
+└── index.html · sw.js · manifest.json · icon-*.png   ← LA APP VIEJA (GitHub Pages). Sigue viva hasta
+                                          que el usuario pase sus datos; después se retira
 ```
 
-Si agregás o renombrás archivos que la app deba cachear offline, actualizá el array `CORE_ASSETS` en `sw.js`.
+Fuera del repo: **`~\LibroDeGastos\datos\`** — `gastos.db`, `token.txt`, `respaldos\` (una copia
+por día, se guardan 30) y `registros\` (logs del servidor y del arranque). Nunca al repo.
 
-## Modelo de datos (todo vive en un solo objeto guardado en localStorage)
+## Cómo corre en esta PC
 
-```js
-{
-  accounts: [{ id, name, color, initialBalance }],
-  categories: [{ id, name, type: "expense" | "income", color, emoji }],
-  transactions: [
-    // gasto o ingreso
-    { id, kind: "expense" | "income", amount, date, time, accountId, categoryId, note,
-      recurrence: null | "weekly" | "monthly", recurrenceGroupId: string | null },
-    // transferencia entre cuentas
-    { id, kind: "transfer", amount, date, time, fromAccountId, toAccountId, note }
-  ],
-  budgets: { [categoryId]: montoMensual },
-  currency: "$" // símbolo, editable en Configuración
-}
-```
+- **Arranca solo** al iniciar sesión (acceso directo `Libro de Gastos.lnk` en `shell:startup` que
+  corre `scripts\iniciar.ps1`). Servidor en `127.0.0.1:8766` (el 8765 es de la universitaria).
+  Estado en http://127.0.0.1:8766 (página pública, sin token).
+- **Acceso desde el iPhone: Tailscale Serve con HTTPS** → `https://sersopc.tail8d7613.ts.net/web/`.
+  Safari necesita HTTPS para instalar la app de verdad (service worker, offline) y para el micrófono
+  (gastos por voz, más adelante). `iniciar.ps1` corre `tailscale serve --bg 8766` (idempotente).
+- **Entrar:** la web pide el token una vez (`token.txt`) y deja una cookie `httponly` por un año.
+  Un enlace `.../web/?t=<token>` entra solo. La app instalada en la pantalla de inicio tiene sus
+  propias cookies: puede pedir el token una vez más después de instalarla.
+- **Tras cambiar la web:** `cd web; npm run build` (el servidor sirve `web\dist` directamente, no
+  hace falta reiniciarlo). Tras cambiar el backend: matar el proceso del 8766 y correr `iniciar.ps1`.
 
-Notas importantes:
-- El saldo de una cuenta **no se guarda**, se calcula siempre a partir de `initialBalance` + las transacciones que la afectan (función `accountBalance`).
-- Las recurrencias **no son infinitas**: al crear una transacción recurrente se generan de una vez 12 ocurrencias (12 semanas si es semanal, 12 meses si es mensual), todas con el mismo `recurrenceGroupId`. Si el usuario pide recurrencia infinita o "renovar" automáticamente, hay que pensar esa lógica (por ejemplo, generar más ocurrencias cuando queden pocas).
-- Borrar una cuenta o categoría está bloqueado si tiene transacciones asociadas (o si es la única cuenta que queda) — ver `deleteAccountSafe` / `deleteCategorySafe`.
-- El orden de cuentas y categorías en sus arrays importa: se puede reordenar desde "Configuración" (flechas arriba/abajo) y ese orden se refleja en toda la app.
+## Decisiones tomadas (no repreguntarlas)
 
-## Diseño / sistema visual
+- **Misma infraestructura que la universitaria**: servidor en la PC, Tailscale, arranque automático,
+  todo gratis. Web PWA en vez de app nativa: no hay que firmar ni renovar cada 7 días.
+- **Montos en centavos (enteros)** en la base y en la API. Fechas ISO. Formato de pantalla es-PA (1,234.56).
+- **Recurrencias = reglas** (`recurrencia`), no copias por adelantado. El servidor crea cada
+  movimiento cuando llega su fecha (`recurrencias.materializar`, al pedir datos y cada 30 min) y
+  anota `generada_hasta`: no duplica y una ocurrencia borrada no vuelve. Lo que viene se muestra en
+  «Próximos» (calculado, no guardado). Las mensuales cuentan siempre desde la fecha de inicio (31 →
+  30 → 28 → 31). La app vieja creaba 12 copias de una vez: ese era el bug que se arregló.
+- **Offline-first en la web**: cada cambio se ve al instante, queda en una cola en localStorage y se
+  manda en orden; ids UUID del cliente y PUT idempotentes, así un reintento nunca duplica.
+- **Sistema visual**: el de siempre (fintech oscuro, IBM Plex Sans/Mono, tarjetas sin bordes, menta
+  para ingresos, rojo para gastos, azul de acento). Nada del concepto "libro contable" que se descartó.
+- No sincronizar con otros servicios ni cuentas: todo vive en la PC.
 
-Estética "fintech oscuro" moderna, tipo apps de finanzas personales (referencia visual que dio el usuario: fondo casi negro, tarjetas sólidas redondeadas sin bordes decorativos, verde menta para positivo/ingresos, rojo para gastos, azul como acento de acción). Se descartó un rediseño anterior tipo "libro contable" (rayado de papel, margen rojo de libreta, bordes dobles, insignia circular, tipografía serif) porque al usuario no le gustó ese concepto — **no lo reintroduzcas** salvo pedido explícito.
+## Estado (16/oct/2026)
 
-- Tipografías: `IBM Plex Sans` (todo el texto, incluidos títulos en negrita vía `.font-display`), `IBM Plex Mono` (montos vía `.font-mono`). No hay fuente serif.
-- Paleta (objeto `COLORS` en el código):
-  - `paper` #0B0E13 (fondo general, casi negro), `card` #171B22 (tarjetas/modales), `cardAlt` #20252E (superficie anidada dentro de una tarjeta, p. ej. los mini-stats de gastos/ingresos), `ink` #F5F6F7 (texto principal), `inkMuted` rgba(245,246,247,0.5) (texto secundario), `rule` / `ruleStrong` (líneas divisorias sutiles, translúcidas), `good` #34D8A6 (verde menta, ingresos y montos positivos), `alert` #F16565 (rojo, gastos), `gold` #3B82F6 / `goldBright` #60A5FA (azul, acento de acción: CTAs, FAB, tabs activos, chips seleccionados — el nombre de la variable quedó de una iteración anterior pero ahora es azul, no dorado), `goldInk` #FFFFFF (texto claro sobre fondos de acento).
-  - Paleta de categorías (`PALETTE`): 10 colores saturados (azul, verde menta, rojo, ámbar, violeta, rosa, etc.) para que el usuario elija al crear categorías/cuentas.
-- Patrón visual: todo vive en tarjetas `rounded-2xl` con fondo `COLORS.card` flotando sobre el fondo casi negro, sin bordes visibles (la separación es por contraste de superficie, no por líneas). Dentro de una lista dentro de una tarjeta, los ítems se separan con un hairline sutil (`COLORS.rule`), nunca doble ni punteado.
-- Los íconos de categoría/cuenta se muestran como placas cuadradas redondeadas (`rounded-xl`, ~40px) con fondo del color de la categoría/cuenta al ~15% de opacidad y el emoji (categorías) o la inicial del nombre (cuentas) adentro — no puntos de color, no numeración tipo libro contable.
-- El botón "+" central es un círculo sólido azul (`COLORS.gold`) con sombra de color, no un gradiente radial dorado.
-- Nada de: rayado de fondo, márgenes rojos verticales, bordes dobles/triples, bordes punteados, insignias circulares tipo sello. Si el usuario pide "más distintivo" de nuevo, proponé variaciones dentro de esta línea fintech-oscura (no volver al concepto de libreta) salvo que lo pida explícitamente.
+- Hecho: servidor con pruebas (24 pasan), web nueva con las 5 pestañas de antes + Próximos,
+  reglas que se repiten (crear/editar/terminar), buscador de movimientos, importación del respaldo
+  viejo (con vista previa), exportar, respaldo diario. Íconos generados (también para la app vieja).
+  App vieja: botón «Exportar mis datos» en Configuración (commit 24980fd).
+- **Falta del lado del usuario:** activar Serve/HTTPS en la tailnet (el enlace sale en
+  `registros\inicio.log`), exportar los datos desde la app vieja e importarlos en la nueva
+  (Ajustes → Traer datos de la app vieja), e instalar la nueva en la pantalla de inicio.
 
-## Funcionalidad ya implementada
+## Qué sigue (ideas acordadas, en este orden)
 
-5 secciones con navegación inferior (Resumen, Cuentas, Presupuesto, Movimientos, Gráficos) + botón "+" central con hoja de acciones (Gasto / Ingreso / Transferencia) + botón de Configuración (⚙️) en el header.
+1. Pasar los datos y usar la app nueva; retirar la vieja de GitHub Pages cuando ya no haga falta.
+2. **Gasto por voz:** grabar en la web → Whisper en la PC (como la universitaria) → `claude -p
+   --model sonnet` lo convierte en movimiento → bandeja «Por revisar» (nada entra solo).
+3. **Foto del recibo** → el agente saca monto, comercio y categoría → misma bandeja.
+4. Resumen semanal/mensual con IA (en qué se fue la plata, qué se disparó, cómo va el presupuesto).
 
-- **Resumen:** balance total, ingresos/gastos/neto del mes (con navegación de mes), últimos movimientos.
-- **Cuentas:** lista con saldo calculado; tocar una entra al detalle con sus movimientos.
-- **Presupuesto:** barra de progreso por categoría de gasto (se recalcula sola con cada gasto cargado), enlace a Configuración para gestionar categorías.
-- **Movimientos:** lista completa (gastos/ingresos/transferencias) con filtro por tipo, agrupada por día; tocar una abre editar/borrar.
-- **Gráficos:** torta de gastos por categoría (mes actual) + barras agrupadas ingresos vs. gastos (últimos 6 meses).
-- **Configuración:** símbolo de moneda, y CRUD + reordenar de cuentas y categorías (gasto/ingreso separadas).
-- **Transacciones:** monto, cuenta, categoría (filtrada según sea gasto/ingreso, con opción de crear categoría al vuelo), nota, fecha, hora opcional, recurrencia (no repetir / cada semana / cada mes).
-- **Transferencias:** monto + cuenta origen/destino + nota + fecha.
+## Convenciones
 
-## Cómo seguir
-
-- El usuario va a seguir pidiendo cambios de features o de diseño en este mismo estilo — mantené la paleta, tipografías y el patrón de componentes (Modal genérico, TransactionRow reutilizable, etc.) al agregar cosas nuevas.
-- Si el usuario pide algo que requiera sincronizar entre dispositivos (no solo local), avisale que eso cambia la arquitectura (necesitaría backend) antes de asumir que hay que agregarlo.
-- Después de cualquier cambio, recordá probar que `index.html` siga abriendo bien como archivo estático (sin build) y hacer commit + push.
+- Un commit = un cambio que se describe en una línea sin "y". Pushear el mismo día.
+- El usuario no usa git: commits y push los hace Claude.
+- Si cambia el esquema: subir `VERSION` en `db.py`, agregar el paso en `MIGRACIONES` y probarlo
+  con una copia de `gastos.db` (hay respaldos diarios en `datos\respaldos`).
