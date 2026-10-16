@@ -119,10 +119,11 @@ def test_el_qr_con_el_token_solo_se_ve_desde_la_pc(config, reloj, monkeypatch):
     monkeypatch.setattr(pagina, "ip_tailscale", lambda: "100.100.10.1")
     app = create_app(config, hoy=reloj)
     with TestClient(app, client=("127.0.0.1", 50000)) as c:
-        assert "Conectar el iPhone" in c.get("/").text
+        assert "Conectar con tus datos" in c.get("/").text
     with TestClient(app, client=("100.100.20.2", 50000)) as c:
         pagina_tailnet = c.get("/").text
-        assert "Conectar el iPhone" not in pagina_tailnet and config.token not in pagina_tailnet
+        assert "Conectar con tus datos" not in pagina_tailnet and config.token not in pagina_tailnet
+    assert pagina.enlace_para_abrir() == "exp+libro-de-gastos://expo-development-client/?url=http%3A%2F%2F100.100.10.1%3A8082"
     assert pagina.enlace_para_conectar("abc", 8766) == "librogastos://conectar?d=100.100.10.1%3A8766&t=abc"
 
 

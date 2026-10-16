@@ -2,6 +2,7 @@
 // la cámara del iPhone el QR de la página de estado (http://127.0.0.1:8766 en la PC): abre
 // librogastos://conectar?d=...&t=... y esta pantalla se conecta sola.
 
+import Constants from 'expo-constants';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, View } from 'react-native';
@@ -12,7 +13,9 @@ import { C } from '@/ui/tema';
 export default function Conectar() {
   const { conectar, conexion } = useAlmacen();
   const params = useLocalSearchParams<{ d?: string; t?: string }>();
-  const [direccion, setDireccion] = useState(params.d ?? conexion?.direccion ?? '');
+  // En el build de desarrollo el código viene de Metro, que corre en la misma PC que el servidor.
+  const pcDeMetro = Constants.expoConfig?.hostUri?.split(':')[0];
+  const [direccion, setDireccion] = useState(params.d ?? conexion?.direccion ?? (pcDeMetro ? `${pcDeMetro}:8766` : ''));
   const [token, setToken] = useState(params.t ?? '');
   const [probando, setProbando] = useState(false);
   const [error, setError] = useState('');

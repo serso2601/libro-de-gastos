@@ -47,15 +47,32 @@ def enlace_para_conectar(token: str, puerto: int) -> str | None:
     return f"librogastos://conectar?{urlencode({'d': f'{ip}:{puerto}', 't': token})}" if ip else None
 
 
+PUERTO_METRO = 8082
+
+
+def enlace_para_abrir() -> str | None:
+    """Abre el build de desarrollo directo en Metro de la PC (esquema exp+<slug> de expo-dev-client)."""
+    ip = ip_tailscale()
+    return f"exp+libro-de-gastos://expo-development-client/?{urlencode({'url': f'http://{ip}:{PUERTO_METRO}'})}" if ip else None
+
+
+def _qr(enlace: str) -> str:
+    return f'<div class="qr">{segno.make(enlace, error="m").svg_inline(scale=5, dark="#0B0E13", light="#ffffff")}</div>'
+
+
 def bloque_qr(token: str, puerto: int) -> str:
-    enlace = enlace_para_conectar(token, puerto)
-    if not enlace:
-        return '<div class="tarjeta"><p class="mal">No encontré la IP de Tailscale de esta PC: revisa que Tailscale esté activo.</p></div>'
-    svg = segno.make(enlace, error="m").svg_inline(scale=6, dark="#0B0E13", light="#ffffff")
-    return f"""<div class="tarjeta"><h1>Conectar el iPhone</h1>
-<p>Abre la cámara del iPhone y apunta a este código: abre la app y se conecta sola.</p>
-<div class="qr">{svg}</div>
-<p>O a mano: dirección <b>{escape(ip_tailscale() or '')}:{puerto}</b> y el token de <b>token.txt</b>.</p></div>"""
+    conectar, abrir = enlace_para_conectar(token, puerto), enlace_para_abrir()
+    if not conectar or not abrir:
+        return '<div class="tarjeta"><p class="mal">No encontré la IP de Tailscale de esta PC: revisa que Tailscale esté activo y recarga.</p></div>'
+    return f"""<div class="tarjeta"><h1>1 · Abrir la app</h1>
+<p>Con Tailscale prendido en el iPhone, apunta la cámara a este código y toca el aviso. La app carga
+su código desde esta PC (tarda unos segundos la primera vez).</p>
+{_qr(abrir)}
+<p>Si sale la pantalla de Expo, toca «Enter URL manually» y escribe <b>http://{escape(ip_tailscale() or '')}:{PUERTO_METRO}</b></p></div>
+<div class="tarjeta"><h1>2 · Conectar con tus datos</h1>
+<p>Cuando la app muestre «Conectar con la PC», vuelve a la cámara y escanea este:</p>
+{_qr(conectar)}
+<p>O a mano: dirección <b>{escape(ip_tailscale() or '')}:{puerto}</b> y el token de <b>datos\\token.txt</b>.</p></div>"""
 
 
 def estado(config, conteos: dict, ultimo_respaldo: str | None, qr: str = "") -> str:
