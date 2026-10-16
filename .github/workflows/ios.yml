@@ -1,0 +1,101 @@
+# Compila la app del iPhone sin firmar; Sideloadly la firma después en la PC con el Apple ID gratis.
+#
+# Un .ipa solo se compila en macOS y la distribución interna de EAS exige cuenta de Apple paga: por
+# eso se usa una Mac de GitHub (en un repo público los minutos no cuestan) y se firma en la PC.
+#
+# Se dispara con una etiqueta, que además deja anotado qué commit se compiló:
+#   git tag ios-dev-1     && git push origin ios-dev-1       → desarrollo: carga el código desde Metro en la PC
+#   git tag ios-release-1 && git push origin ios-release-1   → release: lleva el código adentro, abre sola
+on:
+  push:
+    tags: ['ios-*']
+  workflow_dispatch:
+    inputs:
+      perfil:
+        type: choice
+        options: [development, release]
+        default: development
+
+name: iOS sin firmar
+
+jobs:
+  compilar:
+    runs-on: macos-latest
+    timeout-minutes: 75
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Elegir el perfil
+        run: |
+          P="${{ inputs.perfil }}"
+          if [ -z "$P" ]; then
+            case "${{ github.ref_name }}" in
+              ios-release*) P=release ;;
+              *)            P=development ;;
+            esac
+          fi
+          echo "PERFIL=$P" >> "$GITHUB_ENV"
+          echo "Perfil: $P"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - run: npm ci
+
+      # Solo el de desarrollo lleva el cliente que carga el código desde Metro. Con la variable del
+      # repo DEV_SERVER_URL (la dirección de Metro en la PC) abre directo ahí; no va en el repo ni en el log.
+      - name: Cliente de desarrollo
+        if: env.PERFIL == 'development'
+        env:
+          DEV_SERVER_URL: ${{ vars.DEV_SERVER_URL }}
+        run: |
+          npx expo install expo-dev-client
+          node -e '
+            const fs = require("fs");
+            const app = JSON.parse(fs.readFileSync("app.json", "utf8"));
+            const url = process.env.DEV_SERVER_URL;
+            const plugins = app.expo.plugins.filter((p) => (Array.isArray(p) ? p[0] : p) !== "expo-dev-client");
+            plugins.push(url ? ["expo-dev-client", { launchMode: "launcher", defaultLaunchURL: url }] : "expo-dev-client");
+            app.expo.plugins = plugins;
+            fs.writeFileSync("app.json", JSON.stringify(app, null, 2));
+          '
+
+      - name: Generar el proyecto de Xcode
+        run: npx expo prebuild --platform ios --clean
+
+      - name: Pods (si prebuild no los dejó)
+        run: |
+          if ! ls ios/*.xcworkspace >/dev/null 2>&1; then cd ios && pod install; fi
+
+      - name: Compilar sin firmar
+        run: |
+          set -eo pipefail
+          WS=$(ls -d ios/*.xcworkspace | head -1)
+          ESQUEMA=$(xcodebuild -workspace "$WS" -list -json | sed -n '/^{/,$p' | jq -r '.workspace.schemes[0]')
+          CONFIG=$([ "$PERFIL" = "development" ] && echo Debug || echo Release)
+          echo "workspace: $WS · esquema: $ESQUEMA · configuración: $CONFIG"
+          xcodebuild archive -workspace "$WS" -scheme "$ESQUEMA" -configuration "$CONFIG" \
+            -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/app.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" CODE_SIGN_ENTITLEMENTS="" AD_HOC_CODE_SIGNING_ALLOWED=YES
+
+      # Un .ipa es un zip con la .app dentro de una carpeta Payload.
+      - name: Empaquetar el .ipa
+        run: |
+          set -eo pipefail
+          cd "$RUNNER_TEMP"
+          mkdir -p Payload
+          cp -R app.xcarchive/Products/Applications/*.app Payload/
+          zip -qry gastos.ipa Payload
+          ls -lh gastos.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gastos-${{ env.PERFIL }}
+          path: ${{ runner.temp }}/gastos.ipa
+          retention-days: 30
