@@ -174,9 +174,13 @@ def create_app(config: Config | None = None, hoy=date.today) -> FastAPI:
     r = APIRouter(prefix="/api", dependencies=[Depends(autorizado)])
 
     @app.get("/", response_class=HTMLResponse)
-    def estado(con: sqlite3.Connection = Depends(conexion)):
+    def estado(request: Request, con: sqlite3.Connection = Depends(conexion)):
         conteos = {t: con.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0] for t in ("cuenta", "movimiento", "recurrencia")}
-        return pagina.estado(config, conteos, db.ultimo_respaldo(config.respaldos))
+        # El QR lleva el token: solo se muestra a quien abre la página desde esta misma PC.
+        host = request.client.host if request.client else ""
+        local = host in ("127.0.0.1", "::1") or host.startswith("::ffff:127.")
+        qr = pagina.bloque_qr(config.token, request.url.port or 8766) if local else ""
+        return pagina.estado(config, conteos, db.ultimo_respaldo(config.respaldos), qr)
 
     @app.get("/salud")
     def salud():

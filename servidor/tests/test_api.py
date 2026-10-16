@@ -110,6 +110,22 @@ def test_orden_y_ajustes(cliente):
     assert d["moneda"] == "B/."
 
 
+def test_el_qr_con_el_token_solo_se_ve_desde_la_pc(config, reloj, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from gastos import pagina
+    from gastos.api import create_app
+
+    monkeypatch.setattr(pagina, "ip_tailscale", lambda: "100.83.177.92")
+    app = create_app(config, hoy=reloj)
+    with TestClient(app, client=("127.0.0.1", 50000)) as c:
+        assert "Conectar el iPhone" in c.get("/").text
+    with TestClient(app, client=("100.97.163.107", 50000)) as c:
+        pagina_tailnet = c.get("/").text
+        assert "Conectar el iPhone" not in pagina_tailnet and config.token not in pagina_tailnet
+    assert pagina.enlace_para_conectar("abc", 8766) == "librogastos://conectar?d=100.83.177.92%3A8766&t=abc"
+
+
 def test_solo_atiende_a_la_pc_y_a_la_tailnet(config, reloj):
     from fastapi.testclient import TestClient
 
