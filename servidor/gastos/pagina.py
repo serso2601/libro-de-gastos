@@ -7,7 +7,6 @@ token, a cualquier otro equipo (aunque sea de la tailnet) no se le muestra.
 
 import subprocess
 from datetime import date
-from functools import cache
 from html import escape
 from pathlib import Path
 from urllib.parse import urlencode
@@ -25,15 +24,22 @@ b{color:#F5F6F7;font-weight:600} .ok{color:#34D8A6} .mal{color:#F16565} a{color:
 TAILSCALE = Path(r"C:\Program Files\Tailscale\tailscale.exe")
 
 
-@cache
+_ip_conocida: str | None = None
+
+
 def ip_tailscale() -> str | None:
-    if not TAILSCALE.exists():
-        return None
+    """La IP de Tailscale de la PC. Se recuerda solo cuando se encontró: si Tailscale estaba caído,
+    se vuelve a preguntar en el próximo pedido en vez de quedarse con el "no hay"."""
+    global _ip_conocida
+    if _ip_conocida or not TAILSCALE.exists():
+        return _ip_conocida
     try:
         salida = subprocess.run([str(TAILSCALE), "ip", "-4"], capture_output=True, text=True, timeout=5).stdout
     except (OSError, subprocess.TimeoutExpired):
         return None
-    return salida.split()[0] if salida.split() else None
+    ip = next((p for p in salida.split() if p.startswith("100.")), None)
+    _ip_conocida = ip
+    return ip
 
 
 def enlace_para_conectar(token: str, puerto: int) -> str | None:
