@@ -11,7 +11,7 @@ ni montos reales en el repo.
 ## Dónde está cada cosa
 
 ```
-Desktop\PROYECTO APP DE GASTOS\        ← el repo
+Documents\PROYECTO APP DE GASTOS\      ← el repo
 ├── app\                     ← la app del iPhone: Expo SDK 58, expo-router, TypeScript
 │   └── src\app\             ← pantallas (rutas): (pestanias)\ con las 5 pestañas, ajustes, conectar
 │       src\lib\             ← datos (almacén + cola offline), api, acciones, formato, tipos
