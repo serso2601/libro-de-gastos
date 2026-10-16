@@ -116,14 +116,14 @@ def test_el_qr_con_el_token_solo_se_ve_desde_la_pc(config, reloj, monkeypatch):
     from gastos import pagina
     from gastos.api import create_app
 
-    monkeypatch.setattr(pagina, "ip_tailscale", lambda: "100.83.177.92")
+    monkeypatch.setattr(pagina, "ip_tailscale", lambda: "100.100.10.1")
     app = create_app(config, hoy=reloj)
     with TestClient(app, client=("127.0.0.1", 50000)) as c:
         assert "Conectar el iPhone" in c.get("/").text
-    with TestClient(app, client=("100.97.163.107", 50000)) as c:
+    with TestClient(app, client=("100.100.20.2", 50000)) as c:
         pagina_tailnet = c.get("/").text
         assert "Conectar el iPhone" not in pagina_tailnet and config.token not in pagina_tailnet
-    assert pagina.enlace_para_conectar("abc", 8766) == "librogastos://conectar?d=100.83.177.92%3A8766&t=abc"
+    assert pagina.enlace_para_conectar("abc", 8766) == "librogastos://conectar?d=100.100.10.1%3A8766&t=abc"
 
 
 def test_solo_atiende_a_la_pc_y_a_la_tailnet(config, reloj):
@@ -133,9 +133,9 @@ def test_solo_atiende_a_la_pc_y_a_la_tailnet(config, reloj):
 
     app = create_app(config, hoy=reloj)
     cabecera = {"Authorization": f"Bearer {config.token}"}
-    for ip, codigo in [("100.97.163.107", 200), ("127.0.0.1", 200), ("192.168.0.20", 403), ("8.8.8.8", 403)]:
+    for ip, codigo in [("100.100.20.2", 200), ("127.0.0.1", 200), ("192.168.0.20", 403), ("8.8.8.8", 403)]:
         with TestClient(app, headers=cabecera, client=(ip, 50000)) as c:
             assert c.get("/api/datos").status_code == codigo, ip
-    assert desde_red_permitida("::ffff:100.83.177.92")
+    assert desde_red_permitida("::ffff:100.100.10.1")
     assert desde_red_permitida("fd7a:115c:a1e0::1")
     assert not desde_red_permitida("no-es-una-ip")
