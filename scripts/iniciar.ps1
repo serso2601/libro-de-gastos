@@ -6,7 +6,7 @@
 
 $ErrorActionPreference = 'Stop'
 $raiz = Split-Path $PSScriptRoot -Parent
-$datos = if ($env:LIBRO_GASTOS_DATOS) { $env:LIBRO_GASTOS_DATOS } else { Join-Path $HOME 'LibroDeGastos\datos' }
+$datos = if ($env:LIBRO_GASTOS_DATOS) { $env:LIBRO_GASTOS_DATOS } else { Join-Path $raiz 'datos' }
 $registros = Join-Path $datos 'registros'
 New-Item -ItemType Directory -Force $registros | Out-Null
 
@@ -39,9 +39,14 @@ if (-not (Test-Path (Join-Path $app 'node_modules'))) {
     Anotar 'Metro ya estaba corriendo'
 } else {
     $tailscale = Join-Path $env:ProgramFiles 'Tailscale\tailscale.exe'
+    # Si Tailscale está caído, `tailscale ip` falla: Metro arranca igual con la IP de la red local.
     if (Test-Path $tailscale) {
-        $ip = (& $tailscale ip -4 2>$null | Select-Object -First 1)
-        if ($ip) { $env:REACT_NATIVE_PACKAGER_HOSTNAME = $ip.Trim() }
+        try {
+            $ip = (& $tailscale ip -4 2>$null | Select-Object -First 1)
+            if ($ip -match '^100\.') { $env:REACT_NATIVE_PACKAGER_HOSTNAME = $ip.Trim() }
+        } catch {
+            Anotar "Tailscale no respondió: $($_.Exception.Message)"
+        }
     }
     Start-Process -FilePath (Get-Command npx.cmd).Source -ArgumentList 'expo', 'start', '--lan', '--dev-client', '--port', '8082' `
         -WorkingDirectory $app -WindowStyle Hidden `

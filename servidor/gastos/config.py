@@ -1,7 +1,7 @@
 """Dónde viven los datos y con qué se entra.
 
-Los datos van fuera del repo, en `~/LibroDeGastos/datos` (o en `LIBRO_GASTOS_DATOS`): la base
-`gastos.db`, el `token.txt` con el que entra la app, los `respaldos/` diarios y los `registros/`.
+Los datos van en la carpeta `datos/` del proyecto (o en `LIBRO_GASTOS_DATOS`), que git ignora: la
+base `gastos.db`, el `token.txt` con el que entra la app, los `respaldos/` diarios y los `registros/`.
 El token se genera la primera vez y no cambia; la app lo pide una sola vez y lo recuerda.
 """
 
@@ -18,7 +18,7 @@ class Config:
 
     @classmethod
     def desde_entorno(cls) -> "Config":
-        carpeta = Path(os.environ.get("LIBRO_GASTOS_DATOS") or Path.home() / "LibroDeGastos" / "datos")
+        carpeta = Path(os.environ.get("LIBRO_GASTOS_DATOS") or Path(__file__).resolve().parents[2] / "datos")
         return cls.en(carpeta)
 
     @classmethod

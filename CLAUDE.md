@@ -26,8 +26,10 @@ Desktop\PROYECTO APP DE GASTOS\        ← el repo
                                de esa dirección. Se retira cuando el usuario haya pasado sus datos.
 ```
 
-Fuera del repo: **`~\LibroDeGastos\datos\`** — `gastos.db`, `token.txt`, `respaldos\` (una copia
-por día, se guardan 30) y `registros\` (servidor, Metro, inicio). Nunca al repo.
+Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
+- **`datos\`** — `gastos.db`, `token.txt`, `respaldos\` (una copia por día, se guardan 30) y
+  `registros\` (servidor, Metro, inicio).
+- **`app-iphone\`** — los .ipa compilados (`gastos-dev-N.ipa`), para arrastrar a Sideloadly.
 
 ## Cómo corre
 
@@ -44,8 +46,8 @@ por día, se guardan 30) y `registros\` (servidor, Metro, inicio). Nunca al repo
 ## Poner la app en el iPhone
 
 1. `git tag ios-dev-N && git push origin ios-dev-N` → GitHub compila (~8 min) → `gh run download
-   --name gastos-development` baja `gastos.ipa`. Se guarda en **`~\LibroDeGastos\app-iphone\`**
-   como `gastos-dev-N.ipa` (fuera del repo). El primero que funcionó es `ios-dev-2`.
+   --name gastos-development` baja `gastos.ipa`. Se guarda en **`app-iphone\`** del proyecto
+   como `gastos-dev-N.ipa` (git lo ignora). El primero que funcionó es `ios-dev-2`.
 2. **Sideloadly** lo firma con el Apple ID del usuario y lo instala **por cable**.
 3. La firma con Apple ID gratis dura **7 días**: se vuelve a firmar el mismo .ipa (no hace falta
    recompilar salvo que cambie algo nativo). Máximo 3 apps instaladas así a la vez.

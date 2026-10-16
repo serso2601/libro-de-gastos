@@ -2,3 +2,7 @@
 __pycache__/
 .pytest_cache/
 node_modules/
+
+# Los datos de la app (base, token, respaldos, registros) y los .ipa compilados: nunca al repo.
+/datos/
+/app-iphone/
