@@ -78,6 +78,7 @@ export function ProveedorDatos({ children }: { children: ReactNode }) {
   const cola = useRef<Cambio[]>(leer<Cambio[]>(CLAVE_COLA, []));
   const [pendientes, setPendientes] = useState(cola.current.length);
   const enviando = useRef(false);
+  const otraVez = useRef(false);
   const conRef = useRef(conexion);
   conRef.current = conexion;
 
@@ -96,14 +97,20 @@ export function ProveedorDatos({ children }: { children: ReactNode }) {
     const con = conRef.current;
     if (!con) return;
     const nuevos = await pedirDatos(con);
+    setEstado('ok');
+    // Si mientras tanto se anotó algo, esto ya está viejo: lo trae el siguiente pedido.
+    if (cola.current.length > 0) return;
     setDatos(nuevos);
     escribir(CLAVE_DATOS, nuevos);
-    setEstado('ok');
   }, []);
 
   const vaciar = useCallback(async () => {
     const con = conRef.current;
-    if (enviando.current || !con) return;
+    if (!con) return;
+    if (enviando.current) {
+      otraVez.current = true;
+      return;
+    }
     enviando.current = true;
     try {
       while (cola.current.length > 0) {
@@ -127,6 +134,10 @@ export function ProveedorDatos({ children }: { children: ReactNode }) {
       fallo(e);
     } finally {
       enviando.current = false;
+      if (otraVez.current) {
+        otraVez.current = false;
+        void vaciar();
+      }
     }
   }, [fallo, guardarCola, pedirTodo]);
 
