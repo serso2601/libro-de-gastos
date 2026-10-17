@@ -13,10 +13,12 @@ ni montos reales en el repo.
 ```
 Documents\PROYECTO APP DE GASTOS\      ← el repo
 ├── app\                     ← la app del iPhone: Expo SDK 58, expo-router, TypeScript
-│   └── src\app\             ← pantallas (rutas): (pestanias)\ con las 5 pestañas, ajustes, conectar
-│       src\lib\             ← datos (almacén + cola offline), api, acciones, formato, tipos
-│       src\dialogos\        ← las hojas: anotar, regla que se repite, cuenta, categoría, presupuesto
-│       src\ui\              ← tema, componentes, gráficos (svg), marco de pantalla
+│   └── src\app\             ← rutas: (pestanias)\ (Inicio + 4 secciones), ver\[pantalla] (secciones
+│                                abiertas encima, con «‹ volver»), cuenta\[id], ajustes, conectar
+│       src\pantallas\       ← las pantallas; inicio\ trae un Inicio por estilo; Tutorial.tsx
+│       src\lib\             ← datos (almacén + cola offline), api, acciones, calculos, formato, tipos
+│       src\dialogos\        ← las hojas: anotar, regla que se repite, cuenta, categoría, topes
+│       src\ui\              ← estilos (los 5), tema (claro/oscuro/color), componentes, gráficos, marco
 ├── servidor\                ← FastAPI + SQLite (uv). Paquete `gastos`. `uv run pytest`
 ├── scripts\iniciar.ps1      ← arranca el servidor (8766) y Metro (8082); lo corre el inicio de Windows
 ├── scripts\instalar-inicio.ps1 · abrir-firewall.ps1
@@ -65,14 +67,24 @@ Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
   vieja creaba 12 copias de una vez: ese era el bug.
 - **Offline**: cada cambio se ve al instante, queda en una cola (expo-sqlite/kv-store) y se manda
   en orden; ids UUID del teléfono y PUT idempotentes, así un reintento no duplica.
-- **Sistema visual**: fintech oscuro, IBM Plex Sans/Mono, tarjetas sin bordes, menta = ingresos,
-  rojo = gastos, azul = acción. Nada del concepto "libro contable" que el usuario descartó.
+- **Sistema visual: 5 estilos** que el usuario elige en Ajustes (`ui/estilos.ts`): Billetera
+  (tarjetas apiladas + barra abajo), Mosaico (bloques de colores, sin barra), Calendario (calendario
+  de calor + barra flotante), Cartera en mosaico y Calendario en mosaico (sin barra, todo sale del
+  Inicio). Cada uno con sus fuentes, medidas y colores, en claro y oscuro (Automático/Claro/Oscuro)
+  y con color principal cambiable. Las pantallas son las mismas y leen el tema con `useTema()`:
+  nada de colores fijos. Los diseños salen del lienzo https://claude.ai/artifact/8xnZiaBVscpofjQ4LpVJtL.
+  Dentro de un estilo, mismas medidas en todas las pantallas. Vasos de presupuesto: un solo color,
+  sin raya en el borde. Nada del concepto "libro contable" que el usuario descartó.
+- **Tutorial** la primera vez que se usa cada estilo (`pantallas/Tutorial.tsx`); se repite desde
+  Ajustes → «Ver cómo funciona». Si un estilo cambia cómo se maneja algo, su tutorial lo explica.
 
-## Estado (16/oct/2026)
+## Estado (17/oct/2026)
 
-- Servidor con 25 pruebas; app Expo con las 5 pestañas, anotar/editar, reglas que se repiten,
-  Próximos, buscador, presupuesto total, importar el respaldo de la app vieja, exportar, QR para
-  conectar. App vieja: botón «Exportar mis datos».
+- Servidor con 25 pruebas. App con los 5 estilos, modo oscuro, color principal, tutoriales,
+  anotar/editar, reglas que se repiten, Próximos, buscador, presupuesto con topes, importar el
+  respaldo de la app vieja, exportar, QR para conectar. App vieja: botón «Exportar mis datos».
+- `app.json` pasó a `userInterfaceStyle: automatic`: hasta instalar un build nuevo, «Automático»
+  se ve oscuro; Claro y Oscuro funcionan con cualquier build.
 - **Pendiente del usuario:** correr `scripts\abrir-firewall.ps1` (admin), instalar el primer .ipa
   con Sideloadly, conectar con el QR, exportar de la app vieja e importar en la nueva.
 

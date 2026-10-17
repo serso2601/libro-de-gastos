@@ -1,53 +1,22 @@
 import * as DocumentPicker from 'expo-document-picker';
 import { File, Paths } from 'expo-file-system';
+import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { useState, type ReactNode } from 'react';
-import { Alert, Pressable, ScrollView, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Alert, Pressable, View } from 'react-native';
 import { useAbrir } from '@/dialogos/abrir';
+import { Grilla } from '@/dialogos/piezas';
 import { useAcciones } from '@/lib/acciones';
 import { useAlmacen, useDatos } from '@/lib/datos';
-import { dinero, etiquetaCorta, fechaISO } from '@/lib/formato';
-import { FRECUENCIAS, type TipoCategoria } from '@/lib/tipos';
-import { Boton, Campo, Separador, Tarjeta, Texto } from '@/ui/componentes';
-import { C } from '@/ui/tema';
-
-function Seccion({ titulo, accion, children }: { titulo: string; accion?: { texto: string; onPress: () => void }; children: ReactNode }) {
-  return (
-    <>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', paddingHorizontal: 4, marginBottom: 6, marginTop: 8 }}>
-        <Texto tam={12} peso="semi" color={C.tenue} style={{ letterSpacing: 0.6 }}>{titulo.toUpperCase()}</Texto>
-        {accion && <Pressable onPress={accion.onPress} hitSlop={8}><Texto tam={13} peso="semi" color={C.acentoClaro}>{accion.texto}</Texto></Pressable>}
-      </View>
-      <Tarjeta style={{ paddingHorizontal: 14, paddingVertical: 4 }}>{children}</Tarjeta>
-    </>
-  );
-}
-
-function Fila({ izquierda, texto, detalle, onPress, alSubir, alBajar, primera }: {
-  izquierda?: ReactNode; texto: string; detalle?: string; onPress: () => void; alSubir?: () => void; alBajar?: () => void; primera: boolean;
-}) {
-  return (
-    <>
-      {!primera && <Separador />}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 11 }}>
-        {izquierda}
-        <Pressable onPress={onPress} style={{ flex: 1 }}>
-          <Texto lineas={1}>{texto}</Texto>
-          {detalle ? <Texto tam={12} color={C.tenue} lineas={1}>{detalle}</Texto> : null}
-        </Pressable>
-        {(alSubir || alBajar) && (
-          <View style={{ flexDirection: 'row', gap: 2 }}>
-            <Pressable onPress={alSubir} disabled={!alSubir} hitSlop={6} style={{ padding: 4, opacity: alSubir ? 1 : 0.2 }}><Texto color={C.tenue}>▲</Texto></Pressable>
-            <Pressable onPress={alBajar} disabled={!alBajar} hitSlop={6} style={{ padding: 4, opacity: alBajar ? 1 : 0.2 }}><Texto color={C.tenue}>▼</Texto></Pressable>
-          </View>
-        )}
-        <Pressable onPress={onPress} hitSlop={6}><Texto tam={18} color={C.tenue}>›</Texto></Pressable>
-      </View>
-    </>
-  );
-}
+import { conSigno, dineroCorto, fechaISO, inicialDe } from '@/lib/formato';
+import type { TipoCategoria } from '@/lib/tipos';
+import { textoRegla } from '@/pantallas/Proximos';
+import { BotonSuave, Campo, FilaSimple, Inicial, Lista, Segmentos, Tarjeta, Texto, TituloSeccion } from '@/ui/componentes';
+import { ACENTOS, ESTILOS, ORDEN_ESTILOS, type IdEstilo } from '@/ui/estilos';
+import { Icono } from '@/ui/iconos';
+import { Marco, ProveedorApilada, useIr } from '@/ui/pantalla';
+import { crearTema, usePreferencias, useTema, type Modo } from '@/ui/tema';
 
 function mover(ids: string[], i: number, delta: number): string[] {
   const copia = [...ids];
@@ -55,9 +24,57 @@ function mover(ids: string[], i: number, delta: number): string[] {
   return copia;
 }
 
+function Ordenar({ alSubir, alBajar }: { alSubir?: () => void; alBajar?: () => void }) {
+  const { c } = useTema();
+  return (
+    <View style={{ flexDirection: 'row' }}>
+      <Pressable onPress={alSubir} disabled={!alSubir} hitSlop={4} accessibilityLabel="Subir" style={{ width: 30, height: 44, alignItems: 'center', justifyContent: 'center', opacity: alSubir ? 1 : 0.25 }}>
+        <Icono nombre="arriba" tam={16} color={c.tenue} grosor={2.2} />
+      </Pressable>
+      <Pressable onPress={alBajar} disabled={!alBajar} hitSlop={4} accessibilityLabel="Bajar" style={{ width: 30, height: 44, alignItems: 'center', justifyContent: 'center', opacity: alBajar ? 1 : 0.25 }}>
+        <Icono nombre="abajo" tam={16} color={c.tenue} grosor={2.2} />
+      </Pressable>
+    </View>
+  );
+}
+
+/** La miniatura de un estilo, dibujada con sus propios colores. */
+function Miniatura({ id }: { id: IdEstilo }) {
+  const { oscuro } = useTema();
+  const t = crearTema(ESTILOS[id], oscuro, null);
+  const p = t.c;
+  const caja = (estilo: object, fondo: string, key?: string) => <View key={key} style={[{ position: 'absolute', borderRadius: 7, backgroundColor: fondo }, estilo]} />;
+  const calor = (lista: number[], rampa: string[]) => (
+    <View style={{ position: 'absolute', left: 8, right: 8, top: 10, padding: 6, borderRadius: 7, backgroundColor: p.tarjeta, gap: 3 }}>
+      {[0, 7, 14].map((desde) => (
+        <View key={desde} style={{ flexDirection: 'row', gap: 3 }}>
+          {lista.slice(desde, desde + 7).map((n, i) => <View key={i} style={{ flex: 1, height: 8, borderRadius: 2, backgroundColor: rampa[n] }} />)}
+        </View>
+      ))}
+    </View>
+  );
+  const PATRON = [0, 2, 1, 0, 3, 1, 2, 4, 0, 2, 1, 3, 0, 1, 2, 3, 0, 2, 4, 1, 0];
+  let dibujo: ReactNode;
+  if (id === 'billetera') {
+    dibujo = <>{caja({ left: 8, right: 8, top: 10, height: 26 }, t.colorCuenta('#1C1C21'))}{caja({ left: 8, right: 8, top: 22, height: 26 }, '#0F6E50')}{caja({ left: 8, right: 8, top: 34, height: 36 }, p.acento)}{caja({ left: 8, right: 8, top: 76, height: 18, borderRadius: 5 }, p.tarjeta)}{caja({ left: 0, right: 0, bottom: 0, height: 12, borderRadius: 0 }, p.tarjeta)}</>;
+  } else if (id === 'mosaico') {
+    const b = ESTILOS.mosaico.bloques!;
+    const tono = (k: keyof typeof b) => (oscuro ? t.relleno(b[k].base) : b[k].claro);
+    dibujo = <>{caja({ left: 8, right: 8, top: 10, height: 26 }, p.heroe)}{caja({ left: 8, width: '40%', top: 40, height: 30 }, tono('lavanda'))}{caja({ right: 8, width: '40%', top: 40, height: 30 }, tono('durazno'))}{caja({ left: 8, width: '40%', top: 74, height: 30 }, tono('menta'))}{caja({ right: 8, width: '40%', top: 74, height: 30 }, tono('limon'))}</>;
+  } else if (id === 'calendario') {
+    dibujo = <>{calor(PATRON, p.calor)}{caja({ left: 8, right: 8, top: 64, height: 8, borderRadius: 3 }, p.tarjeta)}{caja({ left: 8, right: 30, top: 78, height: 8, borderRadius: 3 }, p.tarjeta)}{caja({ left: 8, right: 28, bottom: 8, height: 14 }, p.tarjeta)}{caja({ right: 8, bottom: 8, width: 14, height: 14 }, p.boton)}</>;
+  } else if (id === 'cartera') {
+    dibujo = <>{caja({ left: 8, right: 8, top: 10, height: 22 }, t.colorCuenta('#2A2C33'))}{caja({ left: 8, right: 8, top: 20, height: 22 }, '#1D6A51')}{caja({ left: 8, right: 8, top: 30, height: 32 }, p.acento)}{caja({ left: 8, width: '40%', top: 68, height: 26 }, p.tarjeta)}{caja({ right: 8, width: '40%', top: 68, height: 26 }, p.tarjeta)}</>;
+  } else {
+    dibujo = <>{calor(PATRON.map((n) => Math.min(n, 4)), [p.suave, ...p.calor.slice(1)])}{caja({ left: 8, width: '40%', top: 66, height: 28 }, t.relleno(p.acento))}{caja({ right: 8, width: '40%', top: 66, height: 28 }, oscuro ? t.relleno('#3DB386') : '#E2F1EA')}</>;
+  }
+  return <View style={{ height: 108, borderRadius: 12, backgroundColor: p.fondo, overflow: 'hidden' }}>{dibujo}</View>;
+}
+
 /** Traer el respaldo .json de la app vieja: primero muestra qué va a entrar y después importa. */
 function Importar() {
   const { pedirYa, recargar } = useAlmacen();
+  const { c } = useTema();
   const [mensaje, setMensaje] = useState('');
 
   async function elegir() {
@@ -85,27 +102,37 @@ function Importar() {
   }
 
   return (
-    <Seccion titulo="Traer datos de la app vieja">
-      <Texto tam={13} color={C.tenue} style={{ paddingVertical: 10 }}>
-        En la app vieja: Configuración → Exportar mis datos → Guardar en Archivos. Después elige aquí ese archivo. Solo funciona con la base vacía.
-      </Texto>
-      <Boton tipo="suave" onPress={elegir}>Elegir archivo .json</Boton>
-      {mensaje ? <Texto tam={12} color={C.tenue} style={{ marginBottom: 10 }}>{mensaje}</Texto> : null}
-    </Seccion>
+    <>
+      <TituloSeccion>Traer datos de la app vieja</TituloSeccion>
+      <Tarjeta style={{ padding: 14, gap: 12 }}>
+        <Texto tam={13.5} color={c.tenue} style={{ lineHeight: 20 }}>
+          En la app vieja: Configuración → Exportar mis datos → Guardar en Archivos. Después elige aquí ese archivo. Solo funciona con la base vacía.
+        </Texto>
+        <BotonSuave onPress={elegir}>Elegir archivo .json</BotonSuave>
+        {mensaje ? <Texto tam={12.5} color={c.tenue}>{mensaje}</Texto> : null}
+      </Tarjeta>
+    </>
   );
 }
 
 export default function Ajustes() {
-  const d = useDatos();
-  const { conexion, desconectar, pedirYa } = useAlmacen();
-  const abrir = useAbrir();
-  const acciones = useAcciones();
-  const [moneda, setMoneda] = useState(d.moneda);
-  const insets = useSafeAreaInsets();
+  const { estilo } = useTema();
+  return <ProveedorApilada volver={estilo.inicio}><ContenidoAjustes /></ProveedorApilada>;
+}
 
-  const categoriasDe = (tipo: TipoCategoria) => d.categorias.filter((c) => c.tipo === tipo);
+function ContenidoAjustes() {
+  const d = useDatos();
+  const { conexion, desconectar, pedirYa, estado } = useAlmacen();
+  const abrir = useAbrir();
+  const ir = useIr();
+  const acciones = useAcciones();
+  const { c, estilo } = useTema();
+  const prefs = usePreferencias();
+  const [moneda, setMoneda] = useState(d.moneda);
+
+  const categoriasDe = (tipo: TipoCategoria) => d.categorias.filter((x) => x.tipo === tipo);
   const reordenarCategorias = (tipo: TipoCategoria, ids: string[]) => {
-    const otras = d.categorias.filter((c) => c.tipo !== tipo).map((c) => c.id);
+    const otras = d.categorias.filter((x) => x.tipo !== tipo).map((x) => x.id);
     acciones.ordenar('categorias', tipo === 'gasto' ? [...ids, ...otras] : [...otras, ...ids]);
   };
 
@@ -122,73 +149,141 @@ export default function Ajustes() {
     }
   }
 
+  function verTutorial() {
+    prefs.marcarTutorial(estilo.id, false);
+    router.dismissTo('/');
+  }
+
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: C.fondo }} contentContainerStyle={{ paddingTop: insets.top + 12, paddingHorizontal: 18, paddingBottom: insets.bottom + 40 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-        <Pressable onPress={() => router.back()} hitSlop={10}><Texto tam={16} color={C.acentoClaro}>‹ Volver</Texto></Pressable>
-      </View>
-      <Texto tam={26} peso="negrita" style={{ marginBottom: 8 }}>Ajustes</Texto>
+    <Marco titulo="Ajustes" gap={0}>
+      <TituloSeccion>Estilo</TituloSeccion>
+      <Tarjeta style={{ padding: 14, gap: 12 }}>
+        <Grilla columnas={3} gap={10}>
+          {ORDEN_ESTILOS.map((id) => {
+            const elegido = id === estilo.id;
+            return (
+              <Pressable key={id} onPress={() => { Haptics.selectionAsync(); prefs.cambiar({ estilo: id }); }} accessibilityState={{ selected: elegido }} accessibilityLabel={`Estilo ${ESTILOS[id].nombre}`}
+                style={{ gap: 6, marginBottom: 4 }}>
+                <View style={{ borderRadius: 14, padding: 2, borderWidth: 2, borderColor: elegido ? c.tinta : 'transparent' }}>
+                  <Miniatura id={id} />
+                  {elegido && (
+                    <View style={{ position: 'absolute', top: 8, right: 8, width: 20, height: 20, borderRadius: 10, backgroundColor: c.tinta, alignItems: 'center', justifyContent: 'center' }}>
+                      <Icono nombre="check" tam={12} color={c.tarjeta} grosor={3} />
+                    </View>
+                  )}
+                </View>
+                <Texto tam={12.5} peso={elegido ? 'semi' : 'medio'} style={{ lineHeight: 16, paddingHorizontal: 2 }}>{ESTILOS[id].nombre}</Texto>
+              </Pressable>
+            );
+          })}
+        </Grilla>
+        <Texto tam={12.5} color={c.tenue}>Cambia cómo se ve la app. Tus datos no cambian.</Texto>
+      </Tarjeta>
+
+      <TituloSeccion>Apariencia</TituloSeccion>
+      <Tarjeta style={{ padding: 14, gap: 14 }}>
+        <View style={{ gap: 8 }}>
+          <Texto tam={13} peso="medio" color={c.tenue}>Modo</Texto>
+          <Segmentos<Modo> opciones={[['sistema', 'Automático'], ['claro', 'Claro'], ['oscuro', 'Oscuro']]} valor={prefs.modo} alCambiar={(modo) => prefs.cambiar({ modo })} />
+        </View>
+        <View style={{ gap: 10 }}>
+          <Texto tam={13} peso="medio" color={c.tenue}>Color principal</Texto>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+            {[null, ...ACENTOS].map((color) => {
+              const muestra = color ?? estilo.claro.acento;
+              const elegido = prefs.acento === color;
+              return (
+                <Pressable key={color ?? 'estilo'} onPress={() => { Haptics.selectionAsync(); prefs.cambiar({ acento: color }); }}
+                  accessibilityLabel={color ? `Color ${color}` : 'El color del estilo'} accessibilityState={{ selected: elegido }}
+                  style={{ width: 36, height: 36, borderRadius: 18, borderWidth: 2, borderColor: elegido ? c.tinta : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
+                  <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: muestra, alignItems: 'center', justifyContent: 'center' }}>
+                    {color === null && <Texto tam={9} peso="negrita" color="#FFFFFF">auto</Texto>}
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+          <Texto tam={12.5} color={c.tenue}>«auto» usa el color propio de cada estilo. Los colores de cada cuenta y categoría se cambian tocándolas abajo.</Texto>
+        </View>
+        <BotonSuave icono="libro" onPress={verTutorial}>Ver cómo funciona {estilo.nombre}</BotonSuave>
+      </Tarjeta>
 
       {d.movimientos.length === 0 && <Importar />}
 
-      <Seccion titulo="Se repiten">
-        {d.recurrencias.length === 0 && <Texto tam={13} color={C.tenue} style={{ paddingVertical: 12 }}>Nada se repite todavía. Al anotar algo, elige «Repetir».</Texto>}
-        {d.recurrencias.map((r, i) => {
-          const cat = d.categorias.find((c) => c.id === r.categoria_id);
-          const frec = FRECUENCIAS.find(([f]) => f === r.frecuencia)?.[1].toLowerCase();
-          const terminada = !!r.fecha_fin && r.fecha_fin < d.hoy;
-          const proximo = d.proximos.find((p) => p.recurrencia_id === r.id);
-          const detalle = `${dinero(r.monto, d.moneda)} ${frec}` + (terminada ? ' · terminó' : proximo ? ` · próxima ${etiquetaCorta(proximo.fecha)}` : '');
-          return <Fila key={r.id} primera={i === 0} izquierda={<Texto tam={17}>{r.tipo === 'transferencia' ? '⇄' : cat?.emoji ?? '🔁'}</Texto>}
-            texto={r.nota || cat?.nombre || 'Transferencia'} detalle={detalle} onPress={() => abrir({ tipo: 'recurrencia', regla: r })} />;
-        })}
-      </Seccion>
+      <TituloSeccion accion={{ texto: 'Ver próximos', onPress: () => ir('proximos', 'Ajustes') }}>Se repiten</TituloSeccion>
+      <Lista>
+        {d.recurrencias.length === 0 && <Texto tam={13.5} color={c.tenue} style={{ paddingVertical: 14 }}>Nada se repite todavía. Al anotar algo, elige «Se repite».</Texto>}
+        {d.recurrencias.map((r, i) => (
+          <FilaSimple key={r.id} primera={i === 0}
+            izquierda={<View style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: c.suave, alignItems: 'center', justifyContent: 'center' }}><Icono nombre="repetir" tam={15} color={c.tenue} /></View>}
+            texto={r.nota || d.categorias.find((x) => x.id === r.categoria_id)?.nombre || 'Transferencia'}
+            detalle={`${conSigno(r.monto, d.moneda, r.tipo)} · ${textoRegla(r, d).toLowerCase()}`} onPress={() => abrir({ tipo: 'recurrencia', regla: r })} />
+        ))}
+      </Lista>
 
-      <Seccion titulo="Cuentas" accion={{ texto: '+ Agregar', onPress: () => abrir({ tipo: 'cuenta' }) }}>
-        {d.cuentas.map((c, i) => {
-          const ids = d.cuentas.map((x) => x.id);
-          return <Fila key={c.id} primera={i === 0} izquierda={<View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: c.color }} />}
-            texto={c.nombre} onPress={() => abrir({ tipo: 'cuenta', inicial: c })}
-            alSubir={i > 0 ? () => acciones.ordenar('cuentas', mover(ids, i, -1)) : undefined}
-            alBajar={i < ids.length - 1 ? () => acciones.ordenar('cuentas', mover(ids, i, 1)) : undefined} />;
+      <TituloSeccion accion={{ texto: '+ Agregar', onPress: () => abrir({ tipo: 'cuenta' }) }}>Cuentas</TituloSeccion>
+      <Lista>
+        {d.cuentas.map((x, i) => {
+          const ids = d.cuentas.map((y) => y.id);
+          return (
+            <FilaSimple key={x.id} primera={i === 0} texto={x.nombre} onPress={() => abrir({ tipo: 'cuenta', inicial: x })}
+              izquierda={<View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: x.color }} />}
+              derecha={<Ordenar alSubir={i > 0 ? () => acciones.ordenar('cuentas', mover(ids, i, -1)) : undefined}
+                alBajar={i < ids.length - 1 ? () => acciones.ordenar('cuentas', mover(ids, i, 1)) : undefined} />} />
+          );
         })}
-      </Seccion>
+      </Lista>
 
       {(['gasto', 'ingreso'] as TipoCategoria[]).map((tipo) => {
         const lista = categoriasDe(tipo);
-        const ids = lista.map((c) => c.id);
+        const ids = lista.map((x) => x.id);
         return (
-          <Seccion key={tipo} titulo={tipo === 'gasto' ? 'Categorías de gastos' : 'Categorías de ingresos'}
-            accion={{ texto: '+ Agregar', onPress: () => abrir({ tipo: 'categoria', tipoInicial: tipo }) }}>
-            {lista.map((c, i) => (
-              <Fila key={c.id} primera={i === 0} izquierda={<Texto tam={17}>{c.emoji}</Texto>} texto={c.nombre}
-                onPress={() => abrir({ tipo: 'categoria', inicial: c })}
-                alSubir={i > 0 ? () => reordenarCategorias(tipo, mover(ids, i, -1)) : undefined}
-                alBajar={i < lista.length - 1 ? () => reordenarCategorias(tipo, mover(ids, i, 1)) : undefined} />
-            ))}
-          </Seccion>
+          <View key={tipo}>
+            <TituloSeccion accion={{ texto: '+ Agregar', onPress: () => abrir({ tipo: 'categoria', tipoInicial: tipo }) }}>
+              {tipo === 'gasto' ? 'Categorías de gastos' : 'Categorías de ingresos'}
+            </TituloSeccion>
+            <Lista>
+              {lista.length === 0 && <Texto tam={13.5} color={c.tenue} style={{ paddingVertical: 14 }}>Ninguna todavía.</Texto>}
+              {lista.map((x, i) => (
+                <FilaSimple key={x.id} primera={i === 0} texto={x.nombre} onPress={() => abrir({ tipo: 'categoria', inicial: x })}
+                  detalle={x.presupuesto ? `tope ${dineroCorto(x.presupuesto, d.moneda)} al mes` : undefined}
+                  izquierda={<Inicial texto={inicialDe(x.nombre)} color={x.color} tam={30} />}
+                  derecha={<Ordenar alSubir={i > 0 ? () => reordenarCategorias(tipo, mover(ids, i, -1)) : undefined}
+                    alBajar={i < lista.length - 1 ? () => reordenarCategorias(tipo, mover(ids, i, 1)) : undefined} />} />
+              ))}
+            </Lista>
+          </View>
         );
       })}
 
-      <Seccion titulo="Moneda">
-        <View style={{ flexDirection: 'row', gap: 8, paddingTop: 12 }}>
-          <Campo value={moneda} onChangeText={setMoneda} maxLength={4} style={{ flex: 1 }} />
-          <Boton onPress={() => acciones.guardarMoneda(moneda.trim() || '$')} style={{ paddingHorizontal: 20, marginBottom: 16 }}>Guardar</Boton>
+      <TituloSeccion>Moneda</TituloSeccion>
+      <Tarjeta style={{ padding: 14, flexDirection: 'row', gap: 8 }}>
+        <Campo value={moneda} onChangeText={setMoneda} maxLength={4} style={{ flex: 1, height: 44 }} accessibilityLabel="Símbolo de la moneda" />
+        <Pressable onPress={() => { acciones.guardarMoneda(moneda.trim() || '$'); Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); }}
+          style={({ pressed }) => ({ height: 44, paddingHorizontal: 20, borderRadius: 14, backgroundColor: c.boton, justifyContent: 'center', opacity: pressed ? 0.8 : 1 })}>
+          <Texto tam={15} peso="semi" color={c.sobreBoton}>Guardar</Texto>
+        </Pressable>
+      </Tarjeta>
+
+      <TituloSeccion>Respaldo</TituloSeccion>
+      <Tarjeta style={{ padding: 14, gap: 12 }}>
+        <Texto tam={13.5} color={c.tenue} style={{ lineHeight: 20 }}>La PC guarda una copia de la base cada día. Además puedes sacar todo en un archivo .json.</Texto>
+        <BotonSuave icono="exportar" onPress={exportar}>Exportar todo</BotonSuave>
+      </Tarjeta>
+
+      <TituloSeccion>Conexión</TituloSeccion>
+      <Tarjeta style={{ padding: 14, gap: 4 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: estado === 'ok' ? c.bien : c.alerta }} />
+          <Texto tam={14}>{estado === 'ok' ? 'Conectado a la PC por Tailscale' : estado === 'token-malo' ? 'La PC no reconoce la clave' : 'Sin conexión con la PC ahora'}</Texto>
         </View>
-      </Seccion>
-
-      <Seccion titulo="Respaldo">
-        <Texto tam={13} color={C.tenue} style={{ paddingVertical: 10 }}>La PC guarda una copia de la base cada día. Además puedes sacar todo en un .json.</Texto>
-        <Boton tipo="suave" onPress={exportar}>Exportar todo</Boton>
-      </Seccion>
-
-      <Seccion titulo="Conexión">
-        <Texto tam={13} color={C.tenue} style={{ paddingVertical: 10 }}>PC: {conexion?.direccion}</Texto>
-        <Boton tipo="peligro" onPress={() => Alert.alert('¿Desconectar este teléfono?', 'Los datos siguen en la PC. Para volver hay que escanear el QR otra vez.',
-          [{ text: 'Cancelar', style: 'cancel' }, { text: 'Desconectar', style: 'destructive', onPress: () => { desconectar(); router.replace('/conectar'); } }])}>
-          Desconectar
-        </Boton>
-      </Seccion>
-    </ScrollView>
+        <Texto tam={12.5} color={c.tenue}>PC: {conexion?.direccion}. Lo que anotes sin señal se manda solo cuando vuelva.</Texto>
+        <BotonSuave color={c.alerta} style={{ marginTop: 8 }} onPress={() => Alert.alert('¿Desconectar este teléfono?', 'Los datos siguen en la PC. Para volver hay que escanear el QR otra vez.',
+          [{ text: 'Cancelar', style: 'cancel' }, { text: 'Desconectar', style: 'destructive', onPress: () => { desconectar(); router.dismissAll(); } }])}>
+          Desconectar este teléfono
+        </BotonSuave>
+      </Tarjeta>
+      <View style={{ height: 12 }} />
+    </Marco>
   );
 }

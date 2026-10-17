@@ -3,7 +3,8 @@ import type { Cuenta, Movimiento } from './tipos';
 
 export const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 export const MESES_CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-const DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+export const DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+const DIAS_CORTOS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
 
 const dos = (n: number) => String(n).padStart(2, '0');
 
@@ -29,6 +30,49 @@ export function dinero(centavos: number, moneda: string): string {
 }
 
 /** Lo que escribe el usuario ("12.5", "12,50") → centavos. NaN si no es un número. */
+/** Sin centavos ("$412"), para leyendas y topes. Redondea. */
+export function dineroCorto(centavos: number, moneda: string): string {
+  const signo = centavos < 0 ? '−' : '';
+  return `${signo}${moneda}${String(Math.round(Math.abs(centavos) / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
+}
+
+/** Con signo de gasto o ingreso: "−$46.80", "+$1,225.00". */
+export function conSigno(centavos: number, moneda: string, tipo: 'gasto' | 'ingreso' | 'transferencia'): string {
+  return `${tipo === 'gasto' ? '−' : tipo === 'ingreso' ? '+' : ''}${dinero(Math.abs(centavos), moneda)}`;
+}
+
+/** Un saldo o neto: "−$420.15" con el menos tipográfico. */
+export function neto(centavos: number, moneda: string, conMas = false): string {
+  return `${centavos < 0 ? '−' : conMas && centavos > 0 ? '+' : ''}${dinero(Math.abs(centavos), moneda)}`;
+}
+
+export const mayuscula = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+
+/** La primera letra (o emoji entero) de un nombre, en mayúscula. */
+export const inicialDe = (nombre: string) => (Array.from(nombre.trim())[0] ?? '?').toUpperCase();
+
+/** "Hoy, viernes 16", "Ayer, jueves 15", "Miércoles 14" o, si es de otro mes, "Martes 30 de sep". */
+export function tituloDia(iso: string, hoy: string): string {
+  const d = aFecha(iso);
+  const nombre = `${DIAS[d.getDay()]} ${d.getDate()}`;
+  if (iso === hoy) return `Hoy, ${nombre}`;
+  const ayer = aFecha(hoy);
+  ayer.setDate(ayer.getDate() - 1);
+  if (iso === fechaISO(ayer)) return `Ayer, ${nombre}`;
+  return mayuscula(iso.slice(0, 7) === hoy.slice(0, 7) ? nombre : `${nombre} de ${MESES_CORTOS[d.getMonth()]}`);
+}
+
+/** "dom 18" */
+export function diaCorto(iso: string): string {
+  const d = aFecha(iso);
+  return `${DIAS_CORTOS[d.getDay()]} ${d.getDate()}`;
+}
+
+/** "dom" */
+export function nombreDiaCorto(iso: string): string {
+  return DIAS_CORTOS[aFecha(iso).getDay()];
+}
+
 export function aCentavos(texto: string): number {
   const limpio = texto.trim().replace(/\s/g, '').replace(',', '.');
   if (!/^\d*\.?\d*$/.test(limpio) || limpio === '' || limpio === '.') return NaN;

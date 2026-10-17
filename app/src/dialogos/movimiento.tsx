@@ -1,41 +1,46 @@
 import * as Haptics from 'expo-haptics';
 import { useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Alert, Pressable, TextInput, View } from 'react-native';
 import { useAcciones } from '@/lib/acciones';
 import { useDatos } from '@/lib/datos';
-import { aCentavos, aTexto, etiquetaCorta, nuevoId } from '@/lib/formato';
+import { aCentavos, aFecha, aTexto, DIAS, nuevoId } from '@/lib/formato';
 import { FRECUENCIAS, type Frecuencia, type Movimiento, type Recurrencia, type TipoMovimiento } from '@/lib/tipos';
-import { Boton, Campo, CampoFecha, CampoMonto, Etiqueta, Fichas, Hoja, Selector, Texto, TextoError } from '@/ui/componentes';
-import { C } from '@/ui/tema';
-import { ElegirCategoria } from './categorias';
+import { BotonPrincipal, Ficha, Hoja, MontoGrande, Segmentos, Texto, TextoError } from '@/ui/componentes';
+import { Icono } from '@/ui/iconos';
+import { useTema } from '@/ui/tema';
+import { Desplegable, ElegirCategoria, ElegirCuenta, ElegirFecha } from './piezas';
 
 const TIPOS: [TipoMovimiento, string][] = [['gasto', 'Gasto'], ['ingreso', 'Ingreso'], ['transferencia', 'Transferencia']];
-const COLORES_TIPO = { gasto: C.alerta, ingreso: C.bien, transferencia: C.acento };
 type Repetir = 'no' | Frecuencia;
+const REPETIR: [Repetir, string][] = [['no', 'No'], ...FRECUENCIAS];
 
 /** Anotar o editar un gasto, ingreso o transferencia. Al anotar, se puede volver una regla que se repite. */
-export function DialogoMovimiento({ inicial, tipoInicial = 'gasto', alCerrar, alEditarRegla }: {
-  inicial?: Movimiento; tipoInicial?: TipoMovimiento; alCerrar: () => void; alEditarRegla: (r: Recurrencia) => void;
+export function DialogoMovimiento({ inicial, tipoInicial = 'gasto', fechaInicial, cuentaInicial, alCerrar, alEditarRegla }: {
+  inicial?: Movimiento; tipoInicial?: TipoMovimiento; fechaInicial?: string; cuentaInicial?: string;
+  alCerrar: () => void; alEditarRegla: (r: Recurrencia) => void;
 }) {
   const { cuentas, categorias, moneda, hoy, recurrencias } = useDatos();
+  const { c, estilo } = useTema();
   const acciones = useAcciones();
   const editando = !!inicial;
-  const primeraDe = (t: TipoMovimiento) => categorias.find((c) => c.tipo === t)?.id ?? '';
+  const primeraDe = (t: TipoMovimiento) => categorias.find((x) => x.tipo === t)?.id ?? '';
   const [tipo, setTipo] = useState<TipoMovimiento>(inicial?.tipo ?? tipoInicial);
   const [monto, setMonto] = useState(inicial ? aTexto(inicial.monto) : '');
-  const [cuenta, setCuenta] = useState(inicial?.cuenta_id ?? cuentas[0]?.id ?? '');
-  const [destino, setDestino] = useState(inicial?.cuenta_destino_id ?? cuentas[1]?.id ?? '');
-  const [categoria, setCategoria] = useState(inicial?.categoria_id ?? primeraDe(tipo));
+  const [cuenta, setCuenta] = useState(inicial?.cuenta_id ?? (cuentas.some((x) => x.id === cuentaInicial) ? cuentaInicial! : cuentas[0]?.id ?? ''));
+  const [destino, setDestino] = useState(inicial?.cuenta_destino_id ?? cuentas.find((x) => x.id !== cuenta)?.id ?? '');
+  const [categoria, setCategoria] = useState(inicial?.categoria_id ?? primeraDe(inicial?.tipo ?? tipoInicial));
   const [nota, setNota] = useState(inicial?.nota ?? '');
-  const [fecha, setFecha] = useState(inicial?.fecha ?? hoy);
+  const [fecha, setFecha] = useState(inicial?.fecha ?? fechaInicial ?? hoy);
   const [hora, setHora] = useState(inicial?.hora ?? '');
   const [repetir, setRepetir] = useState<Repetir>('no');
+  const [verRepetir, setVerRepetir] = useState(false);
   const [error, setError] = useState('');
   const regla = inicial?.recurrencia_id ? recurrencias.find((r) => r.id === inicial.recurrencia_id) : undefined;
 
   function cambiarTipo(t: TipoMovimiento) {
     setTipo(t);
-    if (t !== 'transferencia' && categorias.find((c) => c.id === categoria)?.tipo !== t) setCategoria(primeraDe(t));
+    setError('');
+    if (t !== 'transferencia' && categorias.find((x) => x.id === categoria)?.tipo !== t) setCategoria(primeraDe(t));
   }
 
   function guardar() {
@@ -62,68 +67,76 @@ export function DialogoMovimiento({ inicial, tipoInicial = 'gasto', alCerrar, al
     alCerrar();
   }
 
-  function borrar(ySiguientes: boolean) {
-    if (inicial) acciones.borrarMovimiento(inicial, ySiguientes);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    alCerrar();
+  function borrar() {
+    if (!inicial) return;
+    const hacer = (ySiguientes: boolean) => {
+      acciones.borrarMovimiento(inicial, ySiguientes);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      alCerrar();
+    };
+    if (inicial.recurrencia_id) {
+      Alert.alert('¿Borrar este movimiento?', 'Viene de algo que se repite.', [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Solo este', style: 'destructive', onPress: () => hacer(false) },
+        { text: 'Este y los siguientes', style: 'destructive', onPress: () => hacer(true) },
+      ]);
+    } else {
+      Alert.alert('¿Borrar este movimiento?', undefined, [{ text: 'Cancelar', style: 'cancel' }, { text: 'Borrar', style: 'destructive', onPress: () => hacer(false) }]);
+    }
   }
 
+  const d = aFecha(fecha);
+  const conDia = estilo.id === 'calendario' || estilo.id === 'calmosaico';
+  const textoGuardar = editando ? 'Guardar cambios' : conDia ? `Guardar el ${DIAS[d.getDay()]} ${d.getDate()}` : 'Guardar';
+  const textoRepetir = REPETIR.find(([r]) => r === repetir)?.[1] ?? 'No';
+
   return (
-    <Hoja titulo={editando ? 'Editar movimiento' : 'Anotar'} alCerrar={alCerrar}>
-      <Selector opciones={TIPOS} valor={tipo} alCambiar={cambiarTipo} colores={COLORES_TIPO} />
+    <Hoja titulo={editando ? 'Editar' : 'Anotar'} alCerrar={alCerrar}
+      derecha={editando ? <Pressable onPress={borrar} hitSlop={10}><Texto tam={16} color={c.alerta}>Borrar</Texto></Pressable> : undefined}
+      pie={<><TextoError texto={error} /><BotonPrincipal onPress={guardar}>{textoGuardar}</BotonPrincipal></>}>
+      <Segmentos opciones={TIPOS} valor={tipo} alCambiar={cambiarTipo} />
 
-      <Etiqueta>Monto</Etiqueta>
-      <CampoMonto valor={monto} alCambiar={setMonto} moneda={moneda} autoFocus={!editando} />
-
-      <Etiqueta>{tipo === 'transferencia' ? 'Desde' : 'Cuenta'}</Etiqueta>
-      <Fichas opciones={cuentas} valor={cuenta} alCambiar={setCuenta} />
-      {tipo === 'transferencia'
-        ? <><Etiqueta>Hacia</Etiqueta><Fichas opciones={cuentas} valor={destino} alCambiar={setDestino} /></>
-        : <ElegirCategoria tipo={tipo} valor={categoria} alCambiar={setCategoria} />}
-
-      <Etiqueta>Descripción</Etiqueta>
-      <Campo value={nota} onChangeText={setNota} placeholder="¿De qué se trata?" />
-
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-        <Texto color={C.tenue}>{repetir === 'no' ? 'Fecha' : 'Primera vez'}</Texto>
-        <View style={{ flexDirection: 'row', gap: 4 }}>
-          <CampoFecha valor={fecha} alCambiar={setFecha} />
-          {repetir === 'no' && (hora
-            ? <CampoFecha valor={hora} alCambiar={setHora} modo="time" />
-            : <Pressable onPress={() => setHora('12:00')} style={{ justifyContent: 'center', paddingHorizontal: 8 }}><Texto tam={13} color={C.acentoClaro}>+ hora</Texto></Pressable>)}
-        </View>
+      <View style={{ alignItems: 'stretch' }}>
+        <MontoGrande valor={monto} alCambiar={(v) => { setMonto(v); setError(''); }} moneda={moneda} autoFocus={!editando} />
+        <TextInput value={nota} onChangeText={setNota} placeholder="¿De qué se trata?" placeholderTextColor={c.tenue} accessibilityLabel="Descripción"
+          style={{ textAlign: 'center', fontSize: 16, height: 36, color: c.tinta, fontFamily: estilo.fuentes.normal }} returnKeyType="done" />
       </View>
 
+      <ElegirFecha fecha={fecha} alCambiar={setFecha} rotulo={repetir === 'no' ? 'Fecha' : 'Primera vez'}
+        hora={repetir === 'no' ? hora : undefined} alCambiarHora={repetir === 'no' ? setHora : undefined} />
+
+      {tipo !== 'transferencia' && <ElegirCategoria tipo={tipo} valor={categoria} alCambiar={setCategoria} fecha={fecha} />}
+
+      <ElegirCuenta rotulo={tipo === 'transferencia' ? 'Desde' : 'Cuenta'} valor={cuenta} alCambiar={setCuenta} />
+      {tipo === 'transferencia' && <ElegirCuenta rotulo="Hacia" valor={destino} alCambiar={setDestino} />}
+
       {!editando && (
-        <>
-          <Etiqueta>Repetir</Etiqueta>
-          <Selector<Repetir> opciones={[['no', 'No'], ['semanal', 'Semanal'], ['quincenal', 'Quincenal'], ['mensual', 'Mensual']]} valor={repetir} alCambiar={setRepetir} />
-          {repetir !== 'no' && (
-            <Texto tam={12} color={C.tenue} style={{ marginTop: -8, marginBottom: 16 }}>
-              Se anota solo cada vez que llega la fecha, sin crear nada por adelantado. Lo que viene lo ves en «Próximos».
-            </Texto>
-          )}
-        </>
+        <View style={{ backgroundColor: c.suave, borderRadius: 14 }}>
+          <Desplegable icono="repetir" texto="Se repite" valor={textoRepetir} abierto={verRepetir} alTocar={() => setVerRepetir((v) => !v)}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+              {REPETIR.map(([r, t]) => (
+                <Ficha key={r} texto={t} activa={r === repetir} alto={36}
+                  onPress={() => { setRepetir(r); if (r === 'no') setVerRepetir(false); }} />
+              ))}
+            </View>
+            {repetir !== 'no' && (
+              <Texto tam={12.5} color={c.tenue} style={{ marginTop: 10, lineHeight: 18 }}>
+                Se anota solo cada vez que llega la fecha, sin crear nada por adelantado. Lo que viene lo ves en «Próximos».
+              </Texto>
+            )}
+          </Desplegable>
+        </View>
       )}
 
       {regla && (
-        <Pressable onPress={() => alEditarRegla(regla)} style={{ backgroundColor: C.tarjetaAlt, borderRadius: 12, padding: 12, marginBottom: 16, flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-          <Texto>🔁</Texto>
-          <Texto tam={12} color={C.tenue} style={{ flex: 1 }}>
-            Se repite {FRECUENCIAS.find(([f]) => f === regla.frecuencia)?.[1].toLowerCase()}{regla.fecha_fin ? ` hasta el ${etiquetaCorta(regla.fecha_fin)}` : ''}.
-          </Texto>
-          <Texto tam={12} peso="semi" color={C.acentoClaro}>Editar la regla</Texto>
+        <Pressable onPress={() => alEditarRegla(regla)}
+          style={({ pressed }) => ({ height: 50, borderRadius: 14, backgroundColor: c.suave, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, opacity: pressed ? 0.7 : 1 })}>
+          <Icono nombre="repetir" tam={18} color={c.tinta} />
+          <Texto tam={15} style={{ flex: 1 }}>Se repite</Texto>
+          <Texto tam={15} color={c.tenue}>{FRECUENCIAS.find(([f]) => f === regla.frecuencia)?.[1]}</Texto>
+          <Icono nombre="adelante" tam={16} color={c.tenue} grosor={2} />
         </Pressable>
       )}
-
-      <TextoError texto={error} />
-      <Boton onPress={guardar}>{editando ? 'Guardar cambios' : 'Guardar'}</Boton>
-      {editando && (inicial?.recurrencia_id
-        ? <View style={{ flexDirection: 'row', gap: 8 }}>
-            <Boton tipo="peligro" onPress={() => borrar(false)} style={{ flex: 1 }}>Borrar esta</Boton>
-            <Boton tipo="peligro" onPress={() => borrar(true)} style={{ flex: 1 }}>Y las siguientes</Boton>
-          </View>
-        : <Boton tipo="peligro" onPress={() => borrar(false)}>Borrar</Boton>)}
     </Hoja>
   );
 }
