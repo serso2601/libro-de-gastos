@@ -83,8 +83,9 @@ Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
 - Servidor con 25 pruebas. App con los 5 estilos, modo oscuro, color principal, tutoriales,
   anotar/editar, reglas que se repiten, Próximos, buscador, presupuesto con topes, importar el
   respaldo de la app vieja, exportar, QR para conectar. App vieja: botón «Exportar mis datos».
-- `app.json` pasó a `userInterfaceStyle: automatic`: hasta instalar un build nuevo, «Automático»
-  se ve oscuro; Claro y Oscuro funcionan con cualquier build.
+- `app.json` pasó a `userInterfaceStyle: automatic`, compilado en `ios-dev-3`
+  (`app-iphone\gastos-dev-3.ipa`). Con `ios-dev-2`, «Automático» se ve oscuro; Claro y Oscuro
+  funcionan con cualquier build.
 - **Pendiente del usuario:** correr `scripts\abrir-firewall.ps1` (admin), instalar el primer .ipa
   con Sideloadly, conectar con el QR, exportar de la app vieja e importar en la nueva.
 
