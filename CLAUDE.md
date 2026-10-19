@@ -22,11 +22,11 @@ Documents\PROYECTO APP DE GASTOS\      ← el repo
 ├── servidor\                ← FastAPI + SQLite (uv). Paquete `gastos`. `uv run pytest`
 ├── scripts\iniciar.ps1      ← arranca el servidor (8766) y Metro (8082); lo corre el inicio de Windows
 ├── scripts\instalar-inicio.ps1 · abrir-firewall.ps1
-├── .github\workflows\ios.yml ← compila el .ipa sin firmar en una Mac de GitHub (etiqueta ios-*)
-└── docs\                    ← LA APP VIEJA (PWA). GitHub Pages la sirve desde docs/ en la misma
-                               dirección de siempre: los datos del usuario viven en el localStorage
-                               de esa dirección. Se retira cuando el usuario haya pasado sus datos.
+└── .github\workflows\ios.yml ← compila el .ipa sin firmar en una Mac de GitHub (etiqueta ios-*)
 ```
+
+La app vieja (PWA en `docs/`) se retiró el 19/oct/2026: sus datos eran de prueba. Si GitHub Pages
+sigue activo en el repo, apagarlo en Settings → Pages.
 
 Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
 - **`datos\`** — `gastos.db`, `token.txt`, `respaldos\` (una copia por día, se guardan 30) y
@@ -82,20 +82,24 @@ Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
 
 - Servidor con 25 pruebas. App con los 5 estilos, modo oscuro, color principal, tutoriales,
   anotar/editar, reglas que se repiten, Próximos, buscador, presupuesto con topes, importar el
-  respaldo de la app vieja, exportar, QR para conectar. App vieja: botón «Exportar mis datos».
-- `app.json` pasó a `userInterfaceStyle: automatic`, compilado en `ios-dev-3`
+  respaldo de la app vieja, exportar, QR para conectar.- `app.json` pasó a `userInterfaceStyle: automatic`, compilado en `ios-dev-3`
   (`app-iphone\gastos-dev-3.ipa`). Con `ios-dev-2`, «Automático» se ve oscuro; Claro y Oscuro
   funcionan con cualquier build.
-- **Pendiente del usuario:** correr `scripts\abrir-firewall.ps1` (admin), instalar el primer .ipa
-  con Sideloadly, conectar con el QR, exportar de la app vieja e importar en la nueva.
+- El usuario ya instaló la app con Sideloadly, está conectada y la usa (19/oct). Está probando los
+  diseños y anotando lo que quiere cambiar; los ve algo genéricos. No migró datos: los de la app
+  vieja eran de prueba.
 
 ## Qué sigue (ideas acordadas)
 
-1. Usar la app y pulir lo que salga. Retirar la app vieja de Pages cuando ya no haga falta.
-2. **Gasto por voz:** grabar en la app → Whisper en la PC → `claude -p --model sonnet` lo vuelve
+1. Usar la app y pulir lo que salga (el usuario va anotando cambios de diseño).
+2. **Gasto por voz** (en veremos: el usuario la usa poco; si se hace, que use las categorías ya
+   creadas): grabar en la app → Whisper en la PC → `claude -p --model sonnet` lo vuelve
    movimiento → bandeja «Por revisar» (nada entra solo).
 3. **Foto del recibo** → monto, comercio y categoría → la misma bandeja.
 4. Resumen semanal/mensual con IA.
+5. **Captura automática** de gastos e ingresos (p. ej. Atajos de iPhone disparados por la
+   notificación del banco, o una extensión nativa). En veremos: necesita la cuenta de pago de
+   Apple (99 USD/año), que el usuario aún no tiene.
 
 ## Convenciones
 
