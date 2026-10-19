@@ -7,6 +7,10 @@ no vuelve. Lo que viene se muestra con `proximas`, que solo calcula y no guarda.
 
 Las fechas mensuales se cuentan siempre desde la fecha de inicio: algo que empieza el 31 cae el 30
 en los meses de 30 días y el 28 (o 29) en febrero, y vuelve al 31 en marzo.
+
+«catorcenal» es cada 14 días (26 veces al año). «quincenal» es dos veces al mes (24 al año): el día
+de inicio y 15 días después. Si empieza el 15, toca el 15 y el 30 (el 28 en febrero); si empieza el
+30, toca el 30 y el 15 del mes siguiente.
 """
 
 import calendar
@@ -16,7 +20,7 @@ from datetime import date, timedelta
 
 from .db import ahora
 
-FRECUENCIAS = ("semanal", "quincenal", "mensual", "anual")
+FRECUENCIAS = ("semanal", "catorcenal", "quincenal", "mensual", "anual")
 
 # Tope de seguridad: una recurrencia semanal de 20 años son ~1000 ocurrencias.
 MAXIMO_OCURRENCIAS = 5000
@@ -28,12 +32,25 @@ def sumar_meses(d: date, n: int) -> date:
     return date(anio, mes, min(d.day, calendar.monthrange(anio, mes)[1]))
 
 
+def media_quincena(inicio: date, n: int) -> date:
+    """La n-ésima vez de algo quincenal: las pares caen el día de inicio, las impares 15 días después."""
+    base = sumar_meses(inicio, n // 2)
+    if n % 2 == 0:
+        return base
+    if inicio.day <= 15:
+        return date(base.year, base.month, min(inicio.day + 15, calendar.monthrange(base.year, base.month)[1]))
+    siguiente = sumar_meses(date(base.year, base.month, 1), 1)
+    return date(siguiente.year, siguiente.month, inicio.day - 15)
+
+
 def ocurrencia(inicio: date, frecuencia: str, n: int) -> date:
     match frecuencia:
         case "semanal":
             return inicio + timedelta(weeks=n)
-        case "quincenal":
+        case "catorcenal":
             return inicio + timedelta(weeks=2 * n)
+        case "quincenal":
+            return media_quincena(inicio, n)
         case "mensual":
             return sumar_meses(inicio, n)
         case "anual":

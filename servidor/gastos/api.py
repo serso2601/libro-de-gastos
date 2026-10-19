@@ -81,7 +81,7 @@ class RecurrenciaIn(BaseModel):
     cuenta_destino_id: str | None = None
     categoria_id: str | None = None
     nota: str = Field(default="", max_length=200)
-    frecuencia: Literal["semanal", "quincenal", "mensual", "anual"]
+    frecuencia: Literal["semanal", "catorcenal", "quincenal", "mensual", "anual"]
     fecha_inicio: date
     fecha_fin: date | None = None
 

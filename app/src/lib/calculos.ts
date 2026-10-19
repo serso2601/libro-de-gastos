@@ -88,12 +88,22 @@ function sumarMeses(d: Date, n: number): Date {
   return new Date(anio, mes, Math.min(d.getDate(), diasDelMes(anio, mes + 1)));
 }
 
+/** Quincenal: las veces pares caen el día de inicio, las impares 15 días después. */
+function mediaQuincena(inicio: Date, n: number): Date {
+  const base = sumarMeses(inicio, Math.floor(n / 2));
+  if (n % 2 === 0) return base;
+  const dia = inicio.getDate();
+  if (dia <= 15) return new Date(base.getFullYear(), base.getMonth(), Math.min(dia + 15, diasDelMes(base.getFullYear(), base.getMonth() + 1)));
+  return new Date(base.getFullYear(), base.getMonth() + 1, dia - 15);
+}
+
 function ocurrencia(inicio: Date, f: Frecuencia, n: number): Date {
-  if (f === 'semanal' || f === 'quincenal') {
+  if (f === 'semanal' || f === 'catorcenal') {
     const r = new Date(inicio);
     r.setDate(r.getDate() + n * (f === 'semanal' ? 7 : 14));
     return r;
   }
+  if (f === 'quincenal') return mediaQuincena(inicio, n);
   return sumarMeses(inicio, f === 'mensual' ? n : 12 * n);
 }
 

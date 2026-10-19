@@ -11,12 +11,17 @@ import { Icono } from '@/ui/iconos';
 import { useTema } from '@/ui/tema';
 import { Desplegable, ElegirCategoria, ElegirCuenta, Grilla } from './piezas';
 
-const CORTAS: Record<Frecuencia, string> = { semanal: 'Cada semana', quincenal: 'Cada 2 sem.', mensual: 'Cada mes', anual: 'Cada año' };
+const CORTAS: Record<Frecuencia, string> = { semanal: 'Semana', catorcenal: '2 semanas', quincenal: 'Quincena', mensual: 'Mes', anual: 'Año' };
 
 function cuando(f: Frecuencia, inicio: string): string {
   const d = aFecha(inicio);
   if (f === 'semanal') return `cada ${DIAS[d.getDay()]}`;
-  if (f === 'quincenal') return `cada 2 semanas, los ${DIAS[d.getDay()]}`;
+  if (f === 'catorcenal') return `cada 2 semanas, los ${DIAS[d.getDay()]}`;
+  if (f === 'quincenal') {
+    const otro = d.getDate() <= 15 ? d.getDate() + 15 : d.getDate() - 15;
+    const [a, b] = [d.getDate(), otro].sort((x, y) => x - y);
+    return `dos veces al mes, el ${a} y el ${b}`;
+  }
   if (f === 'mensual') return `cada mes, el día ${d.getDate()}`;
   return `cada año, el ${d.getDate()} de ${MESES[d.getMonth()]}`;
 }
@@ -85,7 +90,7 @@ export function DialogoRecurrencia({ regla, alCerrar }: { regla: Recurrencia; al
 
       <View style={{ gap: 8 }}>
         <Etiqueta>Se repite</Etiqueta>
-        <Grilla columnas={4} gap={6}>
+        <Grilla columnas={3} gap={6}>
           {FRECUENCIAS.map(([f]) => <Ficha key={f} texto={CORTAS[f]} activa={f === frecuencia} onPress={() => setFrecuencia(f)} alto={40} compacta />)}
         </Grilla>
       </View>

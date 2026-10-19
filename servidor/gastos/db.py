@@ -9,10 +9,40 @@ from datetime import date, datetime
 from pathlib import Path
 
 ESQUEMA = Path(__file__).with_name("esquema.sql")
-VERSION = 1
+VERSION = 2
 
-# {versión a la que lleva: sql}. Vacío mientras el esquema siga en la versión 1.
-MIGRACIONES: dict[int, str] = {}
+# {versión a la que lleva: sql}. Cada paso corre con las claves foráneas apagadas: rehacer una
+# tabla no debe tocar las filas que la apuntan (movimiento.recurrencia_id es ON DELETE SET NULL).
+MIGRACIONES: dict[int, str] = {
+    # «quincenal» era cada 14 días: pasa a llamarse «catorcenal» y «quincenal» queda para dos veces
+    # al mes. SQLite no cambia un CHECK sin rehacer la tabla.
+    2: """
+    BEGIN;
+    CREATE TABLE recurrencia_nueva (
+        id                  TEXT PRIMARY KEY,
+        tipo                TEXT NOT NULL CHECK (tipo IN ('gasto', 'ingreso', 'transferencia')),
+        monto               INTEGER NOT NULL CHECK (monto > 0),
+        cuenta_id           TEXT NOT NULL REFERENCES cuenta(id),
+        cuenta_destino_id   TEXT REFERENCES cuenta(id),
+        categoria_id        TEXT REFERENCES categoria(id),
+        nota                TEXT NOT NULL DEFAULT '',
+        frecuencia          TEXT NOT NULL CHECK (frecuencia IN ('semanal', 'catorcenal', 'quincenal', 'mensual', 'anual')),
+        fecha_inicio        TEXT NOT NULL,
+        fecha_fin           TEXT,
+        generada_hasta      TEXT,
+        creado              TEXT NOT NULL,
+        actualizado         TEXT NOT NULL
+    );
+    INSERT INTO recurrencia_nueva
+        SELECT id, tipo, monto, cuenta_id, cuenta_destino_id, categoria_id, nota,
+               CASE frecuencia WHEN 'quincenal' THEN 'catorcenal' ELSE frecuencia END,
+               fecha_inicio, fecha_fin, generada_hasta, creado, actualizado
+        FROM recurrencia;
+    DROP TABLE recurrencia;
+    ALTER TABLE recurrencia_nueva RENAME TO recurrencia;
+    COMMIT;
+    """,
+}
 
 
 def conectar(ruta: Path | str) -> sqlite3.Connection:
@@ -50,9 +80,13 @@ def inicializar(con: sqlite3.Connection) -> None:
                              for i, (id_, nombre, tipo, emoji) in enumerate(CATEGORIAS_INICIALES)])
         con.execute(f"PRAGMA user_version = {VERSION}")
         return
-    for destino in range(version + 1, VERSION + 1):
-        con.executescript(MIGRACIONES[destino])
-        con.execute(f"PRAGMA user_version = {destino}")
+    con.execute("PRAGMA foreign_keys = OFF")
+    try:
+        for destino in range(version + 1, VERSION + 1):
+            con.executescript(MIGRACIONES[destino])
+            con.execute(f"PRAGMA user_version = {destino}")
+    finally:
+        con.execute("PRAGMA foreign_keys = ON")
 
 
 def ahora() -> str:
