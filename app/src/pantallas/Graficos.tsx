@@ -7,12 +7,12 @@ import { useMes } from '@/lib/mes';
 import { NavegadorMes, Num, Tarjeta, Texto, Vacio } from '@/ui/componentes';
 import { Barras, Dona, Leyenda } from '@/ui/graficos';
 import { Marco } from '@/ui/pantalla';
-import { mezclar, useTema } from '@/ui/tema';
+import { useTema } from '@/ui/tema';
 
 export function Graficos() {
   const d = useDatos();
   const mes = useMes();
-  const { c, estilo, oscuro } = useTema();
+  const { c } = useTema();
 
   const porCategoria = useMemo(() => {
     const delMes = d.movimientos.filter((m) => m.tipo === 'gasto' && m.fecha.startsWith(mes.clave));
@@ -35,10 +35,6 @@ export function Graficos() {
     return { clave, etiqueta: MESES_CORTOS[f.getMonth()], ingresos: sumar(movs, 'ingreso'), gastos: sumar(movs, 'gasto'), actual: i === 5 };
   }), [d.movimientos, mes.anio, mes.mes]);
 
-  const bloque = (cual: 'lavanda' | 'menta') => estilo.bloques
-    ? (oscuro ? mezclar(c.tarjeta, estilo.bloques[cual].base, 0.22) : estilo.bloques[cual].claro)
-    : c.tarjeta;
-  const pesoTitulo = estilo.m.pesoTitulo === 'extra' ? 'negrita' : 'semi';
   const hoy = aFecha(d.hoy);
   const avance = hoy.getDate() / diasDelMes(mes.anio, mes.mes);
   const nota = mes.esActual ? `${mes.nombre} ${avance < 0.35 ? 'recién empieza' : avance < 0.7 ? 'todavía va por la mitad' : 'ya casi termina'}.` : null;
@@ -47,8 +43,8 @@ export function Graficos() {
     <Marco titulo="Gráficos">
       <NavegadorMes nombre={mes.nombre} anio={mes.anio} mover={mes.mover} />
 
-      <Tarjeta color={bloque('lavanda')} style={{ padding: 16, gap: 8 }}>
-        <Texto tam={15} peso={pesoTitulo}>Gastos por categoría</Texto>
+      <Tarjeta style={{ padding: 16, gap: 8 }}>
+        <Texto tam={15} peso="semi">Gastos por categoría</Texto>
         {porCategoria.length === 0 ? <Vacio>Sin gastos en {mes.nombre.toLowerCase()}.</Vacio> : (
           <>
             <Texto tam={13} color={c.tenue} style={{ marginTop: -4 }}>{fraseDona(porCategoria[0].nombre, porCategoria[0].total, total)}</Texto>
@@ -69,13 +65,13 @@ export function Graficos() {
         )}
       </Tarjeta>
 
-      <Tarjeta color={bloque('menta')} style={{ padding: 16, gap: 8 }}>
-        <Texto tam={15} peso={pesoTitulo}>Ingresos y gastos · 6 meses</Texto>
+      <Tarjeta style={{ padding: 16, gap: 8 }}>
+        <Texto tam={15} peso="semi">Ingresos y gastos · 6 meses</Texto>
         <View style={{ flexDirection: 'row', gap: 14 }}>
-          <Leyenda color={c.bien} texto="Ingresos" />
-          <Leyenda color={estilo.id === 'billetera' ? c.tinta : c.calor[3]} texto="Gastos" />
+          <Leyenda color={c.ingreso} texto="Ingresos" />
+          <Leyenda color={c.gasto} texto="Gastos" />
         </View>
-        <Barras datos={seisMeses} colorGastos={estilo.id === 'billetera' ? c.tinta : c.calor[3]} />
+        <Barras datos={seisMeses} />
         {nota && <Texto tam={12} color={c.tenue}>{nota}</Texto>}
       </Tarjeta>
     </Marco>

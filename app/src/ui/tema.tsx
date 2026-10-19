@@ -1,19 +1,24 @@
-// El tema en uso: el estilo elegido, claro u oscuro y el color principal. Se guarda en el teléfono y
-// cada pantalla lo lee con useTema(). También recuerda qué tutoriales ya se vieron.
+// El tema en uso: claro u oscuro y el color principal. Las preferencias (también qué saldo va arriba
+// en el Inicio, la vista del Inicio y si ya se vio el tutorial) se guardan en el teléfono; cada
+// pantalla lee el tema con useTema() y las preferencias con usePreferencias().
 
 import Storage from 'expo-sqlite/kv-store';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Appearance, useColorScheme } from 'react-native';
-import { ESTILOS, type Estilo, type IdEstilo, type Paleta } from './estilos';
+import { ORDEN_SALDOS, type IdSaldo } from '@/lib/calculos';
+import { ESTILO, type Estilo, type Paleta } from './estilos';
 
 export type Modo = 'sistema' | 'claro' | 'oscuro';
+export type VistaInicio = 'tarjetas' | 'calendario';
 
-interface Preferencias {
-  estilo: IdEstilo;
+export interface Preferencias {
   modo: Modo;
-  /** null = el color propio del estilo. */
+  /** null = el color principal de siempre (el primero de ACENTOS). */
   acento: string | null;
-  tutoriales: IdEstilo[];
+  /** Qué saldo se ve arriba en el Inicio. */
+  saldo: IdSaldo;
+  vistaInicio: VistaInicio;
+  tutorialVisto: boolean;
 }
 
 export interface Colores extends Paleta {
@@ -40,13 +45,21 @@ export interface Tema {
 }
 
 const CLAVE = 'gastos:apariencia';
-const INICIALES: Preferencias = { estilo: 'billetera', modo: 'sistema', acento: null, tutoriales: [] };
+const INICIALES: Preferencias = { modo: 'sistema', acento: null, saldo: 'total', vistaInicio: 'tarjetas', tutorialVisto: false };
 
+/** Lee lo guardado; lo que falte o venga de la versión vieja (estilo, tutoriales) toma el valor de siempre. */
 function leer(): Preferencias {
   try {
     const crudo = Storage.getItemSync(CLAVE);
-    const p = crudo ? { ...INICIALES, ...(JSON.parse(crudo) as Partial<Preferencias>) } : INICIALES;
-    return ESTILOS[p.estilo] ? p : { ...p, estilo: 'billetera' };
+    if (!crudo) return INICIALES;
+    const p = JSON.parse(crudo) as Partial<Record<keyof Preferencias, unknown>>;
+    return {
+      modo: p.modo === 'claro' || p.modo === 'oscuro' ? p.modo : 'sistema',
+      acento: typeof p.acento === 'string' ? p.acento : null,
+      saldo: ORDEN_SALDOS.includes(p.saldo as IdSaldo) ? (p.saldo as IdSaldo) : 'total',
+      vistaInicio: p.vistaInicio === 'calendario' ? 'calendario' : 'tarjetas',
+      tutorialVisto: p.tutorialVisto === true,
+    };
   } catch {
     return INICIALES;
   }
@@ -86,8 +99,8 @@ export function sobre(fondo: string, tinta = '#15181D'): string {
   return luminancia(fondo) > 0.42 ? tinta : '#FFFFFF';
 }
 
-export function crearTema(estilo: Estilo, oscuro: boolean, acento: string | null): Tema {
-  const base = oscuro ? estilo.oscuro : estilo.claro;
+export function crearTema(oscuro: boolean, acento: string | null): Tema {
+  const base = oscuro ? ESTILO.oscuro : ESTILO.claro;
   const acentoFinal = acento ? (oscuro && luminancia(acento) < 0.2 ? mezclar(acento, '#FFFFFF', 0.35) : acento) : base.acento;
   const p: Paleta = { ...base, acento: acentoFinal };
   const pasos = oscuro ? [0.28, 0.48, 0.72, 1] : [0.16, 0.36, 0.66, 1];
@@ -100,7 +113,7 @@ export function crearTema(estilo: Estilo, oscuro: boolean, acento: string | null
     velo: oscuro ? 'rgba(0,0,0,0.6)' : 'rgba(20,22,28,0.38)',
   };
   return {
-    estilo,
+    estilo: ESTILO,
     c,
     oscuro,
     pastel: (color) => mezclar(oscuro ? p.tarjeta : '#FFFFFF', color, oscuro ? 0.3 : 0.2),
@@ -115,7 +128,6 @@ interface Contexto {
   tema: Tema;
   prefs: Preferencias;
   cambiar: (p: Partial<Preferencias>) => void;
-  marcarTutorial: (estilo: IdEstilo, visto: boolean) => void;
 }
 
 const Ctx = createContext<Contexto | null>(null);
@@ -141,23 +153,10 @@ export function ProveedorTema({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const marcarTutorial = useCallback((estilo: IdEstilo, visto: boolean) => {
-    setPrefs((viejas) => {
-      const tutoriales = visto ? [...new Set([...viejas.tutoriales, estilo])] : viejas.tutoriales.filter((e) => e !== estilo);
-      const nuevas = { ...viejas, tutoriales };
-      try {
-        Storage.setItemSync(CLAVE, JSON.stringify(nuevas));
-      } catch {
-        /* nada */
-      }
-      return nuevas;
-    });
-  }, []);
-
   const oscuro = prefs.modo === 'oscuro' || (prefs.modo === 'sistema' && sistema === 'dark');
-  const tema = useMemo(() => crearTema(ESTILOS[prefs.estilo], oscuro, prefs.acento), [prefs.estilo, oscuro, prefs.acento]);
+  const tema = useMemo(() => crearTema(oscuro, prefs.acento), [oscuro, prefs.acento]);
 
-  return <Ctx.Provider value={{ tema, prefs, cambiar, marcarTutorial }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ tema, prefs, cambiar }}>{children}</Ctx.Provider>;
 }
 
 function useCtx(): Contexto {
@@ -170,7 +169,8 @@ export function useTema(): Tema {
   return useCtx().tema;
 }
 
+/** Las preferencias guardadas y `cambiar` para tocar una o varias (se guardan solas). */
 export function usePreferencias() {
-  const { prefs, cambiar, marcarTutorial } = useCtx();
-  return { ...prefs, cambiar, marcarTutorial };
+  const { prefs, cambiar } = useCtx();
+  return { ...prefs, cambiar };
 }

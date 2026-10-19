@@ -1,5 +1,5 @@
-// Lo que comparten las hojas de anotar y de la regla que se repite: elegir día, categoría y cuenta.
-// Cada pieza se dibuja como pide el estilo (fichas, tarjetas de colores, una tira de días...).
+// Lo que comparten las hojas de anotar y de la regla que se repite: elegir día (fichas), categoría
+// (una grilla) y cuenta (tarjetas de colores con su saldo).
 
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Haptics from 'expo-haptics';
@@ -8,9 +8,9 @@ import { Pressable, View } from 'react-native';
 import { useAcciones } from '@/lib/acciones';
 import { topes } from '@/lib/calculos';
 import { useDatos } from '@/lib/datos';
-import { aFecha, diaCorto, dineroCorto, fechaISO, horaTexto, inicialDe, nombreDiaCorto, nuevoId, saldo } from '@/lib/formato';
+import { aFecha, diaCorto, dineroCorto, fechaISO, horaTexto, nuevoId, saldo } from '@/lib/formato';
 import type { Categoria, TipoCategoria } from '@/lib/tipos';
-import { Campo, Colores, Etiqueta, Inicial, Num, Texto } from '@/ui/componentes';
+import { Campo, Colores, Etiqueta, Num, Texto } from '@/ui/componentes';
 import { PALETA } from '@/ui/estilos';
 import { Icono } from '@/ui/iconos';
 import { sobre, useTema } from '@/ui/tema';
@@ -38,14 +38,13 @@ function sumarDias(iso: string, n: number): string {
   return fechaISO(d);
 }
 
-/** El día (y la hora, si se quiere). Calendario usa una tira de días; los demás, fichas. */
+/** El día (y la hora, si se quiere): Hoy, Ayer, anteayer o cualquier otro en el calendario. */
 export function ElegirFecha({ fecha, alCambiar, hora, alCambiarHora, rotulo = 'Fecha' }: {
   fecha: string; alCambiar: (f: string) => void; hora?: string; alCambiarHora?: (h: string) => void; rotulo?: string;
 }) {
   const { hoy } = useDatos();
-  const { c, estilo, oscuro } = useTema();
+  const { c, oscuro } = useTema();
   const [calendario, setCalendario] = useState(false);
-  const [base] = useState(() => (Math.abs(aFecha(fecha).getTime() - aFecha(hoy).getTime()) > 4 * 86_400_000 ? fecha : hoy));
   const elegir = (f: string) => { Haptics.selectionAsync(); alCambiar(f); setCalendario(false); };
 
   const botonCalendario = (activo: boolean, ancho: number, alto: number, radio: number, texto?: string) => (
@@ -57,41 +56,21 @@ export function ElegirFecha({ fecha, alCambiar, hora, alCambiarHora, rotulo = 'F
     </Pressable>
   );
 
-  let opciones: ReactNode;
-  if (estilo.id === 'calendario') {
-    const dias = Array.from({ length: 6 }, (_, i) => sumarDias(base, i - 4));
-    const fuera = !dias.includes(fecha);
-    opciones = (
-      <View style={{ flexDirection: 'row', gap: 6 }}>
-        {dias.map((f) => {
-          const activo = f === fecha;
-          return (
-            <Pressable key={f} onPress={() => elegir(f)} style={{ flex: 1, height: 56, borderRadius: 14, backgroundColor: activo ? c.boton : c.suave, alignItems: 'center', justifyContent: 'center', gap: 2 }}>
-              <Texto tam={11} color={activo ? c.sobreBoton : c.tenue}>{f === hoy ? 'hoy' : nombreDiaCorto(f)}</Texto>
-              <Texto num tam={16} peso={activo ? 'semi' : 'medio'} color={activo ? c.sobreBoton : c.tinta}>{aFecha(f).getDate()}</Texto>
-            </Pressable>
-          );
-        })}
-        {botonCalendario(fuera, 44, 56, 14)}
-      </View>
-    );
-  } else {
-    const fichas: [string, string][] = [[hoy, 'Hoy'], [sumarDias(hoy, -1), 'Ayer'], [sumarDias(hoy, -2), diaCorto(sumarDias(hoy, -2))]];
-    const fuera = !fichas.some(([f]) => f === fecha);
-    opciones = (
-      <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
-        {fichas.map(([f, t]) => {
-          const activo = f === fecha;
-          return (
-            <Pressable key={f} onPress={() => elegir(f)} style={{ height: 40, paddingHorizontal: 14, borderRadius: 20, backgroundColor: activo ? c.boton : c.suave, justifyContent: 'center' }}>
-              <Texto tam={14} peso={activo ? 'semi' : 'normal'} color={activo ? c.sobreBoton : c.tinta}>{t}</Texto>
-            </Pressable>
-          );
-        })}
-        {botonCalendario(fuera, 40, 40, 20, fuera ? diaCorto(fecha) : undefined)}
-      </View>
-    );
-  }
+  const fichas: [string, string][] = [[hoy, 'Hoy'], [sumarDias(hoy, -1), 'Ayer'], [sumarDias(hoy, -2), diaCorto(sumarDias(hoy, -2))]];
+  const fuera = !fichas.some(([f]) => f === fecha);
+  const opciones = (
+    <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+      {fichas.map(([f, t]) => {
+        const activo = f === fecha;
+        return (
+          <Pressable key={f} onPress={() => elegir(f)} style={{ height: 40, paddingHorizontal: 14, borderRadius: 20, backgroundColor: activo ? c.boton : c.suave, justifyContent: 'center' }}>
+            <Texto tam={14} peso={activo ? 'semi' : 'normal'} color={activo ? c.sobreBoton : c.tinta}>{t}</Texto>
+          </Pressable>
+        );
+      })}
+      {botonCalendario(fuera, 40, 40, 20, fuera ? diaCorto(fecha) : undefined)}
+    </View>
+  );
 
   return (
     <View style={{ gap: 8 }}>
@@ -125,14 +104,13 @@ export function ElegirCategoria({ tipo, valor, alCambiar, fecha, rotulo = true }
   tipo: TipoCategoria; valor: string; alCambiar: (id: string) => void; fecha: string; rotulo?: boolean;
 }) {
   const d = useDatos();
-  const { c, estilo, pastel } = useTema();
+  const { c } = useTema();
   const { guardarCategoria } = useAcciones();
   const [nueva, setNueva] = useState(false);
   const [nombre, setNombre] = useState('');
   const [color, setColor] = useState(PALETA[0]);
   const disponibles = d.categorias.filter((x) => x.tipo === tipo);
   const estados = new Map(topes(d, fecha.slice(0, 7)).conTope.map((t) => [t.categoria.id, t]));
-  const conCuadro = estilo.id === 'calendario';
 
   function crear() {
     if (!nombre.trim()) return;
@@ -151,22 +129,19 @@ export function ElegirCategoria({ tipo, valor, alCambiar, fecha, rotulo = true }
           const activa = cat.id === valor;
           const t = estados.get(cat.id);
           const aviso = t ? (t.pasado ? 'te pasaste' : t.casiAlTope ? 'casi al tope' : `quedan ${dineroCorto(t.tope - t.gastado, d.moneda)}`) : null;
-          const fondo = estilo.id === 'mosaico' ? pastel(cat.color) : c.suave;
           return (
             <Pressable key={cat.id} onPress={() => { Haptics.selectionAsync(); alCambiar(cat.id); }}
-              style={{ height: conCuadro && !aviso ? 48 : 54, borderRadius: estilo.m.esquinas >= 24 ? 16 : 14, backgroundColor: fondo, paddingHorizontal: conCuadro ? 10 : 11,
-                justifyContent: 'center', borderWidth: 2, borderColor: activa ? c.tinta : 'transparent', flexDirection: conCuadro ? 'row' : 'column',
-                alignItems: conCuadro ? 'center' : 'flex-start', gap: conCuadro ? 8 : 2 }}>
-              {conCuadro && <Inicial texto={inicialDe(cat.nombre)} color={cat.color} tam={26} />}
-              <View style={{ flex: conCuadro ? 1 : undefined, gap: 1 }}>
+              style={{ height: 54, borderRadius: 14, backgroundColor: c.suave, paddingHorizontal: 11,
+                justifyContent: 'center', borderWidth: 2, borderColor: activa ? c.tinta : 'transparent', alignItems: 'flex-start', gap: 2 }}>
+              <View style={{ gap: 1 }}>
                 <Texto tam={14} peso={activa ? 'semi' : 'medio'} lineas={1}>{cat.nombre}</Texto>
-                {aviso && <Texto tam={11.5} peso={t?.pasado || t?.casiAlTope ? 'semi' : 'normal'} color={t?.pasado || t?.casiAlTope ? c.alerta : c.tenue} lineas={1}>{aviso}</Texto>}
+                {aviso && <Texto tam={12} peso={t?.pasado || t?.casiAlTope ? 'semi' : 'normal'} color={t?.pasado || t?.casiAlTope ? c.alerta : c.tenue} lineas={1}>{aviso}</Texto>}
               </View>
             </Pressable>
           );
         })}
         <Pressable key="nueva" onPress={() => setNueva((v) => !v)} accessibilityLabel="Nueva categoría"
-          style={{ height: conCuadro ? 48 : 54, borderRadius: estilo.m.esquinas >= 24 ? 16 : 14, borderWidth: 1.5, borderStyle: 'dashed', borderColor: c.linea,
+          style={{ height: 54, borderRadius: 14, borderWidth: 1.5, borderStyle: 'dashed', borderColor: c.linea,
             alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 }}>
           <Icono nombre={nueva ? 'cerrar' : 'mas'} tam={16} color={c.tenue} />
           <Texto tam={14} color={c.tenue}>{nueva ? 'Cerrar' : 'Nueva'}</Texto>
@@ -186,11 +161,10 @@ export function ElegirCategoria({ tipo, valor, alCambiar, fecha, rotulo = true }
   );
 }
 
-/** Elegir una cuenta: tarjetas de colores con su saldo, cápsulas con un punto o botones simples. */
+/** Elegir una cuenta: tarjetas de colores con su saldo. */
 export function ElegirCuenta({ valor, alCambiar, rotulo }: { valor: string; alCambiar: (id: string) => void; rotulo?: string }) {
   const d = useDatos();
-  const { c, estilo, colorCuenta } = useTema();
-  const forma = estilo.id === 'billetera' || estilo.id === 'cartera' ? 'tarjetas' : estilo.id === 'calendario' ? 'botones' : 'capsulas';
+  const { c, colorCuenta } = useTema();
   return (
     <View style={{ gap: 8 }}>
       {rotulo && <Etiqueta>{rotulo}</Etiqueta>}
@@ -198,30 +172,20 @@ export function ElegirCuenta({ valor, alCambiar, rotulo }: { valor: string; alCa
         {d.cuentas.map((cu) => {
           const activa = cu.id === valor;
           const tocar = () => { Haptics.selectionAsync(); alCambiar(cu.id); };
-          if (forma === 'tarjetas') {
-            const fondo = colorCuenta(cu.color);
-            const tinta = sobre(fondo);
-            return (
-              <Pressable key={cu.id} onPress={tocar} accessibilityState={{ selected: activa }}
-                style={{ borderRadius: 17, padding: 2, borderWidth: 2, borderColor: activa ? c.tinta : 'transparent' }}>
-                <View style={{ height: 56, borderRadius: 13, backgroundColor: fondo, paddingHorizontal: 10, paddingVertical: 8, justifyContent: 'space-between' }}>
-                  <Texto tam={14} peso="semi" color={tinta} lineas={1} style={{ paddingRight: activa ? 18 : 0 }}>{cu.nombre}</Texto>
-                  <Num tam={12} peso="medio" color={tinta} lineas={1} style={{ opacity: 0.86 }}>{dineroCorto(saldo(cu, d.movimientos), d.moneda)}</Num>
-                  {activa && (
-                    <View style={{ position: 'absolute', top: 7, right: 7, width: 18, height: 18, borderRadius: 9, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' }}>
-                      <Icono nombre="check" tam={12} color="#15181D" grosor={3} />
-                    </View>
-                  )}
-                </View>
-              </Pressable>
-            );
-          }
+          const fondo = colorCuenta(cu.color);
+          const tinta = sobre(fondo);
           return (
             <Pressable key={cu.id} onPress={tocar} accessibilityState={{ selected: activa }}
-              style={{ height: 44, borderRadius: forma === 'capsulas' ? 22 : 14, backgroundColor: activa ? c.boton : c.suave, flexDirection: 'row', gap: 8,
-                alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 }}>
-              {forma === 'capsulas' && <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: activa ? c.sobreBoton : colorCuenta(cu.color) }} />}
-              <Texto tam={14} peso={activa ? 'semi' : 'normal'} color={activa ? c.sobreBoton : c.tinta} lineas={1}>{cu.nombre}</Texto>
+              style={{ borderRadius: 17, padding: 2, borderWidth: 2, borderColor: activa ? c.tinta : 'transparent' }}>
+              <View style={{ height: 56, borderRadius: 13, backgroundColor: fondo, paddingHorizontal: 10, paddingVertical: 8, justifyContent: 'space-between' }}>
+                <Texto tam={14} peso="semi" color={tinta} lineas={1} style={{ paddingRight: activa ? 18 : 0 }}>{cu.nombre}</Texto>
+                <Num tam={12} peso="medio" color={tinta} lineas={1} style={{ opacity: 0.86 }}>{dineroCorto(saldo(cu, d.movimientos), d.moneda)}</Num>
+                {activa && (
+                  <View style={{ position: 'absolute', top: 7, right: 7, width: 18, height: 18, borderRadius: 9, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' }}>
+                    <Icono nombre="check" tam={12} color="#15181D" grosor={3} />
+                  </View>
+                )}
+              </View>
             </Pressable>
           );
         })}

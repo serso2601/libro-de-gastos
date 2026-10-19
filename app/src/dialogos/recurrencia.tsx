@@ -6,7 +6,7 @@ import { proximasVeces } from '@/lib/calculos';
 import { useDatos } from '@/lib/datos';
 import { aCentavos, aFecha, aTexto, DIAS, diaCorto, fechaISO, MESES, MESES_CORTOS } from '@/lib/formato';
 import { FRECUENCIAS, type Frecuencia, type Recurrencia } from '@/lib/tipos';
-import { BotonPrincipal, Etiqueta, Ficha, Hoja, MontoGrande, Texto, TextoError } from '@/ui/componentes';
+import { BotonPrincipal, Etiqueta, familia, Ficha, Hoja, MontoGrande, Texto, TextoError } from '@/ui/componentes';
 import { Icono } from '@/ui/iconos';
 import { useTema } from '@/ui/tema';
 import { Desplegable, ElegirCategoria, ElegirCuenta, Grilla } from './piezas';
@@ -31,7 +31,7 @@ const fechaLarga = (iso: string) => { const d = aFecha(iso); return `${d.getDate
 /** Editar una regla que se repite. Lo que cambie vale para lo que viene; lo ya anotado no se toca. */
 export function DialogoRecurrencia({ regla, alCerrar }: { regla: Recurrencia; alCerrar: () => void }) {
   const { cuentas, categorias, moneda, hoy } = useDatos();
-  const { c, estilo, oscuro } = useTema();
+  const { c, oscuro } = useTema();
   const acciones = useAcciones();
   const [monto, setMonto] = useState(aTexto(regla.monto));
   const [cuenta, setCuenta] = useState(regla.cuenta_id);
@@ -78,14 +78,14 @@ export function DialogoRecurrencia({ regla, alCerrar }: { regla: Recurrencia; al
           </Pressable>
         </>
       )}>
-      <Texto tam={13.5} color={c.tenue} style={{ lineHeight: 20 }}>
+      <Texto tam={14} color={c.tenue} style={{ lineHeight: 20 }}>
         Esto se anota solo {cuando(frecuencia, regla.fecha_inicio)}. Si cambias algo, vale para las que vienen; las que ya se anotaron quedan como están.
       </Texto>
 
       <View>
         <MontoGrande valor={monto} alCambiar={setMonto} moneda={moneda} />
         <TextInput value={nota} onChangeText={setNota} placeholder="Descripción" placeholderTextColor={c.tenue} accessibilityLabel="Descripción"
-          style={{ textAlign: 'center', fontSize: 16, height: 36, color: c.tinta, fontFamily: estilo.fuentes.normal }} />
+          style={{ textAlign: 'center', fontSize: 16, height: 36, paddingVertical: 0, color: c.tinta, fontFamily: familia('normal') }} />
       </View>
 
       <View style={{ gap: 8 }}>

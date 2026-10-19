@@ -1,6 +1,6 @@
-// El marco de cada pantalla y cómo se va de una a otra según el estilo: en Billetera y Calendario
-// algunas secciones son pestañas; las demás (y todas en los estilos de bloques) se abren encima, con
-// «‹ volver» arriba a la izquierda.
+// El marco de cada pantalla y cómo se va de una a otra. Inicio, Movimientos, Presupuesto y Cuentas son
+// pestañas de la barra de abajo; Próximos y Gráficos son vistas dentro de Movimientos. Ajustes y una
+// cuenta abierta se abren encima, con «‹ volver» arriba a la izquierda.
 
 import { router } from 'expo-router';
 import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
@@ -8,9 +8,10 @@ import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAlmacen } from '@/lib/datos';
 import { BotonRedondo, Texto } from './componentes';
-import type { Seccion } from './estilos';
 import { Icono } from './iconos';
 import { alfa, useTema } from './tema';
+
+export type Seccion = 'inicio' | 'movimientos' | 'presupuesto' | 'cuentas' | 'proximos' | 'graficos';
 
 const Apilada = createContext<string | null>(null);
 
@@ -23,17 +24,15 @@ export function useApilada(): string | null {
   return useContext(Apilada);
 }
 
-/** Ir a una sección: si es pestaña del estilo, se cambia de pestaña; si no, se abre encima. */
+/** Ir a una sección: cambia de pestaña; Próximos y Gráficos abren Movimientos en esa vista. */
 export function useIr() {
-  const { estilo } = useTema();
-  return useCallback((s: Seccion, volver?: string) => {
-    if (s === 'cuentas' && (estilo.id === 'billetera' || estilo.id === 'cartera')) return router.navigate('/');
-    if (estilo.pestanias.includes(s)) return router.navigate(`/${s}`);
-    router.push({ pathname: '/ver/[pantalla]', params: { pantalla: s, volver: volver ?? estilo.inicio } });
-  }, [estilo]);
+  return useCallback((s: Seccion) => {
+    if (s === 'proximos' || s === 'graficos') return router.navigate({ pathname: '/movimientos', params: { vista: s } });
+    router.navigate(s === 'inicio' ? '/' : `/${s}`);
+  }, []);
 }
 
-export function abrirCuenta(id: string, volver: string) {
+export function abrirCuenta(id: string, volver = 'Inicio') {
   router.push({ pathname: '/cuenta/[id]', params: { id, volver } });
 }
 
@@ -48,7 +47,7 @@ export function Volver({ texto, color }: { texto: string; color?: string }) {
     <Pressable onPress={volverAtras} hitSlop={10} accessibilityLabel={`Volver a ${texto}`}
       style={({ pressed }) => ({ height: 44, flexDirection: 'row', alignItems: 'center', gap: 2, marginLeft: -6, opacity: pressed ? 0.5 : 1 })}>
       <Icono nombre="atras" tam={22} color={color ?? c.tinta} grosor={2} />
-      <Texto tam={16} peso="semi" color={color}>{texto}</Texto>
+      <Texto tam={17} peso="semi" color={color}>{texto}</Texto>
     </Pressable>
   );
 }

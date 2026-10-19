@@ -1,7 +1,7 @@
-// Cuentas que comparten las pantallas: lo del mes, el calor de cada día, el presupuesto y las
-// próximas veces de una regla. Todo en centavos.
+// Cuentas que comparten las pantallas: lo del mes, el calor de cada día, el presupuesto, las formas
+// de ver el saldo y las próximas veces de una regla. Todo en centavos.
 
-import { aFecha, fechaISO } from './formato';
+import { aFecha, dinero, fechaISO, MESES, saldo } from './formato';
 import type { Categoria, Datos, Frecuencia, Movimiento, Proximo, Recurrencia } from './tipos';
 
 export const claveMes = (anio: number, mes: number) => `${anio}-${String(mes).padStart(2, '0')}`;
@@ -78,6 +78,40 @@ export function proximosEn(d: Datos, dias: number, filtro?: (p: Proximo) => bool
   limite.setDate(limite.getDate() + dias);
   const hasta = fechaISO(limite);
   return d.proximos.filter((p) => p.fecha <= hasta && (!filtro || filtro(p))).sort((a, b) => a.fecha.localeCompare(b.fecha));
+}
+
+// --- Formas de ver el saldo -----------------------------------------------------------------------
+
+/** Lo que se puede poner arriba en el Inicio (se elige en Ajustes o tocando el saldo). */
+export type IdSaldo = 'total' | 'libre' | 'mes' | 'gastado' | 'entro';
+
+export const ORDEN_SALDOS: IdSaldo[] = ['total', 'libre', 'mes', 'gastado', 'entro'];
+
+export interface FormaSaldo {
+  rotulo: string;
+  valor: number;
+  detalle: string;
+  /** signo = verde si es 0 o más, rojo si es menos. */
+  tono: 'neutro' | 'ingreso' | 'gasto' | 'signo';
+}
+
+export function saldos(d: Datos): Record<IdSaldo, FormaSaldo> {
+  const total = d.cuentas.reduce((s, x) => s + saldo(x, d.movimientos), 0);
+  const programado = proximosEn(d, 30, (p) => p.tipo === 'gasto').reduce((s, p) => s + p.monto, 0);
+  const movs = delMes(d.movimientos, d.hoy.slice(0, 7));
+  const entro = sumar(movs, 'ingreso');
+  const gastado = sumar(movs, 'gasto');
+  const nGastos = movs.filter((m) => m.tipo === 'gasto').length;
+  const nIngresos = movs.filter((m) => m.tipo === 'ingreso').length;
+  const mes = MESES[Number(d.hoy.slice(5, 7)) - 1];
+  const n = d.cuentas.length;
+  return {
+    total: { rotulo: 'Tienes en total', valor: total, detalle: `en ${n} ${n === 1 ? 'cuenta' : 'cuentas'}`, tono: 'neutro' },
+    libre: { rotulo: 'Libre después de lo que viene', valor: total - programado, detalle: 'descontando lo programado para los próximos 30 días', tono: 'neutro' },
+    mes: { rotulo: `Balance de ${mes}`, valor: entro - gastado, detalle: `entró ${dinero(entro, d.moneda)} y salió ${dinero(gastado, d.moneda)}`, tono: 'signo' },
+    gastado: { rotulo: `Gastado en ${mes}`, valor: gastado, detalle: `en ${nGastos} ${nGastos === 1 ? 'gasto' : 'gastos'}`, tono: 'gasto' },
+    entro: { rotulo: `Entró en ${mes}`, valor: entro, detalle: `en ${nIngresos} ${nIngresos === 1 ? 'ingreso' : 'ingresos'}`, tono: 'ingreso' },
+  };
 }
 
 // La misma cuenta del servidor (recurrencias.py): lo mensual se cuenta siempre desde el inicio.

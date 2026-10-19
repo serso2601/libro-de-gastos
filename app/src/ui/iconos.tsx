@@ -5,7 +5,7 @@ import Svg, { Circle, Path, Rect } from 'react-native-svg';
 export type NombreIcono =
   | 'mas' | 'ajustes' | 'buscar' | 'calendario' | 'graficos' | 'presupuesto' | 'cuentas' | 'lista'
   | 'atras' | 'adelante' | 'abajo' | 'repetir' | 'reloj' | 'check' | 'libro' | 'qr' | 'exportar'
-  | 'cerrar' | 'transferir' | 'arriba';
+  | 'cerrar' | 'transferir' | 'arriba' | 'inicio';
 
 export function Icono({ nombre, tam = 20, color, grosor = 1.9 }: { nombre: NombreIcono; tam?: number; color: string; grosor?: number }) {
   const t = { stroke: color, strokeWidth: grosor, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, fill: 'none' };
@@ -43,6 +43,7 @@ export function Icono({ nombre, tam = 20, color, grosor = 1.9 }: { nombre: Nombr
           case 'exportar': return <><Path d="M12 3v12M7 8l5-5 5 5" {...t} /><Path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" {...t} /></>;
           case 'cerrar': return <Path d="M6 6l12 12M18 6 6 18" {...t} />;
           case 'transferir': return <Path d="M7 7h12l-3-3M17 17H5l3 3" {...t} />;
+          case 'inicio': return <><Path d="M3.5 10.5 12 3.5l8.5 7" {...t} /><Path d="M5.5 9v10a1.5 1.5 0 0 0 1.5 1.5h10a1.5 1.5 0 0 0 1.5-1.5V9M10 20.5V15h4v5.5" {...t} /></>;
         }
       })()}
     </Svg>

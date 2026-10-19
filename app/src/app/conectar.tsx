@@ -20,7 +20,7 @@ function Paso({ n, texto }: { n: number; texto: string }) {
       <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: c.suave, alignItems: 'center', justifyContent: 'center' }}>
         <Texto num tam={13} peso="semi">{n}</Texto>
       </View>
-      <Texto tam={14.5} style={{ flex: 1, lineHeight: 20, paddingTop: 3 }}>{texto}</Texto>
+      <Texto tam={15} style={{ flex: 1, lineHeight: 20, paddingTop: 3 }}>{texto}</Texto>
     </View>
   );
 }
@@ -66,8 +66,8 @@ export default function Conectar() {
           <View style={{ width: 56, height: 56, borderRadius: 16, backgroundColor: c.boton, alignItems: 'center', justifyContent: 'center' }}>
             <Icono nombre="libro" tam={28} color={c.sobreBoton} grosor={1.8} />
           </View>
-          <Texto tam={28} peso={estilo.m.pesoTitulo} style={{ letterSpacing: -0.8 }}>Conectar con la PC</Texto>
-          <Texto tam={15} color={c.tenue} style={{ lineHeight: 22 }}>Tus datos viven en tu PC. El teléfono llega a ella por Tailscale, en casa y afuera.</Texto>
+          <Texto tam={estilo.m.titulo} peso={estilo.m.pesoTitulo} style={{ letterSpacing: -0.8 }}>Conectar con la PC</Texto>
+          <Texto tam={14} color={c.tenue} style={{ lineHeight: 20 }}>Tus datos viven en tu PC. El teléfono llega a ella por Tailscale, en casa y afuera.</Texto>
         </View>
         <Tarjeta style={{ padding: 18, gap: 14 }}>
           <Paso n={1} texto="En la PC, abre «Libro de Gastos» desde el escritorio." />
