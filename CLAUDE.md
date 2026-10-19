@@ -16,7 +16,7 @@ Documents\PROYECTO APP DE GASTOS\      ← el repo
 │   └── src\app\             ← rutas: (pestanias)\ (Inicio · Movimientos · Presupuesto · Cuentas),
 │                                cuenta\[id] y ajustes (abiertas encima, con «‹ volver»), conectar
 │       src\pantallas\       ← las pantallas; inicio\ (saldo elegible + vistas Tarjetas y
-│                                Calendario); Movimientos lleva Lista, Próximos y Gráficos; Tutorial.tsx
+│                                Calendario); Movimientos lleva Lista y Gráficos; Tutorial.tsx
 │       src\lib\             ← datos (almacén + cola offline), api, acciones, calculos, formato, tipos
 │       src\dialogos\        ← las hojas: anotar, regla que se repite, cuenta, categoría, topes
 │       src\ui\              ← estilo (uno), tema (claro/oscuro/color), componentes, gráficos, marco
@@ -64,8 +64,13 @@ Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
 - **Montos en centavos (enteros)** en base y API. Fechas ISO. Formato de pantalla $1,234.56.
 - **Recurrencias = reglas**, no copias por adelantado: el servidor anota cada movimiento cuando
   llega su fecha (`recurrencias.materializar`, al pedir datos y cada 30 min) y guarda
-  `generada_hasta`; no duplica y lo borrado no vuelve. Lo que viene sale en «Próximos». La app
-  vieja creaba 12 copias de una vez: ese era el bug.
+  `generada_hasta`; no duplica y lo borrado no vuelve. La app vieja creaba 12 copias de una vez:
+  ese era el bug.
+- **Lo que viene** (lo que se repite y todavía no llega) sale **arriba de la lista de Movimientos,
+  solo lo que falta del mes actual** («Por venir en octubre», borde punteado); cuando llega su día
+  pasa a la lista y el mes siguiente trae los suyos (`calculos.porVenirDelMes`). El usuario NO
+  quiere una pestaña aparte de Próximos ni de recurrentes; las reglas se editan tocándolas o en
+  Ajustes → Se repiten.
 - **Offline**: cada cambio se ve al instante, queda en una cola (expo-sqlite/kv-store) y se manda
   en orden; ids UUID del teléfono y PUT idempotentes, así un reintento no duplica.
 - **Un solo estilo** (19/oct/2026), basado en Billetera: barra abajo (Inicio · Movimientos · + ·
@@ -77,8 +82,8 @@ Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
   estados. Sobre el color de una cuenta se usa la tinta de contraste, no rojo/verde.
 - **Inicio**: arriba el saldo que el usuario elige (total, libre después de lo que viene, balance,
   gastado o entró del mes: `calculos.saldos`), tocándolo o en Ajustes. Dos vistas: Tarjetas (+
-  recientes) y Calendario (cada día con lo que entró en verde y salió en rojo). **Nada de próximos
-  en el Inicio**: viven en Movimientos. La pestaña Cuentas muestra todas las formas de saldo.
+  recientes) y Calendario (cada día con lo que entró en verde y salió en rojo). **Nada de lo que
+  viene en el Inicio**: va arriba en Movimientos. La pestaña Cuentas muestra todas las formas de saldo.
 - Vasos de presupuesto: un solo color, sin raya en el borde. Nada del concepto "libro contable".
 - **Tutorial** único (`pantallas/Tutorial.tsx`) la primera vez; se repite desde Ajustes → «Ver cómo
   funciona». Si el manejo cambia, el tutorial se actualiza.
@@ -88,7 +93,7 @@ Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
 ## Estado (19/oct/2026)
 
 - Servidor con 27 pruebas (esquema v2). App con un solo estilo, modo oscuro, color principal,
-  tutorial, anotar/editar, reglas que se repiten, Próximos, buscador, gráficos, presupuesto con
+  tutorial, anotar/editar, reglas que se repiten, lo que viene del mes arriba de Movimientos, buscador, gráficos, presupuesto con
   topes (mensual), exportar, QR para conectar.
 - `app.json` pasó a `userInterfaceStyle: automatic`, compilado en `ios-dev-3`
   (`app-iphone\gastos-dev-3.ipa`). Con `ios-dev-2`, «Automático» se ve oscuro; Claro y Oscuro

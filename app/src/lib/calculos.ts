@@ -80,6 +80,13 @@ export function proximosEn(d: Datos, dias: number, filtro?: (p: Proximo) => bool
   return d.proximos.filter((p) => p.fecha <= hasta && (!filtro || filtro(p))).sort((a, b) => a.fecha.localeCompare(b.fecha));
 }
 
+/** Lo que todavía se va a anotar solo en lo que queda del mes de hoy. Cuando llega su día, el
+ *  servidor lo anota y pasa a ser un movimiento más; el mes que viene trae los suyos. */
+export function porVenirDelMes(d: Datos): Proximo[] {
+  const mes = d.hoy.slice(0, 7);
+  return d.proximos.filter((p) => p.fecha > d.hoy && p.fecha.startsWith(mes)).sort((a, b) => a.fecha.localeCompare(b.fecha));
+}
+
 // --- Formas de ver el saldo -----------------------------------------------------------------------
 
 /** Lo que se puede poner arriba en el Inicio (se elige en Ajustes o tocando el saldo). */
@@ -97,7 +104,7 @@ export interface FormaSaldo {
 
 export function saldos(d: Datos): Record<IdSaldo, FormaSaldo> {
   const total = d.cuentas.reduce((s, x) => s + saldo(x, d.movimientos), 0);
-  const programado = proximosEn(d, 30, (p) => p.tipo === 'gasto').reduce((s, p) => s + p.monto, 0);
+  const programado = porVenirDelMes(d).reduce((s, p) => s + (p.tipo === 'gasto' ? p.monto : 0), 0);
   const movs = delMes(d.movimientos, d.hoy.slice(0, 7));
   const entro = sumar(movs, 'ingreso');
   const gastado = sumar(movs, 'gasto');
@@ -107,7 +114,7 @@ export function saldos(d: Datos): Record<IdSaldo, FormaSaldo> {
   const n = d.cuentas.length;
   return {
     total: { rotulo: 'Tienes en total', valor: total, detalle: `en ${n} ${n === 1 ? 'cuenta' : 'cuentas'}`, tono: 'neutro' },
-    libre: { rotulo: 'Libre después de lo que viene', valor: total - programado, detalle: 'descontando lo programado para los próximos 30 días', tono: 'neutro' },
+    libre: { rotulo: 'Libre después de lo que viene', valor: total - programado, detalle: `descontando lo que falta por pagarse en ${mes}`, tono: 'neutro' },
     mes: { rotulo: `Balance de ${mes}`, valor: entro - gastado, detalle: `entró ${dinero(entro, d.moneda)} y salió ${dinero(gastado, d.moneda)}`, tono: 'signo' },
     gastado: { rotulo: `Gastado en ${mes}`, valor: gastado, detalle: `en ${nGastos} ${nGastos === 1 ? 'gasto' : 'gastos'}`, tono: 'gasto' },
     entro: { rotulo: `Entró en ${mes}`, valor: entro, detalle: `en ${nIngresos} ${nIngresos === 1 ? 'ingreso' : 'ingresos'}`, tono: 'ingreso' },

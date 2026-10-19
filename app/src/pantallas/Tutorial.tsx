@@ -14,7 +14,7 @@ interface Paso { icono: NombreIcono; titulo: string; texto: string }
 const PASOS: Paso[] = [
   { icono: 'inicio', titulo: 'Tu saldo, arriba', texto: 'En el Inicio ves tu saldo. Tócalo para elegir cuál ver: el total, lo libre después de lo que viene, el balance del mes… Debajo hay dos vistas: Tarjetas o Calendario.' },
   { icono: 'calendario', titulo: 'El mes en un calendario', texto: 'Cada día muestra en verde lo que entró y en rojo lo que salió. Toca un día para ver sus movimientos; el + anota en ese día.' },
-  { icono: 'lista', titulo: 'Movimientos', texto: 'La lista con el buscador, Próximos (lo que se anota solo cuando llega su día) y Gráficos.' },
+  { icono: 'lista', titulo: 'Movimientos', texto: 'Arriba de la lista sale lo que todavía falta este mes (lo que se repite); cuando llega su día pasa a la lista. Al lado, los Gráficos.' },
   { icono: 'presupuesto', titulo: 'Presupuesto y cuentas', texto: 'El presupuesto va en cuadros que se llenan con lo que gastas. En Cuentas están todas tus cuentas y todas las formas de ver tu saldo.' },
   { icono: 'mas', titulo: 'Anotar', texto: 'El botón negro del centro anota un gasto, un ingreso o una transferencia.' },
 ];

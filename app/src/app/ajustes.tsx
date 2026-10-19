@@ -14,7 +14,7 @@ import { textoRegla } from '@/pantallas/Proximos';
 import { BotonSuave, Campo, colorDeSaldo, FilaSimple, Inicial, Lista, Num, Segmentos, Tarjeta, Texto, TituloSeccion } from '@/ui/componentes';
 import { ACENTOS } from '@/ui/estilos';
 import { Icono } from '@/ui/iconos';
-import { Marco, ProveedorApilada, useIr } from '@/ui/pantalla';
+import { Marco, ProveedorApilada } from '@/ui/pantalla';
 import { usePreferencias, useTema, type Modo } from '@/ui/tema';
 
 function mover(ids: string[], i: number, delta: number): string[] {
@@ -45,7 +45,6 @@ function ContenidoAjustes() {
   const d = useDatos();
   const { conexion, desconectar, pedirYa, estado } = useAlmacen();
   const abrir = useAbrir();
-  const ir = useIr();
   const acciones = useAcciones();
   const { c } = useTema();
   const prefs = usePreferencias();
@@ -125,7 +124,7 @@ function ContenidoAjustes() {
         })}
       </Lista>
 
-      <TituloSeccion accion={{ texto: 'Ver próximos', onPress: () => ir('proximos') }}>Se repiten</TituloSeccion>
+      <TituloSeccion>Se repiten</TituloSeccion>
       <Lista>
         {d.recurrencias.length === 0 && <Texto tam={14} color={c.tenue} style={{ paddingVertical: 14 }}>Nada se repite todavía. Al anotar algo, elige «Se repite».</Texto>}
         {d.recurrencias.map((r, i) => (
