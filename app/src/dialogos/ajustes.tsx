@@ -47,7 +47,7 @@ export function DialogoCuenta({ inicial, alCerrar }: { inicial?: Cuenta; alCerra
           <BotonPrincipal onPress={guardar}>{inicial ? 'Guardar cambios' : 'Crear cuenta'}</BotonPrincipal>
           {inicial && (borrable
             ? <Borrar texto="Borrar cuenta" onPress={() => { acciones.borrarCuenta(inicial); alCerrar(); }} />
-            : <Texto tam={12.5} color={c.tenue} centro style={{ paddingVertical: 8 }}>No se puede borrar: es la única cuenta o tiene movimientos.</Texto>)}
+            : <Texto tam={13} color={c.tenue} centro style={{ paddingVertical: 8 }}>No se puede borrar: es la única cuenta o tiene movimientos.</Texto>)}
         </>
       )}>
       <View style={{ gap: 8 }}>
@@ -91,11 +91,11 @@ export function DialogoCategoria({ inicial, tipoInicial = 'gasto', alCerrar }: {
           <BotonPrincipal onPress={guardar}>{inicial ? 'Guardar cambios' : 'Crear categoría'}</BotonPrincipal>
           {inicial && (borrable
             ? <Borrar texto="Borrar categoría" onPress={() => { acciones.borrarCategoria(inicial); alCerrar(); }} />
-            : <Texto tam={12.5} color={c.tenue} centro style={{ paddingVertical: 8 }}>No se puede borrar: tiene movimientos o se repite.</Texto>)}
+            : <Texto tam={13} color={c.tenue} centro style={{ paddingVertical: 8 }}>No se puede borrar: tiene movimientos o se repite.</Texto>)}
         </>
       )}>
       {inicial
-        ? <Texto tam={13.5} color={c.tenue}>Categoría de {tipo}s</Texto>
+        ? <Texto tam={14} color={c.tenue}>Categoría de {tipo}s</Texto>
         : <Segmentos<TipoCategoria> opciones={[['gasto', 'De gastos'], ['ingreso', 'De ingresos']]} valor={tipo} alCambiar={setTipo} />}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
         <Inicial texto={inicialDe(nombre)} color={color} tam={48} />
@@ -134,7 +134,7 @@ export function DialogoPresupuesto({ categoria, alCerrar }: { categoria: Categor
           {categoria.presupuesto ? <Borrar texto="Quitar el tope" onPress={() => guardar(null)} /> : null}
         </>
       )}>
-      <Texto tam={13.5} color={c.tenue} style={{ lineHeight: 20 }}>
+      <Texto tam={14} color={c.tenue} style={{ lineHeight: 20 }}>
         Cuánto quieres gastar como mucho en {categoria.nombre.toLowerCase()} cada mes. Este mes llevas {dinero(gastado, d.moneda)}.
       </Texto>
       <MontoGrande valor={monto} alCambiar={setMonto} moneda={d.moneda} autoFocus />
@@ -145,7 +145,7 @@ export function DialogoPresupuesto({ categoria, alCerrar }: { categoria: Categor
 /** Todos los topes en una sola hoja. */
 export function DialogoTopes({ alCerrar }: { alCerrar: () => void }) {
   const d = useDatos();
-  const { c, estilo, oscuro } = useTema();
+  const { c, oscuro } = useTema();
   const { guardarCategoria } = useAcciones();
   const deGasto = d.categorias.filter((x) => x.tipo === 'gasto');
   const [valores, setValores] = useState<Record<string, string>>(() => Object.fromEntries(deGasto.map((x) => [x.id, x.presupuesto ? aTexto(x.presupuesto) : ''])));
@@ -166,7 +166,7 @@ export function DialogoTopes({ alCerrar }: { alCerrar: () => void }) {
 
   return (
     <Hoja titulo="Topes por mes" alCerrar={alCerrar} pie={<><TextoError texto={error} /><BotonPrincipal onPress={guardar}>Guardar topes</BotonPrincipal></>}>
-      <Texto tam={13.5} color={c.tenue} style={{ lineHeight: 20 }}>Deja vacío lo que no quieras limitar. En total: {dinero(total, d.moneda)} al mes.</Texto>
+      <Texto tam={14} color={c.tenue} style={{ lineHeight: 20 }}>Deja vacío lo que no quieras limitar. En total: {dinero(total, d.moneda)} al mes.</Texto>
       <View style={{ backgroundColor: c.suave, borderRadius: 14 }}>
         {deGasto.map((cat, i) => (
           <View key={cat.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, height: 54, paddingHorizontal: 14, borderTopWidth: i ? 1 : 0, borderTopColor: c.tarjeta }}>
@@ -175,7 +175,7 @@ export function DialogoTopes({ alCerrar }: { alCerrar: () => void }) {
             <Texto num tam={15} color={c.tenue}>{d.moneda}</Texto>
             <TextInput value={valores[cat.id]} onChangeText={(t) => setValores((v) => ({ ...v, [cat.id]: t }))} placeholder="sin tope" placeholderTextColor={c.tenue}
               keyboardType="decimal-pad" keyboardAppearance={oscuro ? 'dark' : 'light'} accessibilityLabel={`Tope de ${cat.nombre}`}
-              style={{ width: 96, height: 40, textAlign: 'right', fontSize: 15, color: c.tinta, fontFamily: familia(estilo.fuentes, 'medio', true) }} />
+              style={{ width: 96, height: 40, paddingVertical: 0, textAlign: 'right', fontSize: 16, color: c.tinta, fontFamily: familia('medio'), fontVariant: ['tabular-nums'] }} />
           </View>
         ))}
       </View>

@@ -28,13 +28,13 @@ export function Dona({ datos, centro, tam = 136, grosor = 18 }: { datos: { id: s
           })}
         </G>
       </Svg>
-      <Num tam={18}>{centro}</Num>
+      <Num tam={17}>{centro}</Num>
       <Texto tam={11} color={c.tenue}>gastado</Texto>
     </View>
   );
 }
 
-/** Un anillo de avance (el bloque de Presupuesto de Mosaico). */
+/** Un anillo de avance. */
 export function Anillo({ pct, color, fondo, tam = 56, grosor = 8 }: { pct: number; color: string; fondo: string; tam?: number; grosor?: number }) {
   const r = (tam - grosor) / 2;
   const circ = 2 * Math.PI * r;
@@ -49,8 +49,8 @@ export function Anillo({ pct, color, fondo, tam = 56, grosor = 8 }: { pct: numbe
   );
 }
 
-/** Barras de ingresos y gastos por mes; el mes elegido va en negrita. */
-export function Barras({ datos, colorGastos }: { datos: { clave: string; etiqueta: string; ingresos: number; gastos: number; actual: boolean }[]; colorGastos: string }) {
+/** Barras de ingresos (verde) y gastos (rojo) por mes; el mes elegido va en negrita. */
+export function Barras({ datos }: { datos: { clave: string; etiqueta: string; ingresos: number; gastos: number; actual: boolean }[] }) {
   const { c } = useTema();
   const maximo = Math.max(1, ...datos.flatMap((d) => [d.ingresos, d.gastos]));
   const alto = 110;
@@ -59,10 +59,10 @@ export function Barras({ datos, colorGastos }: { datos: { clave: string; etiquet
       {datos.map((d) => (
         <View key={d.clave} style={{ flex: 1, alignItems: 'center', gap: 6 }}>
           <View style={{ height: alto, flexDirection: 'row', alignItems: 'flex-end', gap: 4 }}>
-            <View style={{ width: 11, height: Math.max((d.ingresos / maximo) * alto, 2), backgroundColor: c.bien, borderTopLeftRadius: 3, borderTopRightRadius: 3, borderRadius: 1 }} />
-            <View style={{ width: 11, height: Math.max((d.gastos / maximo) * alto, 2), backgroundColor: colorGastos, borderTopLeftRadius: 3, borderTopRightRadius: 3, borderRadius: 1 }} />
+            <View style={{ width: 11, height: Math.max((d.ingresos / maximo) * alto, 2), backgroundColor: c.ingreso, borderTopLeftRadius: 3, borderTopRightRadius: 3, borderRadius: 1 }} />
+            <View style={{ width: 11, height: Math.max((d.gastos / maximo) * alto, 2), backgroundColor: c.gasto, borderTopLeftRadius: 3, borderTopRightRadius: 3, borderRadius: 1 }} />
           </View>
-          <Texto tam={11.5} peso={d.actual ? 'negrita' : 'normal'} color={d.actual ? c.tinta : c.tenue}>{d.etiqueta}</Texto>
+          <Texto tam={12} peso={d.actual ? 'negrita' : 'normal'} color={d.actual ? c.tinta : c.tenue}>{d.etiqueta}</Texto>
         </View>
       ))}
     </View>
@@ -83,7 +83,7 @@ export interface Celda {
   fondo: string;
   tinta: string;
   borde?: { color: string; punteado: boolean };
-  peso?: 'medio' | 'semi' | 'negrita' | 'extra';
+  peso?: 'medio' | 'semi' | 'negrita';
   /** Texto chico debajo del número ("hoy", "cobro"). */
   marca?: string;
   /** Un puntito debajo del número. */
@@ -116,7 +116,7 @@ export function CalendarioMes({ anio, mes, alto, gap = 4, celda, alElegir }: {
             const contenido: ReactNode = (
               <>
                 <Texto num tam={12} peso={x.peso ?? 'medio'} color={x.tinta}>{d}</Texto>
-                {x.marca ? <Texto tam={9} color={x.tinta} style={{ letterSpacing: 0.2 }}>{x.marca}</Texto> : null}
+                {x.marca ? <Texto tam={11} color={x.tinta} style={{ letterSpacing: 0.2 }}>{x.marca}</Texto> : null}
                 {x.punto ? <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: x.punto }} /> : null}
               </>
             );

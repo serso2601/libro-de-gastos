@@ -13,12 +13,13 @@ ni montos reales en el repo.
 ```
 Documents\PROYECTO APP DE GASTOS\      ← el repo
 ├── app\                     ← la app del iPhone: Expo SDK 58, expo-router, TypeScript
-│   └── src\app\             ← rutas: (pestanias)\ (Inicio + 4 secciones), ver\[pantalla] (secciones
-│                                abiertas encima, con «‹ volver»), cuenta\[id], ajustes, conectar
-│       src\pantallas\       ← las pantallas; inicio\ trae un Inicio por estilo; Tutorial.tsx
+│   └── src\app\             ← rutas: (pestanias)\ (Inicio · Movimientos · Presupuesto · Cuentas),
+│                                cuenta\[id] y ajustes (abiertas encima, con «‹ volver»), conectar
+│       src\pantallas\       ← las pantallas; inicio\ (saldo elegible + vistas Tarjetas y
+│                                Calendario); Movimientos lleva Lista, Próximos y Gráficos; Tutorial.tsx
 │       src\lib\             ← datos (almacén + cola offline), api, acciones, calculos, formato, tipos
 │       src\dialogos\        ← las hojas: anotar, regla que se repite, cuenta, categoría, topes
-│       src\ui\              ← estilos (los 5), tema (claro/oscuro/color), componentes, gráficos, marco
+│       src\ui\              ← estilo (uno), tema (claro/oscuro/color), componentes, gráficos, marco
 ├── servidor\                ← FastAPI + SQLite (uv). Paquete `gastos`. `uv run pytest`
 ├── scripts\iniciar.ps1      ← arranca el servidor (8766) y Metro (8082); lo corre el inicio de Windows
 ├── scripts\instalar-inicio.ps1 · abrir-firewall.ps1
@@ -67,22 +68,28 @@ Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
   vieja creaba 12 copias de una vez: ese era el bug.
 - **Offline**: cada cambio se ve al instante, queda en una cola (expo-sqlite/kv-store) y se manda
   en orden; ids UUID del teléfono y PUT idempotentes, así un reintento no duplica.
-- **Sistema visual: 5 estilos** que el usuario elige en Ajustes (`ui/estilos.ts`): Billetera
-  (tarjetas apiladas + barra abajo), Mosaico (bloques de colores, sin barra), Calendario (calendario
-  de calor + barra flotante), Cartera en mosaico y Calendario en mosaico (sin barra, todo sale del
-  Inicio). Cada uno con sus fuentes, medidas y colores, en claro y oscuro (Automático/Claro/Oscuro)
-  y con color principal cambiable. Las pantallas son las mismas y leen el tema con `useTema()`:
-  nada de colores fijos. Los diseños salen del lienzo https://claude.ai/artifact/8xnZiaBVscpofjQ4LpVJtL.
-  Dentro de un estilo, mismas medidas en todas las pantallas. Vasos de presupuesto: un solo color,
-  sin raya en el borde. Nada del concepto "libro contable" que el usuario descartó.
-- **Tutorial** la primera vez que se usa cada estilo (`pantallas/Tutorial.tsx`); se repite desde
-  Ajustes → «Ver cómo funciona». Si un estilo cambia cómo se maneja algo, su tutorial lo explica.
+- **Un solo estilo** (19/oct/2026), basado en Billetera: barra abajo (Inicio · Movimientos · + ·
+  Presupuesto · Cuentas), cuentas como tarjetas apiladas, letra Onest en todo (montos con cifras
+  tabulares), escala de tamaños 11·12·13·14·15·17·20·22·24·28·34. De Mosaico toma el presupuesto
+  en vasos/cuadros. Los otros 4 estilos se borraron. Claro/oscuro/Automático y color principal
+  siguen; todo sale de `useTema()`, nada de colores fijos.
+- **Verde = ingreso, rojo = gasto en toda la app** (`c.ingreso`, `c.gasto`); `bien`/`alerta` son para
+  estados. Sobre el color de una cuenta se usa la tinta de contraste, no rojo/verde.
+- **Inicio**: arriba el saldo que el usuario elige (total, libre después de lo que viene, balance,
+  gastado o entró del mes: `calculos.saldos`), tocándolo o en Ajustes. Dos vistas: Tarjetas (+
+  recientes) y Calendario (cada día con lo que entró en verde y salió en rojo). **Nada de próximos
+  en el Inicio**: viven en Movimientos. La pestaña Cuentas muestra todas las formas de saldo.
+- Vasos de presupuesto: un solo color, sin raya en el borde. Nada del concepto "libro contable".
+- **Tutorial** único (`pantallas/Tutorial.tsx`) la primera vez; se repite desde Ajustes → «Ver cómo
+  funciona». Si el manejo cambia, el tutorial se actualiza.
+- **Recurrencias**: semanal, cada 2 semanas (`catorcenal`, 26 al año), cada quincena (`quincenal`,
+  dos veces al mes: el día de inicio y 15 días después), mensual, anual.
 
 ## Estado (19/oct/2026)
 
-- Servidor con 25 pruebas. App con los 5 estilos, modo oscuro, color principal, tutoriales,
-  anotar/editar, reglas que se repiten, Próximos, buscador, presupuesto con topes, importar el
-  respaldo de la app vieja, exportar, QR para conectar.
+- Servidor con 27 pruebas (esquema v2). App con un solo estilo, modo oscuro, color principal,
+  tutorial, anotar/editar, reglas que se repiten, Próximos, buscador, gráficos, presupuesto con
+  topes (mensual), exportar, QR para conectar.
 - `app.json` pasó a `userInterfaceStyle: automatic`, compilado en `ios-dev-3`
   (`app-iphone\gastos-dev-3.ipa`). Con `ios-dev-2`, «Automático» se ve oscuro; Claro y Oscuro
   funcionan con cualquier build.
@@ -93,6 +100,14 @@ Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
 ## Qué sigue (ideas acordadas)
 
 1. Usar la app y pulir lo que salga (el usuario va anotando cambios de diseño).
+1b. **Funciones acordadas tras investigar** (Money Manager, Buddy, Copilot, YNAB…), después del
+   diseño: **tarjeta de crédito** = interruptor «Es tarjeta de crédito» en la cuenta (no hay tipos
+   de cuenta): día de corte obligatorio, «gastado en este corte» y deuda total; pago mínimo y fecha
+   de pago opcionales (el usuario los copia, no se calculan); el pago es una transferencia que la
+   app **sugiere** y el usuario confirma, nunca automática. **Presupuestos con periodo
+   configurable** (semanal, cada 2 semanas, quincenal, mensual con día de inicio, personalizado;
+   por defecto mensual, nada obligatorio: hay quien no tiene fechas de cobro), pasar lo que sobra,
+   «te quedan $X para N días». Luego favoritos/plantillas, subcategorías, metas y fondos.
 2. **Gasto por voz** (en veremos: el usuario la usa poco; si se hace, que use las categorías ya
    creadas): grabar en la app → Whisper en la PC → `claude -p --model sonnet` lo vuelve
    movimiento → bandeja «Por revisar» (nada entra solo).

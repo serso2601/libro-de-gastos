@@ -6,17 +6,22 @@ import { proximasVeces } from '@/lib/calculos';
 import { useDatos } from '@/lib/datos';
 import { aCentavos, aFecha, aTexto, DIAS, diaCorto, fechaISO, MESES, MESES_CORTOS } from '@/lib/formato';
 import { FRECUENCIAS, type Frecuencia, type Recurrencia } from '@/lib/tipos';
-import { BotonPrincipal, Etiqueta, Ficha, Hoja, MontoGrande, Texto, TextoError } from '@/ui/componentes';
+import { BotonPrincipal, Etiqueta, familia, Ficha, Hoja, MontoGrande, Texto, TextoError } from '@/ui/componentes';
 import { Icono } from '@/ui/iconos';
 import { useTema } from '@/ui/tema';
 import { Desplegable, ElegirCategoria, ElegirCuenta, Grilla } from './piezas';
 
-const CORTAS: Record<Frecuencia, string> = { semanal: 'Cada semana', quincenal: 'Cada 2 sem.', mensual: 'Cada mes', anual: 'Cada año' };
+const CORTAS: Record<Frecuencia, string> = { semanal: 'Semana', catorcenal: '2 semanas', quincenal: 'Quincena', mensual: 'Mes', anual: 'Año' };
 
 function cuando(f: Frecuencia, inicio: string): string {
   const d = aFecha(inicio);
   if (f === 'semanal') return `cada ${DIAS[d.getDay()]}`;
-  if (f === 'quincenal') return `cada 2 semanas, los ${DIAS[d.getDay()]}`;
+  if (f === 'catorcenal') return `cada 2 semanas, los ${DIAS[d.getDay()]}`;
+  if (f === 'quincenal') {
+    const otro = d.getDate() <= 15 ? d.getDate() + 15 : d.getDate() - 15;
+    const [a, b] = [d.getDate(), otro].sort((x, y) => x - y);
+    return `dos veces al mes, el ${a} y el ${b}`;
+  }
   if (f === 'mensual') return `cada mes, el día ${d.getDate()}`;
   return `cada año, el ${d.getDate()} de ${MESES[d.getMonth()]}`;
 }
@@ -26,7 +31,7 @@ const fechaLarga = (iso: string) => { const d = aFecha(iso); return `${d.getDate
 /** Editar una regla que se repite. Lo que cambie vale para lo que viene; lo ya anotado no se toca. */
 export function DialogoRecurrencia({ regla, alCerrar }: { regla: Recurrencia; alCerrar: () => void }) {
   const { cuentas, categorias, moneda, hoy } = useDatos();
-  const { c, estilo, oscuro } = useTema();
+  const { c, oscuro } = useTema();
   const acciones = useAcciones();
   const [monto, setMonto] = useState(aTexto(regla.monto));
   const [cuenta, setCuenta] = useState(regla.cuenta_id);
@@ -73,19 +78,19 @@ export function DialogoRecurrencia({ regla, alCerrar }: { regla: Recurrencia; al
           </Pressable>
         </>
       )}>
-      <Texto tam={13.5} color={c.tenue} style={{ lineHeight: 20 }}>
+      <Texto tam={14} color={c.tenue} style={{ lineHeight: 20 }}>
         Esto se anota solo {cuando(frecuencia, regla.fecha_inicio)}. Si cambias algo, vale para las que vienen; las que ya se anotaron quedan como están.
       </Texto>
 
       <View>
         <MontoGrande valor={monto} alCambiar={setMonto} moneda={moneda} />
         <TextInput value={nota} onChangeText={setNota} placeholder="Descripción" placeholderTextColor={c.tenue} accessibilityLabel="Descripción"
-          style={{ textAlign: 'center', fontSize: 16, height: 36, color: c.tinta, fontFamily: estilo.fuentes.normal }} />
+          style={{ textAlign: 'center', fontSize: 16, height: 36, paddingVertical: 0, color: c.tinta, fontFamily: familia('normal') }} />
       </View>
 
       <View style={{ gap: 8 }}>
         <Etiqueta>Se repite</Etiqueta>
-        <Grilla columnas={4} gap={6}>
+        <Grilla columnas={3} gap={6}>
           {FRECUENCIAS.map(([f]) => <Ficha key={f} texto={CORTAS[f]} activa={f === frecuencia} onPress={() => setFrecuencia(f)} alto={40} compacta />)}
         </Grilla>
       </View>

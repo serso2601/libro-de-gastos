@@ -27,7 +27,7 @@ export function ElegirMes({ visible, anio, mes, hoy, alElegir, alCerrar }: {
             <Pressable onPress={() => setViendo((a) => a - 1)} hitSlop={8} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }} accessibilityLabel="Año anterior">
               <Icono nombre="atras" tam={20} color={c.tinta} grosor={2} />
             </Pressable>
-            <Texto tam={17} peso={estilo.m.pesoTitulo === 'extra' ? 'extra' : 'semi'} num>{viendo}</Texto>
+            <Texto tam={17} peso="semi" num>{viendo}</Texto>
             <Pressable onPress={() => setViendo((a) => a + 1)} disabled={!hayAdelante} hitSlop={8} accessibilityLabel="Año siguiente"
               style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', opacity: hayAdelante ? 1 : 0.3 }}>
               <Icono nombre="adelante" tam={20} color={c.tinta} grosor={2} />

@@ -1,4 +1,4 @@
--- Esquema del Libro de Gastos (versión 1).
+-- Esquema del Libro de Gastos (versión 2).
 --
 -- Los montos son enteros en centavos: $12,50 se guarda como 1250. Las fechas son texto ISO
 -- ('2026-10-16'), las horas 'HH:MM' y las marcas de tiempo ISO con segundos.
@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS categoria (
 
 -- Una regla que se repite. No genera nada por adelantado: el servidor crea cada movimiento cuando
 -- llega su fecha (ver recurrencias.materializar) y anota hasta dónde llegó en generada_hasta.
+-- catorcenal = cada 14 días; quincenal = dos veces al mes (el día de inicio y 15 días después).
 CREATE TABLE IF NOT EXISTS recurrencia (
     id                  TEXT PRIMARY KEY,
     tipo                TEXT NOT NULL CHECK (tipo IN ('gasto', 'ingreso', 'transferencia')),
@@ -36,7 +37,7 @@ CREATE TABLE IF NOT EXISTS recurrencia (
     cuenta_destino_id   TEXT REFERENCES cuenta(id),
     categoria_id        TEXT REFERENCES categoria(id),
     nota                TEXT NOT NULL DEFAULT '',
-    frecuencia          TEXT NOT NULL CHECK (frecuencia IN ('semanal', 'quincenal', 'mensual', 'anual')),
+    frecuencia          TEXT NOT NULL CHECK (frecuencia IN ('semanal', 'catorcenal', 'quincenal', 'mensual', 'anual')),
     fecha_inicio        TEXT NOT NULL,
     fecha_fin           TEXT,
     generada_hasta      TEXT,

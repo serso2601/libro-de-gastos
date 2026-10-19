@@ -2,7 +2,8 @@
 
 export type TipoMovimiento = 'gasto' | 'ingreso' | 'transferencia';
 export type TipoCategoria = 'gasto' | 'ingreso';
-export type Frecuencia = 'semanal' | 'quincenal' | 'mensual' | 'anual';
+/** catorcenal = cada 14 días; quincenal = dos veces al mes (el día de inicio y 15 días después). */
+export type Frecuencia = 'semanal' | 'catorcenal' | 'quincenal' | 'mensual' | 'anual';
 
 export interface Cuenta {
   id: string;
@@ -73,7 +74,8 @@ export interface Datos {
 
 export const FRECUENCIAS: [Frecuencia, string][] = [
   ['semanal', 'Cada semana'],
-  ['quincenal', 'Cada 2 semanas'],
+  ['catorcenal', 'Cada 2 semanas'],
+  ['quincenal', 'Cada quincena'],
   ['mensual', 'Cada mes'],
   ['anual', 'Cada año'],
 ];

@@ -5,7 +5,7 @@ import { useAcciones } from '@/lib/acciones';
 import { useDatos } from '@/lib/datos';
 import { aCentavos, aFecha, aTexto, DIAS, nuevoId } from '@/lib/formato';
 import { FRECUENCIAS, type Frecuencia, type Movimiento, type Recurrencia, type TipoMovimiento } from '@/lib/tipos';
-import { BotonPrincipal, Ficha, Hoja, MontoGrande, Segmentos, Texto, TextoError } from '@/ui/componentes';
+import { BotonPrincipal, familia, Ficha, Hoja, MontoGrande, Segmentos, Texto, TextoError } from '@/ui/componentes';
 import { Icono } from '@/ui/iconos';
 import { useTema } from '@/ui/tema';
 import { Desplegable, ElegirCategoria, ElegirCuenta, ElegirFecha } from './piezas';
@@ -20,7 +20,7 @@ export function DialogoMovimiento({ inicial, tipoInicial = 'gasto', fechaInicial
   alCerrar: () => void; alEditarRegla: (r: Recurrencia) => void;
 }) {
   const { cuentas, categorias, moneda, hoy, recurrencias } = useDatos();
-  const { c, estilo } = useTema();
+  const { c } = useTema();
   const acciones = useAcciones();
   const editando = !!inicial;
   const primeraDe = (t: TipoMovimiento) => categorias.find((x) => x.tipo === t)?.id ?? '';
@@ -85,21 +85,21 @@ export function DialogoMovimiento({ inicial, tipoInicial = 'gasto', fechaInicial
     }
   }
 
+  // Si no es hoy, el botón dice qué día se va a guardar: «Guardar el martes 14».
   const d = aFecha(fecha);
-  const conDia = estilo.id === 'calendario' || estilo.id === 'calmosaico';
-  const textoGuardar = editando ? 'Guardar cambios' : conDia ? `Guardar el ${DIAS[d.getDay()]} ${d.getDate()}` : 'Guardar';
+  const textoGuardar = editando ? 'Guardar cambios' : fecha === hoy ? 'Guardar' : `Guardar el ${DIAS[d.getDay()]} ${d.getDate()}`;
   const textoRepetir = REPETIR.find(([r]) => r === repetir)?.[1] ?? 'No';
 
   return (
     <Hoja titulo={editando ? 'Editar' : 'Anotar'} alCerrar={alCerrar}
-      derecha={editando ? <Pressable onPress={borrar} hitSlop={10}><Texto tam={16} color={c.alerta}>Borrar</Texto></Pressable> : undefined}
+      derecha={editando ? <Pressable onPress={borrar} hitSlop={10}><Texto tam={17} color={c.alerta}>Borrar</Texto></Pressable> : undefined}
       pie={<><TextoError texto={error} /><BotonPrincipal onPress={guardar}>{textoGuardar}</BotonPrincipal></>}>
       <Segmentos opciones={TIPOS} valor={tipo} alCambiar={cambiarTipo} />
 
       <View style={{ alignItems: 'stretch' }}>
         <MontoGrande valor={monto} alCambiar={(v) => { setMonto(v); setError(''); }} moneda={moneda} autoFocus={!editando} />
         <TextInput value={nota} onChangeText={setNota} placeholder="¿De qué se trata?" placeholderTextColor={c.tenue} accessibilityLabel="Descripción"
-          style={{ textAlign: 'center', fontSize: 16, height: 36, color: c.tinta, fontFamily: estilo.fuentes.normal }} returnKeyType="done" />
+          style={{ textAlign: 'center', fontSize: 16, height: 36, paddingVertical: 0, color: c.tinta, fontFamily: familia('normal') }} returnKeyType="done" />
       </View>
 
       <ElegirFecha fecha={fecha} alCambiar={setFecha} rotulo={repetir === 'no' ? 'Fecha' : 'Primera vez'}
@@ -120,7 +120,7 @@ export function DialogoMovimiento({ inicial, tipoInicial = 'gasto', fechaInicial
               ))}
             </View>
             {repetir !== 'no' && (
-              <Texto tam={12.5} color={c.tenue} style={{ marginTop: 10, lineHeight: 18 }}>
+              <Texto tam={13} color={c.tenue} style={{ marginTop: 10, lineHeight: 18 }}>
                 Se anota solo cada vez que llega la fecha, sin crear nada por adelantado. Lo que viene lo ves en «Próximos».
               </Texto>
             )}

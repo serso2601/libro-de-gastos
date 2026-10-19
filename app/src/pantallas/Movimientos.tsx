@@ -1,25 +1,39 @@
-import { useMemo, useState } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
-import { useAbrir, useAnotar } from '@/dialogos/abrir';
-import { delMes, gastoPorDia, netoDe, nivelador, porDia, sumar } from '@/lib/calculos';
+import { useAbrir } from '@/dialogos/abrir';
+import { delMes, netoDe, porDia, sumar } from '@/lib/calculos';
 import { useDatos } from '@/lib/datos';
 import { MESES, mayuscula, neto, ordenarPorFecha, tituloDia } from '@/lib/formato';
-import { Campo, CabeceraDia, Enlace, FilaMovimiento, Lista, Num, PildoraAnotar, Tarjeta, Texto, Vacio } from '@/ui/componentes';
-import { Icono } from '@/ui/iconos';
+import { Buscador, CabeceraDia, Enlace, FilaMovimiento, Lista, Num, Segmentos, Tarjeta, Texto, Vacio } from '@/ui/componentes';
 import { Marco } from '@/ui/pantalla';
-import { mezclar, useTema } from '@/ui/tema';
+import { useTema } from '@/ui/tema';
+import { ContenidoGraficos } from './Graficos';
+import { ContenidoProximos } from './Proximos';
 
 type Filtro = 'todos' | 'gasto' | 'ingreso' | 'transferencia';
+type Vista = 'lista' | 'proximos' | 'graficos';
+const VISTAS: [Vista, string][] = [['lista', 'Lista'], ['proximos', 'Próximos'], ['graficos', 'Gráficos']];
 const FILTROS: [Filtro, string][] = [['todos', 'Todos'], ['gasto', 'Gastos'], ['ingreso', 'Ingresos'], ['transferencia', 'Transferencias']];
 
+/** Movimientos y sus tres vistas: la lista, lo que viene (Próximos) y los Gráficos. */
 export function Movimientos() {
   const d = useDatos();
+  const { vista: vistaPedida } = useLocalSearchParams<{ vista?: string }>();
+  const [vista, setVista] = useState<Vista>('lista');
   const abrir = useAbrir();
-  const anotar = useAnotar();
-  const { c, estilo, oscuro } = useTema();
+  const { c, estilo } = useTema();
   const [filtro, setFiltro] = useState<Filtro>('todos');
   const [busqueda, setBusqueda] = useState('');
   const [limite, setLimite] = useState(80);
+  // Quien llega desde el Inicio con `vista` cae directo en Próximos o Gráficos; el parámetro se limpia
+  // para que tocar la pestaña después no lo repita.
+  useEffect(() => {
+    if (vistaPedida === 'proximos' || vistaPedida === 'graficos' || vistaPedida === 'lista') {
+      setVista(vistaPedida);
+      router.setParams({ vista: undefined });
+    }
+  }, [vistaPedida]);
   const mesActual = d.hoy.slice(0, 7);
   const delMesActual = delMes(d.movimientos, mesActual);
 
@@ -35,72 +49,59 @@ export function Movimientos() {
     return { lista: porDia(filtrados.slice(0, limite)), total: filtrados.length };
   }, [d.movimientos, d.categorias, d.cuentas, filtro, busqueda, limite]);
 
-  // El cuadrito de calor de cada día (Calendario), comparado con su propio mes.
-  const calorDe = useMemo(() => {
-    if (estilo.id !== 'calendario') return null;
-    const cache = new Map<string, { dias: number[]; nivel: ReturnType<typeof nivelador> }>();
-    return (fecha: string) => {
-      const clave = fecha.slice(0, 7);
-      if (!cache.has(clave)) {
-        const dias = gastoPorDia(d.movimientos, Number(clave.slice(0, 4)), Number(clave.slice(5, 7)));
-        cache.set(clave, { dias, nivel: nivelador(dias) });
-      }
-      const x = cache.get(clave)!;
-      return c.calor[x.nivel(x.dias[Number(fecha.slice(8, 10)) - 1])];
-    };
-  }, [estilo.id, d.movimientos, c.calor]);
-
+  const salio = sumar(delMesActual, 'gasto');
+  const entro = sumar(delMesActual, 'ingreso');
   const mesNombre = mayuscula(MESES[Number(mesActual.slice(5, 7)) - 1]);
-  const limon = estilo.id === 'mosaico' && estilo.bloques ? (oscuro ? mezclar(c.tarjeta, estilo.bloques.limon.base, 0.22) : estilo.bloques.limon.claro) : null;
 
   return (
-    <Marco titulo="Movimientos" subtitulo={`${mesNombre} · ${delMesActual.length} ${delMesActual.length === 1 ? 'anotado' : 'anotados'}`}
-      pie={estilo.navegacion === 'bloques' ? <PildoraAnotar onPress={() => anotar()} /> : undefined}>
-      {limon && (
-        <Tarjeta color={limon} style={{ paddingVertical: 14, paddingHorizontal: 16, flexDirection: 'row', gap: 8 }}>
-          <View style={{ flex: 1, gap: 2 }}>
-            <Texto tam={12.5} color={c.tenue}>Salió</Texto>
-            <Num tam={24}>−{neto(sumar(delMesActual, 'gasto'), d.moneda)}</Num>
-          </View>
-          <View style={{ flex: 1, gap: 2 }}>
-            <Texto tam={12.5} color={c.tenue}>Entró</Texto>
-            <Num tam={24} color={c.bien}>+{neto(sumar(delMesActual, 'ingreso'), d.moneda)}</Num>
-          </View>
-        </Tarjeta>
-      )}
+    <Marco titulo="Movimientos" subtitulo={`${mesNombre} · ${delMesActual.length} ${delMesActual.length === 1 ? 'anotado' : 'anotados'}`}>
+      <Segmentos opciones={VISTAS} valor={vista} alCambiar={setVista} />
 
-      <View style={{ height: 46, borderRadius: estilo.m.esquinas >= 24 ? 16 : 14, backgroundColor: c.tarjeta, flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 14 }}>
-        <Icono nombre="buscar" tam={18} color={c.tenue} />
-        <Campo value={busqueda} onChangeText={setBusqueda} placeholder="Buscar por descripción o categoría" clearButtonMode="while-editing"
-          style={{ flex: 1, backgroundColor: 'transparent', paddingHorizontal: 0, height: 44 }} returnKeyType="search" />
-      </View>
+      {vista === 'proximos' && <ContenidoProximos />}
+      {vista === 'graficos' && <ContenidoGraficos />}
+      {vista === 'lista' && (
+        <>
+          <Tarjeta style={{ flexDirection: 'row', paddingVertical: 12, paddingHorizontal: 16, gap: 16 }}>
+            <View style={{ flex: 1, gap: 2 }}>
+              <Texto tam={13} color={c.tenue}>Salió</Texto>
+              <Num tam={22} color={salio ? c.gasto : undefined} lineas={1}>{neto(salio, d.moneda)}</Num>
+            </View>
+            <View style={{ flex: 1, gap: 2 }}>
+              <Texto tam={13} color={c.tenue}>Entró</Texto>
+              <Num tam={22} color={entro ? c.ingreso : undefined} lineas={1}>{neto(entro, d.moneda)}</Num>
+            </View>
+          </Tarjeta>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginHorizontal: -estilo.m.margen }}
-        contentContainerStyle={{ gap: 6, paddingHorizontal: estilo.m.margen }}>
-        {FILTROS.map(([id, texto]) => {
-          const activo = filtro === id;
-          return (
-            <Pressable key={id} onPress={() => setFiltro(id)} style={{ height: 34, paddingHorizontal: 14, borderRadius: 17, backgroundColor: activo ? c.boton : c.tarjeta, justifyContent: 'center' }}>
-              <Texto tam={13} peso={activo ? 'semi' : 'medio'} color={activo ? c.sobreBoton : c.tenue}>{texto}</Texto>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+          <Buscador valor={busqueda} alCambiar={setBusqueda} placeholder="Buscar por descripción o categoría" />
 
-      {grupos.lista.length === 0
-        ? <Vacio>{busqueda || filtro !== 'todos' ? 'No hay nada que coincida.' : 'Todavía no hay movimientos. Toca + para anotar el primero.'}</Vacio>
-        : grupos.lista.map(([fecha, items]) => (
-          <View key={fecha} style={{ gap: 6 }}>
-            <CabeceraDia titulo={tituloDia(fecha, d.hoy)} derecha={neto(netoDe(items), d.moneda, true)} calor={calorDe?.(fecha)} />
-            <Lista>
-              {items.map((m, i) => <FilaMovimiento key={m.id} m={m} primera={i === 0} onPress={() => abrir({ tipo: 'movimiento', inicial: m })} />)}
-            </Lista>
-          </View>
-        ))}
-      {grupos.total > limite && (
-        <View style={{ alignItems: 'center', paddingVertical: 8 }}>
-          <Enlace tam={15} onPress={() => setLimite((l) => l + 200)}>Ver más ({grupos.total - limite})</Enlace>
-        </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginHorizontal: -estilo.m.margen }}
+            contentContainerStyle={{ gap: 6, paddingHorizontal: estilo.m.margen }}>
+            {FILTROS.map(([id, texto]) => {
+              const activo = filtro === id;
+              return (
+                <Pressable key={id} onPress={() => setFiltro(id)} style={{ height: 34, paddingHorizontal: 14, borderRadius: 17, backgroundColor: activo ? c.boton : c.tarjeta, justifyContent: 'center' }}>
+                  <Texto tam={13} peso={activo ? 'semi' : 'medio'} color={activo ? c.sobreBoton : c.tenue}>{texto}</Texto>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          {grupos.lista.length === 0
+            ? <Vacio>{busqueda || filtro !== 'todos' ? 'No hay nada que coincida.' : 'Todavía no hay movimientos. Toca + para anotar el primero.'}</Vacio>
+            : grupos.lista.map(([fecha, items]) => (
+              <View key={fecha} style={{ gap: 6 }}>
+                <CabeceraDia titulo={tituloDia(fecha, d.hoy)} derecha={neto(netoDe(items), d.moneda, true)} />
+                <Lista>
+                  {items.map((m, i) => <FilaMovimiento key={m.id} m={m} primera={i === 0} onPress={() => abrir({ tipo: 'movimiento', inicial: m })} />)}
+                </Lista>
+              </View>
+            ))}
+          {grupos.total > limite && (
+            <View style={{ alignItems: 'center', paddingVertical: 8 }}>
+              <Enlace tam={15} onPress={() => setLimite((l) => l + 200)}>Ver más ({grupos.total - limite})</Enlace>
+            </View>
+          )}
+        </>
       )}
     </Marco>
   );

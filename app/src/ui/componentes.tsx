@@ -1,21 +1,21 @@
-// Las piezas de todas las pantallas. Cada una lee el tema en uso (estilo, claro u oscuro, color
-// principal), así que se ven distintas en cada estilo sin que las pantallas tengan que saberlo.
+// Las piezas de todas las pantallas. Cada una lee el tema en uso (claro u oscuro, color principal),
+// así que las pantallas no tienen que saber de colores ni de letras.
 
 import * as Haptics from 'expo-haptics';
 import { useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import { KeyboardAvoidingView, Modal, Pressable, ScrollView, Text, TextInput, View, type StyleProp, type TextInputProps, type TextStyle, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDatos } from '@/lib/datos';
-import { montoEnCuenta } from '@/lib/calculos';
-import { conSigno, inicialDe, neto } from '@/lib/formato';
-import type { Movimiento, Proximo } from '@/lib/tipos';
-import { PALETA, type Fuentes, type Peso } from './estilos';
+import { montoEnCuenta, type FormaSaldo } from '@/lib/calculos';
+import { conSigno, neto } from '@/lib/formato';
+import type { Movimiento, Proximo, TipoMovimiento } from '@/lib/tipos';
+import { ESTILO, PALETA, type Peso } from './estilos';
 import { Icono, type NombreIcono } from './iconos';
-import { alfa, sobre, useTema } from './tema';
+import { alfa, sobre, useTema, type Colores as ColoresTema } from './tema';
 
-export function familia(f: Fuentes, peso: Peso, num: boolean): string {
-  if (num && f.mono) return peso === 'normal' ? f.mono.normal : peso === 'medio' ? f.mono.medio : f.mono.semi;
-  return f[peso];
+/** La letra de un peso. Los montos van en la misma letra, con cifras de ancho fijo (`tabular-nums`). */
+export function familia(peso: Peso): string {
+  return ESTILO.fuentes[peso];
 }
 
 export function Texto({ children, tam = 15, peso = 'normal', num = false, color, style, lineas, centro, ajustar }: {
@@ -23,18 +23,18 @@ export function Texto({ children, tam = 15, peso = 'normal', num = false, color,
   /** Achica la letra para que entre en `lineas` en vez de cortar con «…» (montos). */
   ajustar?: boolean;
 }) {
-  const { estilo, c } = useTema();
+  const { c } = useTema();
   return (
     <Text numberOfLines={lineas} adjustsFontSizeToFit={ajustar} minimumFontScale={ajustar ? 0.6 : undefined} style={[{
-      fontFamily: familia(estilo.fuentes, peso, num), fontSize: tam, color: color ?? c.tinta,
-      fontVariant: num && !estilo.fuentes.mono ? ['tabular-nums'] : undefined, textAlign: centro ? 'center' : undefined,
+      fontFamily: familia(peso), fontSize: tam, color: color ?? c.tinta,
+      fontVariant: num ? ['tabular-nums'] : undefined, textAlign: centro ? 'center' : undefined,
     }, style]}>
       {children}
     </Text>
   );
 }
 
-/** Un monto, con el peso de cifras del estilo. */
+/** Un monto: cifras de ancho fijo y el peso de cifras del estilo. */
 export function Num({ children, tam = 15, peso, color, style, lineas }: {
   children: ReactNode; tam?: number; peso?: Peso; color?: string; style?: StyleProp<TextStyle>; lineas?: number;
 }) {
@@ -73,10 +73,10 @@ export function BotonRedondo({ icono, onPress, etiqueta, fondo, color, tam = 44 
 }
 
 export function BotonPrincipal({ children, onPress, style, alto = 56 }: { children: ReactNode; onPress: () => void; style?: StyleProp<ViewStyle>; alto?: number }) {
-  const { c, estilo } = useTema();
+  const { c } = useTema();
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [{ height: alto, borderRadius: 16, backgroundColor: c.boton, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.8 : 1 }, style]}>
-      <Texto tam={16} peso={estilo.m.pesoTitulo === 'extra' ? 'negrita' : 'semi'} color={c.sobreBoton}>{children}</Texto>
+      <Texto tam={17} peso="semi" color={c.sobreBoton}>{children}</Texto>
     </Pressable>
   );
 }
@@ -100,28 +100,10 @@ export function Enlace({ children, onPress, color, tam = 13 }: { children: React
   );
 }
 
-/** El botón ancho de abajo para anotar (los estilos de bloques). */
-export function PildoraAnotar({ texto = 'Anotar', onPress }: { texto?: string; onPress: () => void }) {
-  const { c, estilo } = useTema();
-  const ancho = estilo.id === 'mosaico' ? { width: 200 } : { paddingHorizontal: 28 };
-  const alto = estilo.id === 'mosaico' ? 56 : 54;
-  return (
-    <Pressable onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); onPress(); }} accessibilityLabel={texto}
-      style={({ pressed }) => [{
-        alignSelf: 'center', height: alto, borderRadius: alto / 2, backgroundColor: c.boton, flexDirection: 'row', gap: 10,
-        alignItems: 'center', justifyContent: 'center', maxWidth: '88%', shadowColor: '#14141E', shadowOpacity: 0.2, shadowRadius: 12, shadowOffset: { width: 0, height: 6 },
-        opacity: pressed ? 0.85 : 1,
-      }, ancho]}>
-      <Icono nombre="mas" tam={20} color={c.sobreBoton} grosor={2.4} />
-      <Texto tam={16} peso={estilo.m.pesoTitulo === 'extra' ? 'negrita' : 'semi'} color={c.sobreBoton} lineas={1} style={{ flexShrink: 1 }}>{texto}</Texto>
-    </Pressable>
-  );
-}
-
 /** Opciones en una cápsula (Gasto / Ingreso / Transferencia). */
 export function Segmentos<T extends string>({ opciones, valor, alCambiar }: { opciones: [T, string][]; valor: T; alCambiar: (v: T) => void }) {
-  const { c, estilo } = useTema();
-  const r = estilo.m.esquinas >= 24 ? 16 : 14;
+  const { c } = useTema();
+  const r = 14;
   return (
     <View style={{ flexDirection: 'row', gap: 4, backgroundColor: c.suave, borderRadius: r, padding: 4 }}>
       {opciones.map(([id, texto]) => {
@@ -129,7 +111,7 @@ export function Segmentos<T extends string>({ opciones, valor, alCambiar }: { op
         return (
           <Pressable key={id} onPress={() => { Haptics.selectionAsync(); alCambiar(id); }}
             style={{ flex: 1, height: 36, borderRadius: r - 3, alignItems: 'center', justifyContent: 'center', backgroundColor: activo ? c.boton : 'transparent' }}>
-            <Texto tam={14.5} peso={activo ? 'semi' : 'normal'} color={activo ? c.sobreBoton : c.tenue} lineas={1} ajustar>{texto}</Texto>
+            <Texto tam={15} peso={activo ? 'semi' : 'normal'} color={activo ? c.sobreBoton : c.tenue} lineas={1} ajustar>{texto}</Texto>
           </Pressable>
         );
       })}
@@ -146,16 +128,31 @@ export function Ficha({ texto, activa, onPress, ancho, alto = 40, children, comp
       style={({ pressed }) => ({ height: alto, paddingHorizontal: compacta ? 4 : 14, borderRadius: alto / 2, width: ancho, backgroundColor: activa ? c.boton : c.suave,
         alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, opacity: pressed ? 0.75 : 1 })}>
       {children}
-      {texto !== undefined && <Texto tam={compacta ? 13.5 : 14} peso={activa ? 'semi' : 'normal'} color={activa ? c.sobreBoton : c.tinta} lineas={1} ajustar={compacta}>{texto}</Texto>}
+      {texto !== undefined && <Texto tam={14} peso={activa ? 'semi' : 'normal'} color={activa ? c.sobreBoton : c.tinta} lineas={1} ajustar={compacta}>{texto}</Texto>}
     </Pressable>
   );
 }
 
+/** Un campo de texto. Letra de 16: se lee bien y iOS no agranda la pantalla al tocarlo. */
 export function Campo(props: TextInputProps) {
-  const { c, estilo, oscuro } = useTema();
+  const { c, oscuro } = useTema();
   return (
     <TextInput placeholderTextColor={c.tenue} keyboardAppearance={oscuro ? 'dark' : 'light'} {...props}
-      style={[{ height: 48, borderRadius: 14, backgroundColor: c.suave, paddingHorizontal: 14, fontSize: 15, color: c.tinta, fontFamily: estilo.fuentes.normal }, props.style]} />
+      style={[{ height: 48, borderRadius: 14, backgroundColor: c.suave, paddingHorizontal: 14, paddingVertical: 0, fontSize: 16, color: c.tinta, fontFamily: familia('normal') }, props.style]} />
+  );
+}
+
+/** El buscador de Movimientos y de una cuenta: lupa y campo, centrados en una cápsula de 46. */
+export function Buscador({ valor, alCambiar, placeholder, fondo, autoFocus }: {
+  valor: string; alCambiar: (v: string) => void; placeholder: string; fondo?: string; autoFocus?: boolean;
+}) {
+  const { c } = useTema();
+  return (
+    <View style={{ height: 46, borderRadius: 14, backgroundColor: fondo ?? c.tarjeta, flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 14 }}>
+      <Icono nombre="buscar" tam={18} color={c.tenue} />
+      <Campo value={valor} onChangeText={alCambiar} placeholder={placeholder} autoFocus={autoFocus} clearButtonMode="while-editing" returnKeyType="search"
+        style={{ flex: 1, height: 46, backgroundColor: 'transparent', paddingHorizontal: 0 }} />
+    </View>
   );
 }
 
@@ -173,8 +170,8 @@ export function MontoGrande({ valor, alCambiar, moneda, autoFocus, color }: { va
     <TextInput value={valor ? moneda + valor : ''} placeholder={`${moneda}0.00`} placeholderTextColor={c.tenue} keyboardType="decimal-pad"
       keyboardAppearance={oscuro ? 'dark' : 'light'} autoFocus={autoFocus} accessibilityLabel="Monto"
       onChangeText={(t) => alCambiar(limpiarMonto(t.split(moneda).join('')))}
-      style={{ fontFamily: familia(estilo.fuentes, estilo.m.pesoCifraGrande, true), fontSize: 52, letterSpacing: -2, color: color ?? c.tinta,
-        textAlign: 'center', paddingVertical: 2, fontVariant: estilo.fuentes.mono ? undefined : ['tabular-nums'] }} />
+      style={{ fontFamily: familia(estilo.m.pesoCifraGrande), fontSize: 52, letterSpacing: -2, color: color ?? c.tinta,
+        textAlign: 'center', paddingVertical: 0, fontVariant: ['tabular-nums'] }} />
   );
 }
 
@@ -269,8 +266,8 @@ export function Vaso({ nombre, sub, pct, aviso, alerta, relleno, alto, onPress, 
       <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `${Math.min(pct, 100)}%`, backgroundColor: relleno }} />
       <View style={{ flex: 1, padding: grande ? 14 : 12, paddingHorizontal: grande ? 16 : 14, justifyContent: 'space-between' }}>
         <View style={{ gap: 2 }}>
-          <Texto tam={15} peso={estilo.m.pesoTitulo === 'extra' ? 'negrita' : 'semi'} lineas={1}>{nombre}</Texto>
-          <Texto num tam={12.5} color={c.tenue} lineas={1}>{sub}</Texto>
+          <Texto tam={15} peso="semi" lineas={1}>{nombre}</Texto>
+          <Texto num tam={13} color={c.tenue} lineas={1}>{sub}</Texto>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 6 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1 }}>
@@ -286,7 +283,7 @@ export function Vaso({ nombre, sub, pct, aviso, alerta, relleno, alto, onPress, 
 
 /** El navegador de meses en cápsula: ‹ Octubre 2026 › */
 export function NavegadorMes({ nombre, anio, mover, puedeAdelante = true }: { nombre: string; anio: number; mover: (d: number) => void; puedeAdelante?: boolean }) {
-  const { c, estilo } = useTema();
+  const { c } = useTema();
   const flecha = (d: number, icono: NombreIcono, activa: boolean) => (
     <Pressable onPress={() => { Haptics.selectionAsync(); mover(d); }} disabled={!activa} accessibilityLabel={d < 0 ? 'Mes anterior' : 'Mes siguiente'}
       style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', opacity: activa ? 1 : 0.35 }}>
@@ -296,7 +293,7 @@ export function NavegadorMes({ nombre, anio, mover, puedeAdelante = true }: { no
   return (
     <View style={{ height: 44, borderRadius: 22, backgroundColor: c.tarjeta, paddingHorizontal: 4, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
       {flecha(-1, 'atras', true)}
-      <Texto tam={15} peso={estilo.m.pesoTitulo === 'extra' ? 'negrita' : 'semi'}>{nombre} {anio}</Texto>
+      <Texto tam={15} peso="semi">{nombre} {anio}</Texto>
       {flecha(1, 'adelante', puedeAdelante)}
     </View>
   );
@@ -317,16 +314,17 @@ export function CabeceraDia({ titulo, derecha, calor }: { titulo: string; derech
 }
 
 /**
- * Una fila de movimiento (o de un próximo). A la izquierda lleva lo que pide el estilo: la barra
- * del color de la cuenta, la inicial de la categoría en círculo o en cuadro, o nada.
- * Con `cuentaId`, el monto se muestra visto desde esa cuenta y el detalle no repite la cuenta.
+ * Una fila de movimiento (o de un próximo). A la izquierda lleva la barra del color de la cuenta.
+ * El monto va en verde si es ingreso, en rojo si es gasto y tenue si es transferencia.
+ * Con `cuentaId`, el monto se muestra visto desde esa cuenta (lo que entra verde, lo que sale rojo)
+ * y el detalle no repite la cuenta.
  */
 export function FilaMovimiento({ m, onPress, cuentaId, primera, detalle, sinIcono }: {
   m: Pick<Movimiento | Proximo, 'tipo' | 'monto' | 'cuenta_id' | 'cuenta_destino_id' | 'categoria_id' | 'nota' | 'recurrencia_id'>;
   onPress?: () => void; cuentaId?: string; primera: boolean; detalle?: string; sinIcono?: boolean;
 }) {
   const d = useDatos();
-  const { c, estilo, colorCuenta } = useTema();
+  const { c, colorCuenta } = useTema();
   const nombreCuenta = (id: string | null) => d.cuentas.find((a) => a.id === id)?.nombre ?? '?';
   const transferencia = m.tipo === 'transferencia';
   const cat = d.categorias.find((x) => x.id === m.categoria_id);
@@ -334,27 +332,24 @@ export function FilaMovimiento({ m, onPress, cuentaId, primera, detalle, sinIcon
   const sub = detalle ?? (transferencia
     ? `${nombreCuenta(m.cuenta_id)} → ${nombreCuenta(m.cuenta_destino_id)}`
     : cuentaId ? cat?.nombre ?? 'Sin categoría' : `${cat?.nombre ?? 'Sin categoría'} · ${nombreCuenta(m.cuenta_id)}`);
-  const monto = cuentaId ? neto(montoEnCuenta(m as Movimiento, cuentaId), d.moneda, true) : conSigno(m.monto, d.moneda, m.tipo);
-  const positivo = cuentaId ? monto.startsWith('+') : m.tipo === 'ingreso';
-  const colorCat = transferencia ? c.tenue : cat?.color ?? '#94A3B8';
-  const inicial = transferencia ? '⇄' : inicialDe(cat?.nombre ?? '?');
+  const enCuenta = cuentaId ? montoEnCuenta(m as Movimiento, cuentaId) : 0;
+  const monto = cuentaId ? neto(enCuenta, d.moneda, true) : conSigno(m.monto, d.moneda, m.tipo);
+  const colorMonto = cuentaId ? (enCuenta > 0 ? c.ingreso : enCuenta < 0 ? c.gasto : c.tenue) : colorTipo(m.tipo, c);
   const cuentaColor = d.cuentas.find((a) => a.id === m.cuenta_id)?.color ?? c.tenue;
 
   return (
     <Pressable onPress={onPress} disabled={!onPress}
       style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 54, paddingVertical: 6,
         borderTopWidth: primera ? 0 : 1, borderTopColor: c.linea, opacity: pressed ? 0.6 : 1 })}>
-      {!sinIcono && estilo.fila === 'barra' && <View style={{ width: 6, height: 28, borderRadius: 3, backgroundColor: colorCuenta(cuentaColor) }} />}
-      {!sinIcono && estilo.fila === 'circulo' && <Inicial texto={inicial} color={colorCat} redondo />}
-      {!sinIcono && estilo.fila === 'cuadro' && <Inicial texto={inicial} color={colorCat} />}
+      {!sinIcono && <View style={{ width: 6, height: 28, borderRadius: 3, backgroundColor: colorCuenta(cuentaColor) }} />}
       <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
           <Texto tam={15} peso="medio" lineas={1} style={{ flexShrink: 1 }}>{nombre}</Texto>
           {m.recurrencia_id && <Icono nombre="repetir" tam={12} color={c.tenue} />}
         </View>
-        <Texto tam={12.5} color={c.tenue} lineas={1}>{sub}</Texto>
+        <Texto tam={13} color={c.tenue} lineas={1}>{sub}</Texto>
       </View>
-      <Num tam={15} color={positivo ? c.bien : transferencia && !cuentaId ? c.tenue : c.tinta}>{monto}</Num>
+      <Num tam={15} color={colorMonto}>{monto}</Num>
     </Pressable>
   );
 }
@@ -376,9 +371,9 @@ export function Hoja({ titulo, alCerrar, children, pie, derecha }: { titulo: str
         <View style={{ alignSelf: 'center', width: 36, height: 5, borderRadius: 3, backgroundColor: alfa(c.tenue, 0.35), marginTop: 8 }} />
         <View style={{ height: 44, marginHorizontal: estilo.m.margen, flexDirection: 'row', alignItems: 'center' }}>
           <View style={{ flex: 1, alignItems: 'flex-start' }}>
-            <Pressable onPress={alCerrar} hitSlop={10}><Texto tam={16} color={c.tenue}>Cancelar</Texto></Pressable>
+            <Pressable onPress={alCerrar} hitSlop={10}><Texto tam={17} color={c.tenue}>Cancelar</Texto></Pressable>
           </View>
-          <Texto tam={17} peso={estilo.m.pesoTitulo === 'extra' ? 'negrita' : 'semi'} lineas={1} style={{ flexShrink: 1, maxWidth: '60%' }}>{titulo}</Texto>
+          <Texto tam={17} peso="semi" lineas={1} style={{ flexShrink: 1, maxWidth: '60%' }}>{titulo}</Texto>
           <View style={{ flex: 1, alignItems: 'flex-end' }}>{derecha}</View>
         </View>
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: estilo.m.margen, paddingTop: 6, paddingBottom: 20, gap: 14 }}
@@ -402,12 +397,25 @@ export function FilaSimple({ izquierda, texto, detalle, onPress, derecha, primer
       {izquierda}
       <Pressable onPress={onPress} disabled={!onPress} style={({ pressed }) => ({ flex: 1, minWidth: 0, paddingVertical: 8, gap: 2, opacity: pressed ? 0.6 : 1 })}>
         <Texto tam={15} lineas={1}>{texto}</Texto>
-        {detalle ? <Texto tam={12.5} color={c.tenue} lineas={1}>{detalle}</Texto> : null}
+        {detalle ? <Texto tam={13} color={c.tenue} lineas={1}>{detalle}</Texto> : null}
       </Pressable>
       {derecha}
       {flecha && onPress && <Pressable onPress={onPress} hitSlop={8}><Icono nombre="adelante" tam={16} color={c.tenue} grosor={2} /></Pressable>}
     </View>
   );
+}
+
+/** Verde si es ingreso, rojo si es gasto, tenue si es transferencia. */
+export function colorTipo(tipo: TipoMovimiento, c: ColoresTema): string {
+  return tipo === 'ingreso' ? c.ingreso : tipo === 'gasto' ? c.gasto : c.tenue;
+}
+
+/** El color de una forma de ver el saldo: verde lo que entró, rojo lo gastado, y el balance según su signo. */
+export function colorDeSaldo(f: Pick<FormaSaldo, 'tono' | 'valor'>, c: ColoresTema): string {
+  if (f.tono === 'ingreso') return c.ingreso;
+  if (f.tono === 'gasto') return c.gasto;
+  if (f.tono === 'signo') return f.valor < 0 ? c.gasto : c.ingreso;
+  return c.tinta;
 }
 
 /** Un dato chico con su rótulo arriba («Gastado» y el monto). */
