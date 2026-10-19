@@ -1,5 +1,5 @@
 // El marco de cada pantalla y cómo se va de una a otra. Inicio, Movimientos, Presupuesto y Cuentas son
-// pestañas de la barra de abajo; Próximos y Gráficos son vistas dentro de Movimientos. Ajustes y una
+// pestañas de la barra de abajo; Gráficos es una vista dentro de Movimientos. Ajustes y una
 // cuenta abierta se abren encima, con «‹ volver» arriba a la izquierda.
 
 import { router } from 'expo-router';
@@ -11,7 +11,7 @@ import { BotonRedondo, Texto } from './componentes';
 import { Icono } from './iconos';
 import { alfa, useTema } from './tema';
 
-export type Seccion = 'inicio' | 'movimientos' | 'presupuesto' | 'cuentas' | 'proximos' | 'graficos';
+export type Seccion = 'inicio' | 'movimientos' | 'presupuesto' | 'cuentas' | 'graficos';
 
 const Apilada = createContext<string | null>(null);
 
@@ -24,10 +24,10 @@ export function useApilada(): string | null {
   return useContext(Apilada);
 }
 
-/** Ir a una sección: cambia de pestaña; Próximos y Gráficos abren Movimientos en esa vista. */
+/** Ir a una sección: cambia de pestaña; Gráficos abre Movimientos en esa vista. */
 export function useIr() {
   return useCallback((s: Seccion) => {
-    if (s === 'proximos' || s === 'graficos') return router.navigate({ pathname: '/movimientos', params: { vista: s } });
+    if (s === 'graficos') return router.navigate({ pathname: '/movimientos', params: { vista: s } });
     router.navigate(s === 'inicio' ? '/' : `/${s}`);
   }, []);
 }

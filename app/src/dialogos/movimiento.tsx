@@ -121,7 +121,7 @@ export function DialogoMovimiento({ inicial, tipoInicial = 'gasto', fechaInicial
             </View>
             {repetir !== 'no' && (
               <Texto tam={13} color={c.tenue} style={{ marginTop: 10, lineHeight: 18 }}>
-                Se anota solo cada vez que llega la fecha, sin crear nada por adelantado. Lo que viene lo ves en «Próximos».
+                Se anota solo cada vez que llega la fecha, sin crear nada por adelantado. Lo que falta del mes sale arriba en Movimientos.
               </Texto>
             )}
           </Desplegable>

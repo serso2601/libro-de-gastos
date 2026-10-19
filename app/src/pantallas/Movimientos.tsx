@@ -2,21 +2,25 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useAbrir } from '@/dialogos/abrir';
-import { delMes, netoDe, porDia, sumar } from '@/lib/calculos';
+import { delMes, netoDe, porDia, porVenirDelMes, sumar } from '@/lib/calculos';
 import { useDatos } from '@/lib/datos';
 import { MESES, mayuscula, neto, ordenarPorFecha, tituloDia } from '@/lib/formato';
-import { Buscador, CabeceraDia, Enlace, FilaMovimiento, Lista, Num, Segmentos, Tarjeta, Texto, Vacio } from '@/ui/componentes';
+import type { Movimiento, Proximo } from '@/lib/tipos';
+import { Buscador, CabeceraDia, Enlace, FilaMovimiento, Lista, Num, Rotulo, Segmentos, Tarjeta, Texto, Vacio } from '@/ui/componentes';
 import { Marco } from '@/ui/pantalla';
-import { useTema } from '@/ui/tema';
+import { alfa, useTema } from '@/ui/tema';
 import { ContenidoGraficos } from './Graficos';
-import { ContenidoProximos } from './Proximos';
+import { cuandoViene } from './Proximos';
 
 type Filtro = 'todos' | 'gasto' | 'ingreso' | 'transferencia';
-type Vista = 'lista' | 'proximos' | 'graficos';
-const VISTAS: [Vista, string][] = [['lista', 'Lista'], ['proximos', 'Próximos'], ['graficos', 'Gráficos']];
+type Vista = 'lista' | 'graficos';
+const VISTAS: [Vista, string][] = [['lista', 'Lista'], ['graficos', 'Gráficos']];
 const FILTROS: [Filtro, string][] = [['todos', 'Todos'], ['gasto', 'Gastos'], ['ingreso', 'Ingresos'], ['transferencia', 'Transferencias']];
 
-/** Movimientos y sus tres vistas: la lista, lo que viene (Próximos) y los Gráficos. */
+/**
+ * Movimientos: la lista y los Gráficos. Arriba de la lista va lo que todavía se va a anotar solo en
+ * lo que queda del mes; cuando llega su día pasa a la lista como cualquier otro movimiento.
+ */
 export function Movimientos() {
   const d = useDatos();
   const { vista: vistaPedida } = useLocalSearchParams<{ vista?: string }>();
@@ -26,10 +30,10 @@ export function Movimientos() {
   const [filtro, setFiltro] = useState<Filtro>('todos');
   const [busqueda, setBusqueda] = useState('');
   const [limite, setLimite] = useState(80);
-  // Quien llega desde el Inicio con `vista` cae directo en Próximos o Gráficos; el parámetro se limpia
-  // para que tocar la pestaña después no lo repita.
+  // Quien llega con `vista` cae directo en Gráficos; el parámetro se limpia para que tocar la pestaña
+  // después no lo repita.
   useEffect(() => {
-    if (vistaPedida === 'proximos' || vistaPedida === 'graficos' || vistaPedida === 'lista') {
+    if (vistaPedida === 'graficos' || vistaPedida === 'lista') {
       setVista(vistaPedida);
       router.setParams({ vista: undefined });
     }
@@ -37,17 +41,25 @@ export function Movimientos() {
   const mesActual = d.hoy.slice(0, 7);
   const delMesActual = delMes(d.movimientos, mesActual);
 
-  const grupos = useMemo(() => {
+  // El buscador y los filtros valen igual para lo anotado y para lo que viene.
+  const coincide = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
     const nombreCat = new Map(d.categorias.map((x) => [x.id, x.nombre.toLowerCase()]));
     const nombreCuenta = new Map(d.cuentas.map((x) => [x.id, x.nombre.toLowerCase()]));
-    const filtrados = d.movimientos
-      .filter((m) => filtro === 'todos' || m.tipo === filtro)
-      .filter((m) => !q || m.nota.toLowerCase().includes(q) || (nombreCat.get(m.categoria_id ?? '') ?? '').includes(q)
-        || (nombreCuenta.get(m.cuenta_id) ?? '').includes(q))
-      .sort(ordenarPorFecha);
+    return (m: Movimiento | Proximo) => (filtro === 'todos' || m.tipo === filtro)
+      && (!q || m.nota.toLowerCase().includes(q) || (nombreCat.get(m.categoria_id ?? '') ?? '').includes(q)
+        || (nombreCuenta.get(m.cuenta_id) ?? '').includes(q));
+  }, [d.categorias, d.cuentas, filtro, busqueda]);
+
+  const grupos = useMemo(() => {
+    const filtrados = d.movimientos.filter(coincide).sort(ordenarPorFecha);
     return { lista: porDia(filtrados.slice(0, limite)), total: filtrados.length };
-  }, [d.movimientos, d.categorias, d.cuentas, filtro, busqueda, limite]);
+  }, [d.movimientos, coincide, limite]);
+
+  const porVenir = porVenirDelMes(d).filter(coincide);
+  const vaASalir = porVenir.reduce((s, p) => s + (p.tipo === 'gasto' ? p.monto : 0), 0);
+  const vaAEntrar = porVenir.reduce((s, p) => s + (p.tipo === 'ingreso' ? p.monto : 0), 0);
+  const nombreCuenta = (id: string) => d.cuentas.find((x) => x.id === id)?.nombre ?? '';
 
   const salio = sumar(delMesActual, 'gasto');
   const entro = sumar(delMesActual, 'ingreso');
@@ -57,7 +69,6 @@ export function Movimientos() {
     <Marco titulo="Movimientos" subtitulo={`${mesNombre} · ${delMesActual.length} ${delMesActual.length === 1 ? 'anotado' : 'anotados'}`}>
       <Segmentos opciones={VISTAS} valor={vista} alCambiar={setVista} />
 
-      {vista === 'proximos' && <ContenidoProximos />}
       {vista === 'graficos' && <ContenidoGraficos />}
       {vista === 'lista' && (
         <>
@@ -85,6 +96,31 @@ export function Movimientos() {
               );
             })}
           </ScrollView>
+
+          {porVenir.length > 0 && (
+            <View style={{ gap: 6 }}>
+              <Rotulo derecha={(
+                <Texto tam={13}>
+                  {vaASalir > 0 && <Texto num tam={13} peso="medio" color={c.gasto}>−{neto(vaASalir, d.moneda)}</Texto>}
+                  {vaASalir > 0 && vaAEntrar > 0 && '  '}
+                  {vaAEntrar > 0 && <Texto num tam={13} peso="medio" color={c.ingreso}>+{neto(vaAEntrar, d.moneda)}</Texto>}
+                </Texto>
+              )}>
+                Por venir en {mesNombre.toLowerCase()}
+              </Rotulo>
+              {/* Borde punteado: todavía no pasó; se anota solo cuando llegue su día. */}
+              <Lista style={{ borderWidth: 1.5, borderStyle: 'dashed', borderColor: alfa(c.tenue, 0.35) }}>
+                {porVenir.map((p, i) => {
+                  const regla = d.recurrencias.find((r) => r.id === p.recurrencia_id);
+                  return (
+                    <FilaMovimiento key={`${p.recurrencia_id}@${p.fecha}`} m={p} primera={i === 0}
+                      detalle={`Se anota solo ${cuandoViene(p.fecha, d.hoy)} · ${nombreCuenta(p.cuenta_id)}`}
+                      onPress={regla ? () => abrir({ tipo: 'recurrencia', regla }) : undefined} />
+                  );
+                })}
+              </Lista>
+            </View>
+          )}
 
           {grupos.lista.length === 0
             ? <Vacio>{busqueda || filtro !== 'todos' ? 'No hay nada que coincida.' : 'Todavía no hay movimientos. Toca + para anotar el primero.'}</Vacio>
