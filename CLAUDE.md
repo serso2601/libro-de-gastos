@@ -78,11 +78,12 @@ Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
 - **Tutorial** la primera vez que se usa cada estilo (`pantallas/Tutorial.tsx`); se repite desde
   Ajustes → «Ver cómo funciona». Si un estilo cambia cómo se maneja algo, su tutorial lo explica.
 
-## Estado (17/oct/2026)
+## Estado (19/oct/2026)
 
 - Servidor con 25 pruebas. App con los 5 estilos, modo oscuro, color principal, tutoriales,
   anotar/editar, reglas que se repiten, Próximos, buscador, presupuesto con topes, importar el
-  respaldo de la app vieja, exportar, QR para conectar.- `app.json` pasó a `userInterfaceStyle: automatic`, compilado en `ios-dev-3`
+  respaldo de la app vieja, exportar, QR para conectar.
+- `app.json` pasó a `userInterfaceStyle: automatic`, compilado en `ios-dev-3`
   (`app-iphone\gastos-dev-3.ipa`). Con `ios-dev-2`, «Automático» se ve oscuro; Claro y Oscuro
   funcionan con cualquier build.
 - El usuario ya instaló la app con Sideloadly, está conectada y la usa (19/oct). Está probando los
