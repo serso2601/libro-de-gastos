@@ -6,7 +6,6 @@ import { aFecha, conSigno, diaCorto, diasHasta, MESES, MESES_CORTOS, neto, nombr
 import { FRECUENCIAS, type Proximo, type Recurrencia } from '@/lib/tipos';
 import { colorTipo, FilaSimple, Lista, Num, Rotulo, Tarjeta, Texto, Vacio } from '@/ui/componentes';
 import { Icono } from '@/ui/iconos';
-import { Marco } from '@/ui/pantalla';
 import { useTema } from '@/ui/tema';
 
 export function cuandoViene(fecha: string, hoy: string): string {
@@ -39,7 +38,8 @@ export function textoRegla(r: Recurrencia, d: ReturnType<typeof useDatos>): stri
   return frec + (terminada ? ' · terminó' : proximo ? ` · próxima ${diaCorto(proximo.fecha)} ${MESES_CORTOS[aFecha(proximo.fecha).getMonth()]}` : '');
 }
 
-export function Proximos() {
+/** Lo que viene: va a salir / va a entrar, los próximos 30 días y las reglas. Sin marco: vive dentro de Movimientos. */
+export function ContenidoProximos() {
   const d = useDatos();
   const abrir = useAbrir();
   const { c } = useTema();
@@ -55,7 +55,7 @@ export function Proximos() {
   });
 
   return (
-    <Marco titulo="Próximos" subtitulo="Se anotan solos cuando llega su día.">
+    <>
       <View style={{ flexDirection: 'row', gap: 10 }}>
         <Tarjeta style={{ flex: 1, paddingVertical: 12, paddingHorizontal: 16, gap: 2 }}>
           <Texto tam={13} color={c.tenue}>Va a salir</Texto>
@@ -98,6 +98,6 @@ export function Proximos() {
           ))}
         </Lista>
       </View>
-    </Marco>
+    </>
   );
 }

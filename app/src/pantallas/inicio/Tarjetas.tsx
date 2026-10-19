@@ -1,48 +1,38 @@
-// El Inicio: las cuentas como tarjetas apiladas. La de adelante muestra su saldo y lo que entró y
-// salió este mes; tocar una de atrás la pasa al frente. Debajo, el mes.
+// La vista «Tarjetas» del Inicio: las cuentas apiladas (la de adelante muestra su saldo y lo que entró
+// y salió este mes; tocar una de atrás la pasa al frente), la tarjeta del mes y los últimos movimientos.
 
 import * as Haptics from 'expo-haptics';
-import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { useAbrir } from '@/dialogos/abrir';
 import { diasQueQuedan, flujoCuenta, topes } from '@/lib/calculos';
 import { useDatos } from '@/lib/datos';
-import { dinero, dineroCorto, MESES, mayuscula, neto, saldo } from '@/lib/formato';
-import { BotonPrincipal, BotonRedondo, Num, Tarjeta, Texto } from '@/ui/componentes';
-import { abrirCuenta, Marco, useIr } from '@/ui/pantalla';
+import { dinero, dineroCorto, MESES, mayuscula, neto, ordenarPorFecha, saldo } from '@/lib/formato';
+import { BotonPrincipal, Enlace, FilaMovimiento, Lista, Num, Rotulo, Tarjeta, Texto, Vacio } from '@/ui/componentes';
+import { abrirCuenta, useIr } from '@/ui/pantalla';
 import { sobre, useTema } from '@/ui/tema';
 
-export function InicioBilletera() {
+/** Cuántos movimientos salen en «Recientes». */
+const RECIENTES = 5;
+
+export function Tarjetas() {
   const d = useDatos();
   const abrir = useAbrir();
   const ir = useIr();
-  const { c, estilo, colorCuenta } = useTema();
+  const { c, colorCuenta } = useTema();
   const [elegida, setElegida] = useState<string | null>(null);
   const frente = d.cuentas.find((x) => x.id === elegida) ?? d.cuentas[0];
   const atras = d.cuentas.filter((x) => x.id !== frente?.id).reverse();
-  const total = d.cuentas.reduce((s, x) => s + saldo(x, d.movimientos), 0);
   const clave = d.hoy.slice(0, 7);
   const t = topes(d, clave);
   const gastoMes = d.movimientos.reduce((s, m) => s + (m.tipo === 'gasto' && m.fecha.startsWith(clave) ? m.monto : 0), 0);
   const base = t.tope > 0 ? Math.max(t.tope, gastoMes) : gastoMes;
-
-  const cabecera = (
-    <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-      <View style={{ gap: 2 }}>
-        <Texto tam={14} color={c.tenue}>Tienes en total</Texto>
-        <Num tam={estilo.m.cifra}>{neto(total, d.moneda)}</Num>
-      </View>
-      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 4 }}>
-        <BotonRedondo icono="mas" etiqueta="Nueva cuenta" onPress={() => abrir({ tipo: 'cuenta' })} />
-        <BotonRedondo icono="ajustes" etiqueta="Ajustes" onPress={() => router.push('/ajustes')} />
-      </View>
-    </View>
-  );
+  // Lo que ya pasó, del más nuevo al más viejo: un movimiento con fecha futura no es «reciente».
+  const recientes = d.movimientos.filter((m) => m.fecha <= d.hoy).sort(ordenarPorFecha).slice(0, RECIENTES);
 
   return (
-    <Marco cabecera={cabecera} gap={16}>
+    <>
       {!frente ? (
         <Tarjeta style={{ padding: 18, gap: 12 }}>
           <Texto tam={15} peso="semi">Todavía no hay cuentas</Texto>
@@ -86,7 +76,20 @@ export function InicioBilletera() {
           {t.tope > 0 && <Texto tam={13} color={gastoMes > t.tope ? c.alerta : c.tenue}>{Math.round((gastoMes / t.tope) * 100)}%</Texto>}
         </View>
       </Tarjeta>
-    </Marco>
+
+      <View style={{ gap: 8 }}>
+        <Rotulo derecha={<Enlace onPress={() => ir('movimientos')}>Ver todo</Enlace>}>Recientes</Rotulo>
+        {recientes.length === 0 ? (
+          <Tarjeta><Vacio>Todavía no hay movimientos.</Vacio></Tarjeta>
+        ) : (
+          <Lista>
+            {recientes.map((m, i) => (
+              <FilaMovimiento key={m.id} m={m} primera={i === 0} onPress={() => abrir({ tipo: 'movimiento', inicial: m })} />
+            ))}
+          </Lista>
+        )}
+      </View>
+    </>
   );
 }
 

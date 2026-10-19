@@ -2,14 +2,14 @@ import { useMemo } from 'react';
 import { View } from 'react-native';
 import { claveMes, diasDelMes, fraseDona, sumar } from '@/lib/calculos';
 import { useDatos } from '@/lib/datos';
-import { aFecha, dineroCorto, MESES_CORTOS } from '@/lib/formato';
+import { aFecha, dineroCorto, MESES, MESES_CORTOS, mayuscula } from '@/lib/formato';
 import { useMes } from '@/lib/mes';
 import { NavegadorMes, Num, Tarjeta, Texto, Vacio } from '@/ui/componentes';
 import { Barras, Dona, Leyenda } from '@/ui/graficos';
-import { Marco } from '@/ui/pantalla';
 import { useTema } from '@/ui/tema';
 
-export function Graficos() {
+/** Los gráficos del mes: dona por categoría, barras de 6 meses y este mes contra el anterior. Sin marco: vive dentro de Movimientos. */
+export function ContenidoGraficos() {
   const d = useDatos();
   const mes = useMes();
   const { c } = useTema();
@@ -20,12 +20,12 @@ export function Graficos() {
       .map((x) => ({ id: x.id, nombre: x.nombre, color: x.color, total: delMes.reduce((s, m) => s + (m.categoria_id === x.id ? m.monto : 0), 0) }))
       .filter((x) => x.total > 0).sort((a, b) => b.total - a.total);
     const sinCat = delMes.reduce((s, m) => s + (m.categoria_id && d.categorias.some((x) => x.id === m.categoria_id) ? 0 : m.monto), 0);
-    if (sinCat > 0) lista.push({ id: 'sin', nombre: 'Sin categoría', color: '#94A3B8', total: sinCat });
+    if (sinCat > 0) lista.push({ id: 'sin', nombre: 'Sin categoría', color: c.tenue, total: sinCat });
     // Con muchas categorías, las chicas se juntan en «Otras» para que la leyenda se lea.
     if (lista.length <= 6) return lista;
     const resto = lista.slice(5);
-    return [...lista.slice(0, 5), { id: 'otras', nombre: 'Otras', color: '#A7ADB6', total: resto.reduce((s, x) => s + x.total, 0) }];
-  }, [d.movimientos, d.categorias, mes.clave]);
+    return [...lista.slice(0, 5), { id: 'otras', nombre: 'Otras', color: c.tenue, total: resto.reduce((s, x) => s + x.total, 0) }];
+  }, [d.movimientos, d.categorias, mes.clave, c.tenue]);
   const total = porCategoria.reduce((s, x) => s + x.total, 0);
 
   const seisMeses = useMemo(() => Array.from({ length: 6 }, (_, i) => {
@@ -35,12 +35,28 @@ export function Graficos() {
     return { clave, etiqueta: MESES_CORTOS[f.getMonth()], ingresos: sumar(movs, 'ingreso'), gastos: sumar(movs, 'gasto'), actual: i === 5 };
   }), [d.movimientos, mes.anio, mes.mes]);
 
+  // Este mes contra el anterior. Si el mes se está viviendo todavía, el anterior se corta en el mismo día
+  // para que la comparación sea justa.
+  const comparacion = useMemo(() => {
+    const f = new Date(mes.anio, mes.mes - 2, 1);
+    const claveAnt = claveMes(f.getFullYear(), f.getMonth() + 1);
+    const hasta = mes.esActual ? d.hoy.slice(8, 10) : '31';
+    const gastoAnt = d.movimientos.reduce((s, m) => s + (m.tipo === 'gasto' && m.fecha.startsWith(claveAnt) && m.fecha.slice(8, 10) <= hasta ? m.monto : 0), 0);
+    const gastoEste = d.movimientos.reduce((s, m) => s + (m.tipo === 'gasto' && m.fecha.startsWith(mes.clave) ? m.monto : 0), 0);
+    return { gastoAnt, gastoEste, nombreAnt: MESES[f.getMonth()] };
+  }, [d.movimientos, d.hoy, mes.anio, mes.mes, mes.clave, mes.esActual]);
+  const { gastoAnt, gastoEste, nombreAnt } = comparacion;
+  const dif = gastoAnt > 0 ? Math.round(((gastoEste - gastoAnt) / gastoAnt) * 100) : null;
+  const fraseComparacion = dif === null ? `En ${nombreAnt} no hubo gastos para comparar.`
+    : dif === 0 ? `Vas igual que en ${nombreAnt}.`
+    : `${mes.esActual ? 'Vas' : 'Gastaste'} un ${Math.abs(dif)}% ${dif < 0 ? 'menos' : 'más'} que en ${nombreAnt}${mes.esActual ? ' a esta altura' : ''}.`;
+
   const hoy = aFecha(d.hoy);
   const avance = hoy.getDate() / diasDelMes(mes.anio, mes.mes);
   const nota = mes.esActual ? `${mes.nombre} ${avance < 0.35 ? 'recién empieza' : avance < 0.7 ? 'todavía va por la mitad' : 'ya casi termina'}.` : null;
 
   return (
-    <Marco titulo="Gráficos">
+    <>
       <NavegadorMes nombre={mes.nombre} anio={mes.anio} mover={mes.mover} />
 
       <Tarjeta style={{ padding: 16, gap: 8 }}>
@@ -74,6 +90,21 @@ export function Graficos() {
         <Barras datos={seisMeses} />
         {nota && <Texto tam={12} color={c.tenue}>{nota}</Texto>}
       </Tarjeta>
-    </Marco>
+
+      <Tarjeta style={{ padding: 16, gap: 8 }}>
+        <Texto tam={15} peso="semi">Este mes vs. el anterior</Texto>
+        <View style={{ flexDirection: 'row', gap: 16 }}>
+          <View style={{ flex: 1, gap: 2 }}>
+            <Texto tam={13} color={c.tenue}>{mes.nombre}</Texto>
+            <Num tam={22} color={gastoEste ? c.gasto : undefined} lineas={1}>{dineroCorto(gastoEste, d.moneda)}</Num>
+          </View>
+          <View style={{ flex: 1, gap: 2 }}>
+            <Texto tam={13} color={c.tenue}>{mayuscula(nombreAnt)}</Texto>
+            <Num tam={22} color={c.tenue} lineas={1}>{dineroCorto(gastoAnt, d.moneda)}</Num>
+          </View>
+        </View>
+        <Texto tam={13} color={c.tenue}>{fraseComparacion}</Texto>
+      </Tarjeta>
+    </>
   );
 }
