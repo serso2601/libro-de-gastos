@@ -3,7 +3,7 @@
 
 import * as Haptics from 'expo-haptics';
 import { useRef, useState, type ComponentRef, type ReactNode } from 'react';
-import { KeyboardAvoidingView, Modal, Pressable, ScrollView, Text, TextInput, View, type StyleProp, type TextInputProps, type TextStyle, type ViewStyle } from 'react-native';
+import { KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type StyleProp, type TextInputProps, type TextStyle, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDatos } from '@/lib/datos';
 import { montoEnCuenta, type FormaSaldo } from '@/lib/calculos';
@@ -91,6 +91,16 @@ export function BotonSuave({ children, onPress, icono, color, style }: { childre
   );
 }
 
+/** El botón de texto rojo de abajo de una hoja: «Borrar cuenta», «Quitar el tope». */
+export function BotonBorrar({ texto, onPress }: { texto: string; onPress: () => void }) {
+  const { c } = useTema();
+  return (
+    <Pressable onPress={onPress} style={{ height: 44, alignItems: 'center', justifyContent: 'center' }}>
+      <Texto tam={15} peso="semi" color={c.alerta}>{texto}</Texto>
+    </Pressable>
+  );
+}
+
 export function Enlace({ children, onPress, color, tam = 13 }: { children: ReactNode; onPress: () => void; color?: string; tam?: number }) {
   const { c } = useTema();
   return (
@@ -134,11 +144,28 @@ export function Ficha({ texto, activa, onPress, ancho, alto = 40, children, comp
 }
 
 /** Un campo de texto. Letra de 16: se lee bien y iOS no agranda la pantalla al tocarlo. */
-export function Campo(props: TextInputProps) {
+/**
+ * Un campo de texto. El texto de ejemplo no es el `placeholder` de iOS: con Onest (mucho espacio
+ * arriba de las letras) iOS lo dibuja corrido. Se dibuja aparte, con la misma letra que el resto, y
+ * se esconde al escribir. `style` es la caja (alto, fondo, márgenes, textAlign).
+ */
+export function Campo({ style, placeholder, value, ...props }: TextInputProps) {
   const { c, oscuro } = useTema();
+  const caja = StyleSheet.flatten([{ height: 48, borderRadius: 14, backgroundColor: c.suave, paddingHorizontal: 14 }, style]) as TextStyle;
+  const { paddingHorizontal, paddingLeft, paddingRight, textAlign, fontSize = 16, color, paddingVertical: _pv, ...resto } = caja;
+  const izquierda = paddingLeft ?? paddingHorizontal ?? 0;
+  const derecha = paddingRight ?? paddingHorizontal ?? 0;
+  const letra = { fontFamily: familia('normal'), fontSize, textAlign };
   return (
-    <TextInput placeholderTextColor={c.tenue} keyboardAppearance={oscuro ? 'dark' : 'light'} {...props}
-      style={[{ height: 48, borderRadius: 14, backgroundColor: c.suave, paddingHorizontal: 14, paddingVertical: 0, fontSize: 16, color: c.tinta, fontFamily: familia('normal') }, props.style]} />
+    <View style={resto}>
+      {!value && placeholder ? (
+        <View pointerEvents="none" style={{ position: 'absolute', left: izquierda, right: derecha, top: 0, bottom: 0, justifyContent: 'center' }}>
+          <Text numberOfLines={1} style={[letra, { color: c.tenue }]}>{placeholder}</Text>
+        </View>
+      ) : null}
+      <TextInput keyboardAppearance={oscuro ? 'dark' : 'light'} {...props} value={value} accessibilityHint={props.accessibilityHint ?? placeholder}
+        style={[letra, { flex: 1, paddingLeft: izquierda, paddingRight: derecha, paddingVertical: 0, color: color ?? c.tinta }]} />
+    </View>
   );
 }
 

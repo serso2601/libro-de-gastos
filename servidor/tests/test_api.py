@@ -140,3 +140,62 @@ def test_solo_atiende_a_la_pc_y_a_la_tailnet(config, reloj):
     assert desde_red_permitida("::ffff:100.100.10.1")
     assert desde_red_permitida("fd7a:115c:a1e0::1")
     assert not desde_red_permitida("no-es-una-ip")
+
+
+def test_tarjeta_de_credito(cliente):
+    tarjeta = {"nombre": "Visa", "es_credito": True, "dia_corte": 15, "dia_pago": 5, "pago_minimo": 45000}
+    r = cliente.put("/api/cuentas/visa", json=tarjeta)
+    assert r.status_code == 200
+    assert r.json()["es_credito"] is True and (r.json()["dia_corte"], r.json()["dia_pago"], r.json()["pago_minimo"]) == (15, 5, 45000)
+
+    por_id = {c["id"]: c for c in cliente.get("/api/datos").json()["cuentas"]}
+    assert por_id["visa"]["es_credito"] is True and por_id["visa"]["dia_corte"] == 15
+    assert por_id["efectivo"]["es_credito"] is False and por_id["efectivo"]["dia_corte"] is None
+    exportada = {c["id"]: c for c in cliente.get("/api/exportar").json()["cuentas"]}
+    assert exportada["visa"]["es_credito"] is True and exportada["efectivo"]["es_credito"] is False
+
+    # Si deja de ser tarjeta, los tres datos se limpian.
+    r = cliente.put("/api/cuentas/visa", json={**tarjeta, "es_credito": False})
+    assert r.json()["es_credito"] is False and (r.json()["dia_corte"], r.json()["dia_pago"], r.json()["pago_minimo"]) == (None, None, None)
+
+
+def test_tarjeta_de_credito_pide_dia_de_corte(cliente):
+    r = cliente.put("/api/cuentas/visa", json={"nombre": "Visa", "es_credito": True})
+    assert r.status_code == 422 and "día de corte" in r.text
+    assert cliente.put("/api/cuentas/visa", json={"nombre": "Visa", "es_credito": True, "dia_corte": 32}).status_code == 422
+    assert cliente.put("/api/cuentas/visa", json={"nombre": "Visa", "es_credito": True, "dia_corte": 10, "pago_minimo": -1}).status_code == 422
+    assert [c["id"] for c in cliente.get("/api/datos").json()["cuentas"]] == ["efectivo"]
+
+
+def test_borrar_cuenta_con_todo(cliente):
+    cliente.put("/api/cuentas/banco", json={"nombre": "Banco", "saldo_inicial": 50000})
+    cliente.put("/api/cuentas/ahorro", json={"nombre": "Ahorro"})
+    cliente.put("/api/movimientos/g1", json=gasto(cuenta_id="banco"))
+    cliente.put("/api/movimientos/g2", json=gasto(cuenta_id="efectivo"))
+    cliente.put("/api/movimientos/t1", json={"tipo": "transferencia", "monto": 700, "fecha": "2026-10-16",
+                                             "cuenta_id": "efectivo", "cuenta_destino_id": "banco"})
+    cliente.put("/api/movimientos/t2", json={"tipo": "transferencia", "monto": 300, "fecha": "2026-10-16",
+                                             "cuenta_id": "efectivo", "cuenta_destino_id": "ahorro"})
+    regla = {"tipo": "gasto", "monto": 900, "categoria_id": "transporte", "frecuencia": "semanal", "fecha_inicio": "2026-10-02"}
+    cliente.put("/api/recurrencias/r-banco", json={**regla, "cuenta_id": "banco"})
+    cliente.put("/api/recurrencias/r-efectivo", json={**regla, "cuenta_id": "efectivo"})
+    cliente.put("/api/recurrencias/r-trans", json={"tipo": "transferencia", "monto": 100, "cuenta_id": "ahorro",
+                                                   "cuenta_destino_id": "banco", "frecuencia": "mensual", "fecha_inicio": "2026-10-01"})
+
+    # Sin con_todo sigue como antes: la cuenta en uso no se borra.
+    assert cliente.delete("/api/cuentas/banco").status_code == 409
+    assert cliente.delete("/api/cuentas/banco", params={"con_todo": False}).status_code == 409
+    assert len(cliente.get("/api/datos").json()["cuentas"]) == 3
+
+    assert cliente.delete("/api/cuentas/banco", params={"con_todo": True}).status_code == 200
+    d = cliente.get("/api/datos").json()
+    assert sorted(c["id"] for c in d["cuentas"]) == ["ahorro", "efectivo"]
+    assert {m["id"] for m in d["movimientos"] if m["origen"] == "manual"} == {"g2", "t2"}
+    assert all("banco" not in (m["cuenta_id"], m["cuenta_destino_id"]) for m in d["movimientos"])
+    assert [r["id"] for r in d["recurrencias"]] == ["r-efectivo"]
+
+
+def test_borrar_la_unica_cuenta_sigue_siendo_409_aun_con_todo(cliente):
+    cliente.put("/api/movimientos/m1", json=gasto())
+    assert cliente.delete("/api/cuentas/efectivo", params={"con_todo": True}).status_code == 409
+    assert len(cliente.get("/api/datos").json()["movimientos"]) == 1

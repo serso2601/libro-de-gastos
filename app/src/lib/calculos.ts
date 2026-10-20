@@ -2,7 +2,7 @@
 // de ver el saldo y las próximas veces de una regla. Todo en centavos.
 
 import { aFecha, dinero, fechaISO, MESES, saldo } from './formato';
-import type { Categoria, Datos, Frecuencia, Movimiento, Proximo, Recurrencia } from './tipos';
+import type { Categoria, Cuenta, Datos, Frecuencia, Movimiento, Proximo, Recurrencia } from './tipos';
 
 export const claveMes = (anio: number, mes: number) => `${anio}-${String(mes).padStart(2, '0')}`;
 
@@ -203,4 +203,63 @@ export function porDia(movs: Movimiento[]): [string, Movimiento[]][] {
   const mapa = new Map<string, Movimiento[]>();
   for (const m of movs) mapa.set(m.fecha, [...(mapa.get(m.fecha) ?? []), m]);
   return [...mapa.entries()];
+}
+
+// --- Tarjeta de crédito ---------------------------------------------------------------------------
+
+/** El día `dia` de un mes, o el último si el mes es más corto (corte el 31 → 30 de abril). */
+function diaDelMes(anio: number, mes0: number, dia: number): Date {
+  const primero = new Date(anio, mes0, 1);
+  return new Date(primero.getFullYear(), primero.getMonth(), Math.min(dia, diasDelMes(primero.getFullYear(), primero.getMonth() + 1)));
+}
+
+export interface CicloTarjeta {
+  /** El último corte que ya pasó (el periodo actual empieza el día siguiente). */
+  corteAnterior: string;
+  /** El próximo corte (hoy, si hoy es día de corte): ahí se cierra el periodo actual. */
+  proximoCorte: string;
+  /** La fecha de pago que sigue al último corte, si el usuario puso día de pago. */
+  fechaPago: string | null;
+}
+
+/** El periodo de la tarjeta en el que cae `hoy`: (corteAnterior, proximoCorte]. */
+export function cicloTarjeta(cuenta: Cuenta, hoy: string): CicloTarjeta | null {
+  if (!cuenta.es_credito || !cuenta.dia_corte) return null;
+  const h = aFecha(hoy);
+  let proximo = diaDelMes(h.getFullYear(), h.getMonth(), cuenta.dia_corte);
+  if (proximo < h) proximo = diaDelMes(h.getFullYear(), h.getMonth() + 1, cuenta.dia_corte);
+  const anterior = diaDelMes(proximo.getFullYear(), proximo.getMonth() - 1, cuenta.dia_corte);
+  let fechaPago: string | null = null;
+  if (cuenta.dia_pago) {
+    let pago = diaDelMes(anterior.getFullYear(), anterior.getMonth(), cuenta.dia_pago);
+    if (pago <= anterior) pago = diaDelMes(anterior.getFullYear(), anterior.getMonth() + 1, cuenta.dia_pago);
+    fechaPago = fechaISO(pago);
+  }
+  return { corteAnterior: fechaISO(anterior), proximoCorte: fechaISO(proximo), fechaPago };
+}
+
+/** Lo que se gastó con la tarjeta en el periodo actual (desde el día después del último corte). */
+export function gastadoEnCorte(d: Datos, cuenta: Cuenta): number {
+  const ciclo = cicloTarjeta(cuenta, d.hoy);
+  if (!ciclo) return 0;
+  return d.movimientos.reduce((s, m) => s + (m.cuenta_id === cuenta.id && m.tipo !== 'ingreso' && m.fecha > ciclo.corteAnterior
+    && m.fecha <= ciclo.proximoCorte ? m.monto : 0), 0);
+}
+
+/** Lo que se debe en la tarjeta: su saldo en contra (0 si está a favor). */
+export function deudaTarjeta(d: Datos, cuenta: Cuenta): number {
+  return Math.max(0, -saldo(cuenta, d.movimientos));
+}
+
+/**
+ * El pago que la app sugiere (nunca lo anota sola): aparece si se debe algo y desde el último corte
+ * no entró ningún pago a la tarjeta. Total = la deuda; mínimo = el que copió el usuario, si lo puso.
+ */
+export function pagoSugerido(d: Datos, cuenta: Cuenta): { total: number; minimo: number | null; fecha: string | null } | null {
+  const ciclo = cicloTarjeta(cuenta, d.hoy);
+  const deuda = deudaTarjeta(d, cuenta);
+  if (!ciclo || deuda <= 0) return null;
+  const pagado = d.movimientos.some((m) => m.tipo === 'transferencia' && m.cuenta_destino_id === cuenta.id && m.fecha > ciclo.corteAnterior);
+  if (pagado) return null;
+  return { total: deuda, minimo: cuenta.pago_minimo ?? null, fecha: ciclo.fechaPago };
 }

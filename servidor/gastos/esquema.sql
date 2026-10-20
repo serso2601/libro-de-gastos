@@ -1,4 +1,4 @@
--- Esquema del Libro de Gastos (versión 2).
+-- Esquema del Libro de Gastos (versión 3).
 --
 -- Los montos son enteros en centavos: $12,50 se guarda como 1250. Las fechas son texto ISO
 -- ('2026-10-16'), las horas 'HH:MM' y las marcas de tiempo ISO con segundos.
@@ -11,7 +11,13 @@ CREATE TABLE IF NOT EXISTS cuenta (
     saldo_inicial   INTEGER NOT NULL DEFAULT 0,
     orden           INTEGER NOT NULL DEFAULT 0,
     creado          TEXT NOT NULL,
-    actualizado     TEXT NOT NULL
+    actualizado     TEXT NOT NULL,
+    -- Tarjeta de crédito: el día de corte es obligatorio; el día de pago y el pago mínimo (centavos)
+    -- los copia el usuario de su estado de cuenta, la app no los calcula.
+    es_credito      INTEGER NOT NULL DEFAULT 0 CHECK (es_credito IN (0, 1)),
+    dia_corte       INTEGER CHECK (dia_corte BETWEEN 1 AND 31),
+    dia_pago        INTEGER CHECK (dia_pago BETWEEN 1 AND 31),
+    pago_minimo     INTEGER CHECK (pago_minimo >= 0)
 );
 
 CREATE TABLE IF NOT EXISTS categoria (
@@ -19,7 +25,7 @@ CREATE TABLE IF NOT EXISTS categoria (
     nombre          TEXT NOT NULL,
     tipo            TEXT NOT NULL CHECK (tipo IN ('gasto', 'ingreso')),
     color           TEXT NOT NULL DEFAULT '#3DA5F5',
-    emoji           TEXT NOT NULL DEFAULT '💰',
+    emoji           TEXT NOT NULL DEFAULT '💰',  -- un emoji o un símbolo de la app: 'i:<clave>'
     presupuesto     INTEGER CHECK (presupuesto IS NULL OR presupuesto >= 0),  -- por mes, solo gastos
     orden           INTEGER NOT NULL DEFAULT 0,
     creado          TEXT NOT NULL,

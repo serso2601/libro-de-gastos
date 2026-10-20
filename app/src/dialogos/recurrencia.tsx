@@ -1,12 +1,12 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useState } from 'react';
-import { Alert, Pressable, TextInput, View } from 'react-native';
+import { Alert, Pressable, View } from 'react-native';
 import { useAcciones } from '@/lib/acciones';
 import { proximasVeces } from '@/lib/calculos';
 import { useDatos } from '@/lib/datos';
 import { aCentavos, aFecha, aTexto, DIAS, diaCorto, fechaISO, MESES, MESES_CORTOS } from '@/lib/formato';
 import { FRECUENCIAS, type Frecuencia, type Recurrencia } from '@/lib/tipos';
-import { BotonPrincipal, Etiqueta, familia, Ficha, Hoja, MontoGrande, Texto, TextoError } from '@/ui/componentes';
+import { BotonPrincipal, Campo, Etiqueta, Ficha, Hoja, MontoGrande, Texto, TextoError } from '@/ui/componentes';
 import { Icono } from '@/ui/iconos';
 import { useTema } from '@/ui/tema';
 import { Desplegable, ElegirCategoria, ElegirCuenta, Grilla } from './piezas';
@@ -84,8 +84,8 @@ export function DialogoRecurrencia({ regla, alCerrar }: { regla: Recurrencia; al
 
       <View>
         <MontoGrande valor={monto} alCambiar={setMonto} moneda={moneda} />
-        <TextInput value={nota} onChangeText={setNota} placeholder="Descripción" placeholderTextColor={c.tenue} accessibilityLabel="Descripción"
-          style={{ textAlign: 'center', fontSize: 16, height: 36, paddingVertical: 0, color: c.tinta, fontFamily: familia('normal') }} />
+        <Campo value={nota} onChangeText={setNota} placeholder="Descripción" accessibilityLabel="Descripción"
+          style={{ height: 40, backgroundColor: 'transparent', textAlign: 'center' }} />
       </View>
 
       <View style={{ gap: 8 }}>

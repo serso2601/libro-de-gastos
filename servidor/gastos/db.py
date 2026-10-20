@@ -9,7 +9,7 @@ from datetime import date, datetime
 from pathlib import Path
 
 ESQUEMA = Path(__file__).with_name("esquema.sql")
-VERSION = 2
+VERSION = 3
 
 # {versión a la que lleva: sql}. Cada paso corre con las claves foráneas apagadas: rehacer una
 # tabla no debe tocar las filas que la apuntan (movimiento.recurrencia_id es ON DELETE SET NULL).
@@ -42,6 +42,28 @@ MIGRACIONES: dict[int, str] = {
     ALTER TABLE recurrencia_nueva RENAME TO recurrencia;
     COMMIT;
     """,
+    # Tarjeta de crédito en la cuenta, y símbolos de la app (`i:<clave>`) como icono de categoría.
+    # Los emojis iniciales pasan a símbolo solo si el usuario no los cambió.
+    3: """
+    BEGIN;
+    ALTER TABLE cuenta ADD COLUMN es_credito INTEGER NOT NULL DEFAULT 0 CHECK (es_credito IN (0, 1));
+    ALTER TABLE cuenta ADD COLUMN dia_corte INTEGER CHECK (dia_corte BETWEEN 1 AND 31);
+    ALTER TABLE cuenta ADD COLUMN dia_pago INTEGER CHECK (dia_pago BETWEEN 1 AND 31);
+    ALTER TABLE cuenta ADD COLUMN pago_minimo INTEGER CHECK (pago_minimo >= 0);
+    UPDATE categoria SET emoji = 'i:comida' WHERE id = 'comida' AND emoji = '🍔';
+    UPDATE categoria SET emoji = 'i:transporte' WHERE id = 'transporte' AND emoji = '🚌';
+    UPDATE categoria SET emoji = 'i:casa' WHERE id = 'vivienda' AND emoji = '🏠';
+    UPDATE categoria SET emoji = 'i:servicios' WHERE id = 'servicios' AND emoji = '⚡';
+    UPDATE categoria SET emoji = 'i:entretenimiento' WHERE id = 'entretenimiento' AND emoji = '🎬';
+    UPDATE categoria SET emoji = 'i:salud' WHERE id = 'salud' AND emoji = '❤️';
+    UPDATE categoria SET emoji = 'i:compras' WHERE id = 'compras' AND emoji = '🛍️';
+    UPDATE categoria SET emoji = 'i:otros' WHERE id = 'otros' AND emoji = '✳️';
+    UPDATE categoria SET emoji = 'i:sueldo' WHERE id = 'sueldo' AND emoji = '💼';
+    UPDATE categoria SET emoji = 'i:trabajo' WHERE id = 'freelance' AND emoji = '💻';
+    UPDATE categoria SET emoji = 'i:regalo' WHERE id = 'regalos' AND emoji = '🎁';
+    UPDATE categoria SET emoji = 'i:otros' WHERE id = 'otros-ingresos' AND emoji = '✳️';
+    COMMIT;
+    """,
 }
 
 
@@ -57,13 +79,13 @@ def conectar(ruta: Path | str) -> sqlite3.Connection:
 # Con lo que arranca una base nueva (las mismas de la app vieja). Importar un respaldo las reemplaza.
 PALETA = ["#3DA5F5", "#34D8A6", "#F16565", "#F5B942", "#A78BFA", "#F472B6", "#4ADE80", "#38BDF8", "#FB923C", "#94A3B8"]
 CUENTAS_INICIALES = [("efectivo", "Efectivo", PALETA[1])]
-CATEGORIAS_INICIALES = [
-    ("comida", "Comida", "gasto", "🍔"), ("transporte", "Transporte", "gasto", "🚌"),
-    ("vivienda", "Vivienda", "gasto", "🏠"), ("servicios", "Servicios", "gasto", "⚡"),
-    ("entretenimiento", "Entretenimiento", "gasto", "🎬"), ("salud", "Salud", "gasto", "❤️"),
-    ("compras", "Compras", "gasto", "🛍️"), ("otros", "Otros", "gasto", "✳️"),
-    ("sueldo", "Sueldo", "ingreso", "💼"), ("freelance", "Freelance", "ingreso", "💻"),
-    ("regalos", "Regalos", "ingreso", "🎁"), ("otros-ingresos", "Otros ingresos", "ingreso", "✳️"),
+CATEGORIAS_INICIALES = [  # el icono es un símbolo de la app: 'i:<clave>'
+    ("comida", "Comida", "gasto", "i:comida"), ("transporte", "Transporte", "gasto", "i:transporte"),
+    ("vivienda", "Vivienda", "gasto", "i:casa"), ("servicios", "Servicios", "gasto", "i:servicios"),
+    ("entretenimiento", "Entretenimiento", "gasto", "i:entretenimiento"), ("salud", "Salud", "gasto", "i:salud"),
+    ("compras", "Compras", "gasto", "i:compras"), ("otros", "Otros", "gasto", "i:otros"),
+    ("sueldo", "Sueldo", "ingreso", "i:sueldo"), ("freelance", "Freelance", "ingreso", "i:trabajo"),
+    ("regalos", "Regalos", "ingreso", "i:regalo"), ("otros-ingresos", "Otros ingresos", "ingreso", "i:otros"),
 ]
 
 
@@ -73,9 +95,11 @@ def inicializar(con: sqlite3.Connection) -> None:
         con.executescript(ESQUEMA.read_text(encoding="utf-8"))
         marca = ahora()
         with con:
-            con.executemany("INSERT INTO cuenta VALUES (?, ?, ?, 0, ?, ?, ?)",
+            con.executemany("INSERT INTO cuenta (id, nombre, color, saldo_inicial, orden, creado, actualizado) "
+                            "VALUES (?, ?, ?, 0, ?, ?, ?)",
                             [(id_, nombre, color, i, marca, marca) for i, (id_, nombre, color) in enumerate(CUENTAS_INICIALES)])
-            con.executemany("INSERT INTO categoria VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?)",
+            con.executemany("INSERT INTO categoria (id, nombre, tipo, color, emoji, presupuesto, orden, creado, actualizado) "
+                            "VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?)",
                             [(id_, nombre, tipo, PALETA[i % len(PALETA)], emoji, i, marca, marca)
                              for i, (id_, nombre, tipo, emoji) in enumerate(CATEGORIAS_INICIALES)])
         con.execute(f"PRAGMA user_version = {VERSION}")
