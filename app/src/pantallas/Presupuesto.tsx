@@ -1,24 +1,73 @@
 // El presupuesto en vasos: cada categoría con tope es un vaso que se llena con lo que gastas, del
-// color de la categoría (o del de alerta si te pasaste o vas casi al tope). Se puede ver otro mes.
+// color de la categoría (o del de alerta si te pasaste o vas casi al tope). Se navega por periodos
+// (semana, quincena, mes…, según Ajustes) y se puede ver otro.
 
+import * as Haptics from 'expo-haptics';
+import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useAbrir } from '@/dialogos/abrir';
 import { Grilla } from '@/dialogos/piezas';
-import { diasQueQuedan, gastadoEn, topes, type EstadoTope } from '@/lib/calculos';
+import {
+  configPresupuesto, diasQueQuedanEn, gastadoEn, nombrePeriodo, NOMBRES_PERIODO, periodoDe, periodoVecino, topes,
+  type EstadoTope, type Periodo,
+} from '@/lib/calculos';
 import { useDatos } from '@/lib/datos';
-import { dinero, dineroCorto } from '@/lib/formato';
-import { useMes } from '@/lib/mes';
-import type { Categoria } from '@/lib/tipos';
-import { Barra, BotonPrincipal, NavegadorMes, Num, Tarjeta, Texto, Vaso } from '@/ui/componentes';
+import { DIAS, dinero, dineroCorto } from '@/lib/formato';
+import type { Categoria, ConfigPresupuesto } from '@/lib/tipos';
+import { Barra, BotonPrincipal, Num, Tarjeta, Texto, Vaso } from '@/ui/componentes';
+import { Icono, type NombreIcono } from '@/ui/iconos';
 import { Marco } from '@/ui/pantalla';
 import { SimboloCategoria } from '@/ui/simbolos';
 import { mezclar, useTema } from '@/ui/tema';
 
-/** Corto a propósito: en un vaso de media pantalla tiene que caber junto al porcentaje. Los montos ya van en el subtítulo. */
+/**
+ * Corto a propósito: en un vaso de media pantalla tiene que caber junto al porcentaje. Los montos ya
+ * van en el subtítulo. Si trae algo del periodo anterior y no hay alerta, eso es lo que se avisa.
+ */
 function avisoDe(t: EstadoTope, moneda: string): string {
   if (t.pasado) return 'Te pasaste';
   if (t.casiAlTope) return 'Casi al tope';
+  if (t.arrastre !== 0) return `${t.arrastre > 0 ? '+' : ''}${dineroCorto(t.arrastre, moneda)} del anterior`;
   return `Quedan ${dineroCorto(t.tope - t.gastado, moneda)}`;
+}
+
+/** Cómo está configurado el periodo, para la ficha de arriba: «Cada semana · empieza el lunes». */
+function descripcionPeriodo(config: ConfigPresupuesto): string {
+  const nombre = NOMBRES_PERIODO[config.periodo];
+  if (config.periodo === 'mensual') return `${nombre} · desde el día ${Number(config.inicio) || 1}`;
+  if (config.periodo === 'semanal') return `${nombre} · empieza el ${DIAS[Number(config.inicio) || 0]}`;
+  return nombre;
+}
+
+/** El navegador de periodos en cápsula, de la misma forma que el de meses: ‹ 19 – 25 oct › */
+function NavegadorPeriodo({ nombre, mover }: { nombre: string; mover: (d: number) => void }) {
+  const { c } = useTema();
+  const flecha = (d: number, icono: NombreIcono) => (
+    <Pressable onPress={() => { Haptics.selectionAsync(); mover(d); }} accessibilityLabel={d < 0 ? 'Periodo anterior' : 'Periodo siguiente'}
+      style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
+      <Icono nombre={icono} tam={20} color={c.tinta} grosor={2} />
+    </Pressable>
+  );
+  return (
+    <View style={{ height: 44, borderRadius: 22, backgroundColor: c.tarjeta, paddingHorizontal: 4, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+      {flecha(-1, 'atras')}
+      <Texto tam={15} peso="semi">{nombre}</Texto>
+      {flecha(1, 'adelante')}
+    </View>
+  );
+}
+
+/** La ficha chica con el periodo del presupuesto; tocarla abre la hoja para cambiarlo. */
+function FichaPeriodo({ config }: { config: ConfigPresupuesto }) {
+  const abrir = useAbrir();
+  const { c } = useTema();
+  return (
+    <Pressable onPress={() => abrir({ tipo: 'periodo' })} accessibilityLabel={`${descripcionPeriodo(config)}. Cambiar el periodo`}
+      style={({ pressed }) => ({ alignSelf: 'center', height: 32, paddingLeft: 14, paddingRight: 10, borderRadius: 16, backgroundColor: c.tarjeta, flexDirection: 'row', alignItems: 'center', gap: 4, opacity: pressed ? 0.7 : 1 })}>
+      <Texto tam={13} color={c.tenue}>{descripcionPeriodo(config)}</Texto>
+      <Icono nombre="adelante" tam={14} color={c.tenue} grosor={2} />
+    </Pressable>
+  );
 }
 
 function BotonTopes() {
@@ -37,17 +86,28 @@ function SinTopes() {
   return (
     <Tarjeta style={{ padding: 18, gap: 12 }}>
       <Texto tam={15} peso="semi">Todavía no hay topes</Texto>
-      <Texto tam={14} color={c.tenue} style={{ lineHeight: 20 }}>Ponle a cada categoría cuánto quieres gastar como mucho al mes y aquí ves cuánto te queda.</Texto>
+      <Texto tam={14} color={c.tenue} style={{ lineHeight: 20 }}>Ponle a cada categoría cuánto quieres gastar como mucho en cada periodo y aquí ves cuánto te queda.</Texto>
       <BotonPrincipal alto={48} onPress={() => abrir({ tipo: 'topes' })}>Poner topes</BotonPrincipal>
     </Tarjeta>
   );
 }
 
-/** Lo gastado contra la suma de todos los topes del mes que se mira. */
-function Resumen({ gastado, tope, moneda, dias }: { gastado: number; tope: number; moneda: string; dias: number | null }) {
+/** Dónde queda el periodo que se mira respecto a hoy. */
+type Momento = 'actual' | 'pasado' | 'futuro';
+
+/** Lo gastado contra la suma de todos los topes del periodo que se mira. */
+function Resumen({ gastado, tope, moneda, momento, dias }: { gastado: number; tope: number; moneda: string; momento: Momento; dias: number }) {
   const { c } = useTema();
   const pasado = gastado > tope;
   const pct = tope > 0 ? Math.round((gastado / tope) * 100) : 0;
+  const quedan = tope - gastado;
+  const aviso = momento === 'futuro'
+    ? 'Todavía no empieza'
+    : pasado
+      ? `Te pasaste por ${dinero(-quedan, moneda)}`
+      : momento === 'pasado'
+        ? `Terminó con ${dinero(quedan, moneda)} de sobra`
+        : `Te quedan ${dinero(quedan, moneda)} para ${dias} ${dias === 1 ? 'día' : 'días'} · ~${dineroCorto(Math.round(quedan / dias), moneda)} por día`;
   return (
     <Tarjeta style={{ padding: 16, gap: 12 }}>
       <View style={{ flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: 6 }}>
@@ -56,10 +116,7 @@ function Resumen({ gastado, tope, moneda, dias }: { gastado: number; tope: numbe
         <Texto tam={14} color={c.tenue}>de {dinero(tope, moneda)}</Texto>
       </View>
       <Barra pct={pct} color={pasado ? c.alerta : c.gasto} />
-      <Texto num tam={14} peso={pasado ? 'semi' : 'normal'} color={pasado ? c.alerta : c.tenue}>
-        {pasado ? `Te pasaste por ${dinero(gastado - tope, moneda)}` : `Te quedan ${dinero(tope - gastado, moneda)}`}
-        {dias !== null ? ` · quedan ${dias} ${dias === 1 ? 'día' : 'días'}` : ''}
-      </Texto>
+      <Texto num tam={14} peso={pasado ? 'semi' : 'normal'} color={pasado ? c.alerta : c.tenue}>{aviso}</Texto>
     </Tarjeta>
   );
 }
@@ -67,21 +124,29 @@ function Resumen({ gastado, tope, moneda, dias }: { gastado: number; tope: numbe
 export function Presupuesto() {
   const d = useDatos();
   const abrir = useAbrir();
-  const mes = useMes();
   const { c, relleno } = useTema();
-  const t = topes(d, mes.clave);
+  const config = configPresupuesto(d);
+  // El periodo que se mira. Si cambia la configuración, se vuelve al periodo de hoy.
+  const clave = `${config.periodo}|${config.inicio}`;
+  const [elegido, setElegido] = useState<{ clave: string; periodo: Periodo } | null>(null);
+  const p = elegido && elegido.clave === clave ? elegido.periodo : periodoDe(config, d.hoy);
+  const mover = (delta: number) => setElegido({ clave, periodo: periodoVecino(config, p, delta) });
+  const momento: Momento = d.hoy < p.desde ? 'futuro' : d.hoy > p.hasta ? 'pasado' : 'actual';
+
+  const t = topes(d, p);
   const alto = 150;
-  const ver = (categoria: Categoria) => abrir({ tipo: 'detalleCategoria', categoria, mes: mes.clave });
+  const ver = (categoria: Categoria) => abrir({ tipo: 'detalleCategoria', categoria, periodo: p });
   // Las categorías sin tope van aparte, en cuadros bajitos: no tienen nada que llenar.
   const sinTope = t.sinTope.length > 0 && (
     <Grilla columnas={2} gap={12}>
-      {t.sinTope.map((cat) => <CuadroSinTope key={cat.id} categoria={cat} gastado={gastadoEn(d, cat.id, mes.clave)} moneda={d.moneda} onPress={() => ver(cat)} />)}
+      {t.sinTope.map((cat) => <CuadroSinTope key={cat.id} categoria={cat} gastado={gastadoEn(d, cat.id, p)} moneda={d.moneda} onPress={() => ver(cat)} />)}
     </Grilla>
   );
 
   return (
     <Marco titulo="Presupuesto" derecha={<BotonTopes />}>
-      <NavegadorMes nombre={mes.nombre} anio={mes.anio} mover={mes.mover} />
+      <NavegadorPeriodo nombre={nombrePeriodo(p)} mover={mover} />
+      <FichaPeriodo config={config} />
       {t.conTope.length === 0 ? (
         <>
           <SinTopes />
@@ -89,7 +154,7 @@ export function Presupuesto() {
         </>
       ) : (
         <>
-          <Resumen gastado={t.gastado} tope={t.tope} moneda={d.moneda} dias={mes.esActual ? diasQueQuedan(d.hoy) : null} />
+          <Resumen gastado={t.gastado} tope={t.tope} moneda={d.moneda} momento={momento} dias={diasQueQuedanEn(p, d.hoy)} />
           <Grilla columnas={2} gap={12}>
             {t.conTope.map((x) => {
               const malo = x.pasado || x.casiAlTope;
@@ -101,18 +166,18 @@ export function Presupuesto() {
             })}
           </Grilla>
           {sinTope}
-          <Texto tam={13} color={c.tenue} centro style={{ marginTop: 6 }}>Toca una categoría para ver sus compras del mes.</Texto>
+          <Texto tam={13} color={c.tenue} centro style={{ marginTop: 6 }}>Toca una categoría para ver sus compras de este periodo.</Texto>
         </>
       )}
     </Marco>
   );
 }
 
-/** Una categoría sin tope: su nombre arriba y abajo «Sin tope» con lo gastado ese mes, si hay. */
+/** Una categoría sin tope: su nombre arriba y abajo «Sin tope» con lo gastado en el periodo, si hay. */
 function CuadroSinTope({ categoria, gastado, moneda, onPress }: { categoria: Categoria; gastado: number; moneda: string; onPress: () => void }) {
   const { c, estilo } = useTema();
   return (
-    <Pressable onPress={onPress} accessibilityLabel={`${categoria.nombre}, sin tope${gastado > 0 ? `, ${dinero(gastado, moneda)} este mes` : ''}`}
+    <Pressable onPress={onPress} accessibilityLabel={`${categoria.nombre}, sin tope${gastado > 0 ? `, ${dinero(gastado, moneda)} en este periodo` : ''}`}
       style={({ pressed }) => ({ height: 84, borderRadius: estilo.m.esquinas, borderWidth: 1.5, borderStyle: 'dashed', borderColor: mezclar(c.fondo, c.tenue, 0.35),
         paddingVertical: 12, paddingHorizontal: 14, justifyContent: 'space-between', opacity: pressed ? 0.6 : 1 })}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>

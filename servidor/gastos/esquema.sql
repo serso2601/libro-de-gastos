@@ -1,4 +1,4 @@
--- Esquema del Libro de Gastos (versión 3).
+-- Esquema del Libro de Gastos (versión 4).
 --
 -- Los montos son enteros en centavos: $12,50 se guarda como 1250. Las fechas son texto ISO
 -- ('2026-10-16'), las horas 'HH:MM' y las marcas de tiempo ISO con segundos.
@@ -26,10 +26,14 @@ CREATE TABLE IF NOT EXISTS categoria (
     tipo            TEXT NOT NULL CHECK (tipo IN ('gasto', 'ingreso')),
     color           TEXT NOT NULL DEFAULT '#3DA5F5',
     emoji           TEXT NOT NULL DEFAULT '💰',  -- un emoji o un símbolo de la app: 'i:<clave>'
-    presupuesto     INTEGER CHECK (presupuesto IS NULL OR presupuesto >= 0),  -- por mes, solo gastos
+    presupuesto     INTEGER CHECK (presupuesto IS NULL OR presupuesto >= 0),  -- por periodo del presupuesto (ajuste), solo gastos
     orden           INTEGER NOT NULL DEFAULT 0,
     creado          TEXT NOT NULL,
-    actualizado     TEXT NOT NULL
+    actualizado     TEXT NOT NULL,
+    -- Pasar lo que sobra: con `acumula`, lo que no se gastó de un periodo se suma al siguiente,
+    -- contando desde el inicio del periodo `acumula_desde` (fecha ISO; la manda la app al activarlo).
+    acumula         INTEGER NOT NULL DEFAULT 0 CHECK (acumula IN (0, 1)),
+    acumula_desde   TEXT
 );
 
 -- Una regla que se repite. No genera nada por adelantado: el servidor crea cada movimiento cuando
@@ -72,6 +76,9 @@ CREATE TABLE IF NOT EXISTS movimiento (
 CREATE INDEX IF NOT EXISTS movimiento_fecha ON movimiento (fecha);
 CREATE INDEX IF NOT EXISTS movimiento_recurrencia ON movimiento (recurrencia_id);
 
+-- Claves: `moneda`; `presupuesto_periodo` (semanal · catorcenal · quincenal · mensual) y
+-- `presupuesto_inicio` (semanal: día de la semana '0'..'6', 0 = domingo; catorcenal: una fecha ISO
+-- en que empieza un periodo; quincenal: ''; mensual: día del mes '1'..'28').
 CREATE TABLE IF NOT EXISTS ajuste (
     clave   TEXT PRIMARY KEY,
     valor   TEXT NOT NULL

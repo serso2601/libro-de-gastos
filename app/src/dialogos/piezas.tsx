@@ -6,7 +6,7 @@ import * as Haptics from 'expo-haptics';
 import { Children, useState, type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 import { useAcciones } from '@/lib/acciones';
-import { topes } from '@/lib/calculos';
+import { configPresupuesto, periodoDe, topes } from '@/lib/calculos';
 import { useDatos } from '@/lib/datos';
 import { aFecha, diaCorto, dineroCorto, fechaISO, horaTexto, nuevoId, saldo } from '@/lib/formato';
 import type { Categoria, TipoCategoria } from '@/lib/tipos';
@@ -111,7 +111,7 @@ export function ElegirCategoria({ tipo, valor, alCambiar, fecha, rotulo = true }
   const [nombre, setNombre] = useState('');
   const [color, setColor] = useState(PALETA[0]);
   const disponibles = d.categorias.filter((x) => x.tipo === tipo);
-  const estados = new Map(topes(d, fecha.slice(0, 7)).conTope.map((t) => [t.categoria.id, t]));
+  const estados = new Map(topes(d, periodoDe(configPresupuesto(d), fecha)).conTope.map((t) => [t.categoria.id, t]));
 
   function crear() {
     if (!nombre.trim()) return;

@@ -1,11 +1,19 @@
 import re
+import sqlite3
+
+import pytest
 
 from gastos import db
 
 
+def esquema_v3() -> str:
+    """El esquema de la versión 3: el actual sin lo que agregó la 4 (pasar lo que sobra en la categoría)."""
+    return re.sub(r",\n    -- Pasar lo que sobra.*?acumula_desde   TEXT", "", db.ESQUEMA.read_text(encoding="utf-8"), flags=re.S)
+
+
 def esquema_v2() -> str:
-    """El esquema de la versión 2: el actual sin lo que agregó la 3 (tarjeta de crédito en la cuenta)."""
-    return re.sub(r",\n    -- Tarjeta de crédito.*?CHECK \(pago_minimo >= 0\)", "", db.ESQUEMA.read_text(encoding="utf-8"), flags=re.S)
+    """El esquema de la versión 2: el de la 3 sin lo que agregó la 3 (tarjeta de crédito en la cuenta)."""
+    return re.sub(r",\n    -- Tarjeta de crédito.*?CHECK \(pago_minimo >= 0\)", "", esquema_v3(), flags=re.S)
 
 
 def test_migracion_2_pasa_quincenal_a_catorcenal_sin_soltar_movimientos(tmp_path):
@@ -52,7 +60,7 @@ def test_migracion_3_agrega_la_tarjeta_y_pasa_los_emojis_iniciales_a_simbolos(tm
 
     db.inicializar(con)
 
-    assert con.execute("PRAGMA user_version").fetchone()[0] == 3
+    assert con.execute("PRAGMA user_version").fetchone()[0] == db.VERSION
     cuenta = dict(con.execute("SELECT * FROM cuenta").fetchone())
     assert cuenta["saldo_inicial"] == 1500
     assert (cuenta["es_credito"], cuenta["dia_corte"], cuenta["dia_pago"], cuenta["pago_minimo"]) == (0, None, None, None)
@@ -61,6 +69,33 @@ def test_migracion_3_agrega_la_tarjeta_y_pasa_los_emojis_iniciales_a_simbolos(tm
                       "sueldo": "i:sueldo", "viajes": "🍔"}
     assert tuple(con.execute("SELECT id, nota FROM movimiento").fetchone()) == ("m", "x")
     assert con.execute("PRAGMA foreign_key_check").fetchall() == []
+
+
+def test_migracion_4_agrega_acumular_a_las_categorias(tmp_path):
+    con = db.conectar(tmp_path / "v3.db")
+    con.executescript(esquema_v3())
+    assert "acumula" not in {f["name"] for f in con.execute("PRAGMA table_info(categoria)")}
+    con.execute("PRAGMA user_version = 3")
+    marca = db.ahora()
+    with con:
+        con.execute("INSERT INTO cuenta (id, nombre, creado, actualizado) VALUES ('c', 'Cuenta', ?, ?)", (marca, marca))
+        con.execute("INSERT INTO categoria VALUES ('comida', 'Comida', 'gasto', '#000', 'i:comida', 30000, 0, ?, ?)", (marca, marca))
+        con.execute("""INSERT INTO movimiento VALUES ('m', 'gasto', 500, '2026-10-01', NULL, 'c', NULL, 'comida', 'x',
+                       NULL, 'manual', ?, ?)""", (marca, marca))
+        con.execute("INSERT INTO ajuste VALUES ('moneda', '€')")
+
+    db.inicializar(con)
+
+    assert con.execute("PRAGMA user_version").fetchone()[0] == 4
+    categoria = dict(con.execute("SELECT * FROM categoria").fetchone())
+    assert (categoria["nombre"], categoria["presupuesto"]) == ("Comida", 30000)
+    assert (categoria["acumula"], categoria["acumula_desde"]) == (0, None)
+    assert tuple(con.execute("SELECT id, nota FROM movimiento").fetchone()) == ("m", "x")
+    assert con.execute("SELECT valor FROM ajuste WHERE clave = 'moneda'").fetchone()[0] == "€"
+    assert con.execute("PRAGMA foreign_key_check").fetchall() == []
+    # El CHECK de la columna nueva viaja con la migración.
+    with pytest.raises(sqlite3.IntegrityError):
+        con.execute("UPDATE categoria SET acumula = 2")
 
 
 def test_base_nueva_trae_simbolos_y_la_version_actual(tmp_path):

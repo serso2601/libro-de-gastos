@@ -9,7 +9,7 @@ from datetime import date, datetime
 from pathlib import Path
 
 ESQUEMA = Path(__file__).with_name("esquema.sql")
-VERSION = 3
+VERSION = 4
 
 # {versión a la que lleva: sql}. Cada paso corre con las claves foráneas apagadas: rehacer una
 # tabla no debe tocar las filas que la apuntan (movimiento.recurrencia_id es ON DELETE SET NULL).
@@ -62,6 +62,14 @@ MIGRACIONES: dict[int, str] = {
     UPDATE categoria SET emoji = 'i:trabajo' WHERE id = 'freelance' AND emoji = '💻';
     UPDATE categoria SET emoji = 'i:regalo' WHERE id = 'regalos' AND emoji = '🎁';
     UPDATE categoria SET emoji = 'i:otros' WHERE id = 'otros-ingresos' AND emoji = '✳️';
+    COMMIT;
+    """,
+    # Presupuesto por categoría que puede pasar lo que sobra al periodo siguiente. El periodo del
+    # presupuesto vive en `ajuste` (con valores por defecto en la API), así que no hay más que migrar.
+    4: """
+    BEGIN;
+    ALTER TABLE categoria ADD COLUMN acumula INTEGER NOT NULL DEFAULT 0 CHECK (acumula IN (0, 1));
+    ALTER TABLE categoria ADD COLUMN acumula_desde TEXT;
     COMMIT;
     """,
 }

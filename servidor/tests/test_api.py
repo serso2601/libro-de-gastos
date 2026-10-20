@@ -17,6 +17,7 @@ def test_base_nueva_trae_lo_basico(cliente):
     assert [c["nombre"] for c in d["cuentas"]] == ["Efectivo"]
     assert len(d["categorias"]) == 12
     assert d["moneda"] == "$"
+    assert d["presupuesto"] == {"periodo": "mensual", "inicio": "1"}
     assert d["hoy"] == "2026-10-16"
 
 
@@ -199,3 +200,67 @@ def test_borrar_la_unica_cuenta_sigue_siendo_409_aun_con_todo(cliente):
     cliente.put("/api/movimientos/m1", json=gasto())
     assert cliente.delete("/api/cuentas/efectivo", params={"con_todo": True}).status_code == 409
     assert len(cliente.get("/api/datos").json()["movimientos"]) == 1
+
+
+def test_periodo_del_presupuesto_por_defecto_tambien_se_exporta(cliente):
+    assert cliente.get("/api/datos").json()["presupuesto"] == {"periodo": "mensual", "inicio": "1"}
+    assert cliente.get("/api/exportar").json()["presupuesto"] == {"periodo": "mensual", "inicio": "1"}
+
+
+def test_ajustes_con_cada_periodo_valido(cliente):
+    casos = [("semanal", "0", "0"), ("semanal", "6", "6"), ("catorcenal", "2026-10-05", "2026-10-05"),
+             ("quincenal", "", ""), ("quincenal", "15", ""), ("quincenal", None, ""),
+             ("mensual", "1", "1"), ("mensual", "28", "28")]
+    for periodo, inicio, guardado in casos:
+        cuerpo = {"presupuesto_periodo": periodo}
+        if inicio is not None:
+            cuerpo["presupuesto_inicio"] = inicio
+        r = cliente.put("/api/ajustes", json=cuerpo)
+        esperado = {"periodo": periodo, "inicio": guardado}
+        assert r.status_code == 200 and r.json() == {"moneda": "$", "presupuesto": esperado}, (periodo, inicio)
+        assert cliente.get("/api/datos").json()["presupuesto"] == esperado
+        assert cliente.get("/api/exportar").json()["presupuesto"] == esperado
+
+
+def test_ajustes_rechaza_un_inicio_que_no_corresponde(cliente):
+    cliente.put("/api/ajustes", json={"presupuesto_periodo": "semanal", "presupuesto_inicio": "3"})
+    malos = [("semanal", "7"), ("semanal", "lunes"), ("semanal", None), ("catorcenal", "5"), ("catorcenal", "2026-13-40"),
+             ("catorcenal", ""), ("mensual", "0"), ("mensual", "29"), ("mensual", "uno"), ("mensual", None),
+             ("anual", "1")]
+    for periodo, inicio in malos:
+        cuerpo = {"presupuesto_periodo": periodo, "presupuesto_inicio": inicio}
+        r = cliente.put("/api/ajustes", json=cuerpo)
+        assert r.status_code == 422, (periodo, inicio)
+    assert "semanal" in cliente.put("/api/ajustes", json={"presupuesto_periodo": "semanal", "presupuesto_inicio": "9"}).text
+    # Nada de lo rechazado se guardó.
+    assert cliente.get("/api/datos").json()["presupuesto"] == {"periodo": "semanal", "inicio": "3"}
+
+
+def test_cambiar_solo_la_moneda_no_borra_el_periodo(cliente):
+    cliente.put("/api/ajustes", json={"presupuesto_periodo": "catorcenal", "presupuesto_inicio": "2026-10-05"})
+    r = cliente.put("/api/ajustes", json={"moneda": "€"})
+    assert r.json() == {"moneda": "€", "presupuesto": {"periodo": "catorcenal", "inicio": "2026-10-05"}}
+    d = cliente.get("/api/datos").json()
+    assert d["moneda"] == "€" and d["presupuesto"] == {"periodo": "catorcenal", "inicio": "2026-10-05"}
+    # Y al revés: cambiar el periodo no toca la moneda.
+    r = cliente.put("/api/ajustes", json={"presupuesto_periodo": "mensual", "presupuesto_inicio": "15"})
+    assert r.json() == {"moneda": "€", "presupuesto": {"periodo": "mensual", "inicio": "15"}}
+
+
+def test_categoria_que_pasa_lo_que_sobra(cliente):
+    cat = {"nombre": "Comida", "tipo": "gasto", "presupuesto": 30000, "acumula": True, "acumula_desde": "2026-10-01"}
+    r = cliente.put("/api/categorias/comida", json=cat)
+    assert r.status_code == 200 and r.json()["acumula"] is True and r.json()["acumula_desde"] == "2026-10-01"
+
+    por_id = {c["id"]: c for c in cliente.get("/api/datos").json()["categorias"]}
+    assert por_id["comida"]["acumula"] is True and por_id["comida"]["acumula_desde"] == "2026-10-01"
+    assert por_id["salud"]["acumula"] is False and por_id["salud"]["acumula_desde"] is None
+    exportada = {c["id"]: c for c in cliente.get("/api/exportar").json()["categorias"]}
+    assert exportada["comida"]["acumula"] is True and exportada["salud"]["acumula"] is False
+
+    # Sin decir nada, `acumula` queda apagado; con acumula en false la fecha se limpia aunque llegue.
+    r = cliente.put("/api/categorias/comida", json={**cat, "acumula": False})
+    assert r.json()["acumula"] is False and r.json()["acumula_desde"] is None
+    assert cliente.put("/api/categorias/nueva", json={"nombre": "Nueva", "tipo": "gasto"}).json()["acumula"] is False
+    por_id = {c["id"]: c for c in cliente.get("/api/datos").json()["categorias"]}
+    assert por_id["comida"]["acumula"] is False and por_id["comida"]["acumula_desde"] is None

@@ -1,44 +1,41 @@
-// El detalle de una categoría en el presupuesto: lo gastado, su tope y las compras del mes.
+// El detalle de una categoría en el presupuesto: lo gastado, su tope y las compras del periodo.
 // Editar el tope es una opción de aquí, no lo primero que se ve.
 
 import { View } from 'react-native';
-import { delMes, diasQueQuedan, gastadoEn, netoDe, porDia } from '@/lib/calculos';
+import { configPresupuesto, diasQueQuedanEn, gastadoEn, netoDe, nombrePeriodo, periodoVecino, porDia, topes, type Periodo } from '@/lib/calculos';
 import { useDatos } from '@/lib/datos';
-import { dinero, dineroCorto, MESES, mayuscula, neto, ordenarPorFecha, tituloDia } from '@/lib/formato';
+import { dinero, dineroCorto, neto, ordenarPorFecha, tituloDia } from '@/lib/formato';
 import type { Categoria } from '@/lib/tipos';
 import { Barra, BotonSuave, CabeceraDia, Dato, FilaMovimiento, Hoja, Lista, Num, Tarjeta, Texto, Vacio } from '@/ui/componentes';
 import { SimboloCategoria } from '@/ui/simbolos';
 import { useTema } from '@/ui/tema';
 import { useAbrir } from './abrir';
 
-/** El mes anterior de 'YYYY-MM' (diciembre → enero del año antes). */
-function mesAnterior(clave: string): string {
-  const anio = Number(clave.slice(0, 4));
-  const m = Number(clave.slice(5, 7));
-  return m === 1 ? `${anio - 1}-12` : `${anio}-${String(m - 1).padStart(2, '0')}`;
-}
-
-export function DialogoDetalleCategoria({ categoria, mes, alCerrar, alEditarTope }: {
-  categoria: Categoria; /** 'YYYY-MM' del mes que se está mirando en Presupuesto. */ mes: string;
+export function DialogoDetalleCategoria({ categoria, periodo, alCerrar, alEditarTope }: {
+  categoria: Categoria; /** El periodo que se está mirando en Presupuesto. */ periodo: Periodo;
   alCerrar: () => void; alEditarTope: () => void;
 }) {
   const d = useDatos();
   const abrir = useAbrir();
   const { c, relleno } = useTema();
 
-  const compras = delMes(d.movimientos, mes).filter((m) => m.tipo === 'gasto' && m.categoria_id === categoria.id).sort(ordenarPorFecha);
-  const gastado = gastadoEn(d, categoria.id, mes);
-  const anterior = gastadoEn(d, categoria.id, mesAnterior(mes));
+  const compras = d.movimientos
+    .filter((m) => m.tipo === 'gasto' && m.categoria_id === categoria.id && m.fecha >= periodo.desde && m.fecha <= periodo.hasta)
+    .sort(ordenarPorFecha);
+  const gastado = gastadoEn(d, categoria.id, periodo);
+  const anterior = gastadoEn(d, categoria.id, periodoVecino(configPresupuesto(d), periodo, -1));
   const masGrande = compras.reduce((s, m) => Math.max(s, m.monto), 0);
   const nombreCuenta = (id: string) => d.cuentas.find((x) => x.id === id)?.nombre ?? '?';
 
-  const tope = categoria.presupuesto ?? 0;
-  const conTope = tope > 0;
+  // El tope del periodo ya incluye lo que trae de antes (si la categoría pasa lo que sobra).
+  const estado = topes(d, periodo).conTope.find((x) => x.categoria.id === categoria.id);
+  const tope = estado?.tope ?? 0;
+  const arrastre = estado?.arrastre ?? 0;
+  const conTope = !!estado;
   const pasado = gastado > tope;
   const quedan = tope - gastado;
-  const esActual = mes === d.hoy.slice(0, 7);
-  const dias = diasQueQuedan(d.hoy);
-  const nombreMes = `${mayuscula(MESES[Number(mes.slice(5, 7)) - 1])} ${mes.slice(0, 4)}`;
+  const esActual = d.hoy >= periodo.desde && d.hoy <= periodo.hasta;
+  const dias = diasQueQuedanEn(periodo, d.hoy);
 
   // Con una sola hoja a la vez: se cierra esta y la otra se abre cuando ya bajó (como en abrir.tsx).
   const abrirCompra = (inicial: (typeof compras)[number]) => {
@@ -47,7 +44,7 @@ export function DialogoDetalleCategoria({ categoria, mes, alCerrar, alEditarTope
   };
 
   return (
-    <Hoja titulo={nombreMes} alCerrar={alCerrar}
+    <Hoja titulo={nombrePeriodo(periodo)} alCerrar={alCerrar}
       pie={<BotonSuave onPress={alEditarTope}>{conTope ? 'Editar tope' : 'Poner tope'}</BotonSuave>}>
       <View style={{ gap: 14 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
@@ -67,9 +64,14 @@ export function DialogoDetalleCategoria({ categoria, mes, alCerrar, alEditarTope
               <Texto num tam={14} peso={pasado ? 'semi' : 'normal'} color={pasado ? c.alerta : c.tenue}>
                 {pasado ? `Te pasaste por ${dinero(-quedan, d.moneda)}` : `Te quedan ${dinero(quedan, d.moneda)}`}
               </Texto>
-              {esActual && !pasado && quedan > 0 && (
+              {esActual && !pasado && quedan > 0 && dias > 0 && (
                 <Texto num tam={13} color={c.tenue} style={{ lineHeight: 18 }}>
-                  {dias === 0 ? 'Hoy es el último día del mes' : `Quedan ${dias} ${dias === 1 ? 'día' : 'días'} · puedes gastar ~${dineroCorto(Math.round(quedan / dias), d.moneda)} por día`}
+                  {`${dias === 1 ? 'Queda' : 'Quedan'} ${dias} ${dias === 1 ? 'día' : 'días'} · puedes gastar ~${dineroCorto(Math.round(quedan / dias), d.moneda)} por día`}
+                </Texto>
+              )}
+              {arrastre !== 0 && (
+                <Texto num tam={13} color={c.tenue} style={{ lineHeight: 18 }}>
+                  {arrastre > 0 ? `Incluye +${dinero(arrastre, d.moneda)} que sobró antes` : `Incluye −${dinero(-arrastre, d.moneda)} que te pasaste antes`}
                 </Texto>
               )}
             </>
@@ -81,13 +83,13 @@ export function DialogoDetalleCategoria({ categoria, mes, alCerrar, alEditarTope
         <Tarjeta color={c.suave} style={{ padding: 14, flexDirection: 'row', gap: 12 }}>
           <Dato rotulo="Compras" valor={String(compras.length)} />
           <Dato rotulo="La más grande" valor={dineroCorto(masGrande, d.moneda)} />
-          <Dato rotulo="Mes anterior" valor={anterior > 0 ? dineroCorto(anterior, d.moneda) : '—'} />
+          <Dato rotulo="Anterior" valor={anterior > 0 ? dineroCorto(anterior, d.moneda) : '—'} />
         </Tarjeta>
       )}
 
       {compras.length === 0 ? (
         <Tarjeta color={c.suave}>
-          <Vacio>{anterior > 0 ? `Sin compras en ${categoria.nombre.toLowerCase()} este mes.` : `Todavía no hay compras en ${categoria.nombre.toLowerCase()}.`}</Vacio>
+          <Vacio>{anterior > 0 ? `Sin compras en ${categoria.nombre.toLowerCase()} en este periodo.` : `Todavía no hay compras en ${categoria.nombre.toLowerCase()}.`}</Vacio>
         </Tarjeta>
       ) : (
         porDia(compras).map(([fecha, items]) => (

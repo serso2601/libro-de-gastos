@@ -26,7 +26,12 @@ export interface Categoria {
   color: string;
   /** Un emoji o un símbolo de la app con la forma 'i:<clave>' (ver ui/simbolos.tsx). */
   emoji: string;
+  /** El tope por periodo del presupuesto (ver ConfigPresupuesto). */
   presupuesto: number | null;
+  /** Pasar lo que sobra: lo no gastado se suma al periodo siguiente (y lo pasado se resta). */
+  acumula?: boolean;
+  /** Desde qué periodo se acumula (la fecha en que empieza ese periodo). */
+  acumula_desde?: string | null;
   orden: number;
 }
 
@@ -69,9 +74,23 @@ export interface Proximo {
   nota: string;
 }
 
+export type PeriodoPresupuesto = 'semanal' | 'catorcenal' | 'quincenal' | 'mensual';
+
+/**
+ * Cada cuánto se reinicia el presupuesto. `inicio` según el periodo: semanal = día de la semana en
+ * que empieza ('0' domingo … '6' sábado); catorcenal = una fecha en que empieza un periodo;
+ * quincenal = '' (1–15 y 16–fin de mes); mensual = día del mes en que empieza ('1'..'28').
+ */
+export interface ConfigPresupuesto {
+  periodo: PeriodoPresupuesto;
+  inicio: string;
+}
+
 export interface Datos {
   hoy: string;
   moneda: string;
+  /** Falta en datos viejos guardados en el teléfono: entonces es mensual desde el día 1. */
+  presupuesto?: ConfigPresupuesto;
   cuentas: Cuenta[];
   categorias: Categoria[];
   movimientos: Movimiento[];

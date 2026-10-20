@@ -7,6 +7,8 @@ import { DialogoCategoria } from './categoria';
 import { DialogoCuenta } from './cuenta';
 import { DialogoDetalleCategoria } from './detalleCategoria';
 import { DialogoMovimiento } from './movimiento';
+import { DialogoPeriodo } from './periodo';
+import type { Periodo } from '@/lib/calculos';
 import { DialogoPresupuesto, DialogoTopes } from './presupuesto';
 import { DialogoRecurrencia } from './recurrencia';
 
@@ -22,8 +24,10 @@ export type Dialogo =
   | { tipo: 'cuenta'; inicial?: Cuenta }
   | { tipo: 'categoria'; inicial?: Categoria; tipoInicial?: TipoCategoria }
   | { tipo: 'presupuesto'; categoria: Categoria }
-  /** El detalle de una categoría del presupuesto en el mes `mes` ('YYYY-MM'). */
-  | { tipo: 'detalleCategoria'; categoria: Categoria; mes: string }
+  /** El detalle de una categoría del presupuesto en un periodo. */
+  | { tipo: 'detalleCategoria'; categoria: Categoria; periodo: Periodo }
+  /** Elegir cada cuánto se reinicia el presupuesto (y convertir los topes). */
+  | { tipo: 'periodo' }
   | { tipo: 'topes' };
 
 const Contexto = createContext<((d: Dialogo) => void) | null>(null);
@@ -54,7 +58,7 @@ export function AnfitrionDialogos({ children }: { children: ReactNode }) {
       {d?.tipo === 'categoria' && <DialogoCategoria inicial={d.inicial} tipoInicial={d.tipoInicial} alCerrar={cerrar} />}
       {d?.tipo === 'presupuesto' && <DialogoPresupuesto categoria={d.categoria} alCerrar={cerrar} />}
       {d?.tipo === 'detalleCategoria' && (
-        <DialogoDetalleCategoria categoria={d.categoria} mes={d.mes} alCerrar={cerrar}
+        <DialogoDetalleCategoria categoria={d.categoria} periodo={d.periodo} alCerrar={cerrar}
           alEditarTope={() => {
             const categoria = d.categoria;
             setD(null);
@@ -62,6 +66,7 @@ export function AnfitrionDialogos({ children }: { children: ReactNode }) {
           }} />
       )}
       {d?.tipo === 'topes' && <DialogoTopes alCerrar={cerrar} />}
+      {d?.tipo === 'periodo' && <DialogoPeriodo alCerrar={cerrar} />}
     </Contexto.Provider>
   );
 }
