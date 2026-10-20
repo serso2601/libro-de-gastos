@@ -1,12 +1,13 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
-import { useAbrir } from '@/dialogos/abrir';
-import { delMes, netoDe, porDia, porVenirDelMes, sumar } from '@/lib/calculos';
+import { useAbrir, useAnotar } from '@/dialogos/abrir';
+import { delMes, netoDe, pagoSugerido, porDia, porVenirDelMes, sumar } from '@/lib/calculos';
 import { useDatos } from '@/lib/datos';
 import { MESES, mayuscula, neto, ordenarPorFecha, tituloDia } from '@/lib/formato';
 import type { Movimiento, Proximo } from '@/lib/tipos';
 import { Buscador, CabeceraDia, Enlace, FilaMovimiento, Lista, Num, Rotulo, Segmentos, Tarjeta, Texto, Vacio } from '@/ui/componentes';
+import { Icono } from '@/ui/iconos';
 import { Marco } from '@/ui/pantalla';
 import { alfa, useTema } from '@/ui/tema';
 import { ContenidoGraficos } from './Graficos';
@@ -26,7 +27,8 @@ export function Movimientos() {
   const { vista: vistaPedida } = useLocalSearchParams<{ vista?: string }>();
   const [vista, setVista] = useState<Vista>('lista');
   const abrir = useAbrir();
-  const { c, estilo } = useTema();
+  const anotar = useAnotar();
+  const { c, colorCuenta, estilo } = useTema();
   const [filtro, setFiltro] = useState<Filtro>('todos');
   const [busqueda, setBusqueda] = useState('');
   const [limite, setLimite] = useState(80);
@@ -59,6 +61,20 @@ export function Movimientos() {
   const porVenir = porVenirDelMes(d).filter(coincide);
   const vaASalir = porVenir.reduce((s, p) => s + (p.tipo === 'gasto' ? p.monto : 0), 0);
   const vaAEntrar = porVenir.reduce((s, p) => s + (p.tipo === 'ingreso' ? p.monto : 0), 0);
+  // Pagos de tarjeta que la app sugiere (nunca se anotan solos): tocarlos abre la transferencia ya armada.
+  // Si la fecha de pago cae en otro mes, no se muestra aquí.
+  const sugeridos = useMemo(() => {
+    if (filtro !== 'todos' && filtro !== 'transferencia') return [];
+    const q = busqueda.trim().toLowerCase();
+    return d.cuentas.flatMap((cuenta) => {
+      const pago = cuenta.es_credito ? pagoSugerido(d, cuenta) : null;
+      return pago && (!q || `pago de ${cuenta.nombre}`.toLowerCase().includes(q)) ? [{ cuenta, pago }] : [];
+    }).sort((a, b) => (a.pago.fecha ?? '9').localeCompare(b.pago.fecha ?? '9'));
+  }, [d, filtro, busqueda]);
+  function registrarPago(tarjeta: string, total: number) {
+    anotar({ tipoInicial: 'transferencia', cuentaInicial: d.cuentas.find((x) => !x.es_credito)?.id, destinoInicial: tarjeta,
+      montoInicial: total, notaInicial: `Pago de ${d.cuentas.find((x) => x.id === tarjeta)?.nombre ?? ''}` });
+  }
   const nombreCuenta = (id: string) => d.cuentas.find((x) => x.id === id)?.nombre ?? '';
 
   const salio = sumar(delMesActual, 'gasto');
@@ -97,7 +113,7 @@ export function Movimientos() {
             })}
           </ScrollView>
 
-          {porVenir.length > 0 && (
+          {(porVenir.length > 0 || sugeridos.length > 0) && (
             <View style={{ gap: 6 }}>
               <Rotulo derecha={(
                 <Texto tam={13}>
@@ -108,7 +124,7 @@ export function Movimientos() {
               )}>
                 Por venir en {mesNombre.toLowerCase()}
               </Rotulo>
-              {/* Borde punteado: todavía no pasó; se anota solo cuando llegue su día. */}
+              {/* Borde punteado: todavía no pasó; se anota solo cuando llegue su día (el pago de una tarjeta, solo si tú lo confirmas). */}
               <Lista style={{ borderWidth: 1.5, borderStyle: 'dashed', borderColor: alfa(c.tenue, 0.35) }}>
                 {porVenir.map((p, i) => {
                   const regla = d.recurrencias.find((r) => r.id === p.recurrencia_id);
@@ -116,6 +132,27 @@ export function Movimientos() {
                     <FilaMovimiento key={`${p.recurrencia_id}@${p.fecha}`} m={p} primera={i === 0}
                       detalle={`Se anota solo ${cuandoViene(p.fecha, d.hoy)} · ${nombreCuenta(p.cuenta_id)}`}
                       onPress={regla ? () => abrir({ tipo: 'recurrencia', regla }) : undefined} />
+                  );
+                })}
+                {sugeridos.map(({ cuenta, pago }, i) => {
+                  const delMesPago = pago.fecha && pago.fecha.slice(0, 7) === mesActual ? pago.fecha : null;
+                  const cuando = delMesPago ? (delMesPago < d.hoy ? `venció el ${Number(delMesPago.slice(8))}` : `paga ${cuandoViene(delMesPago, d.hoy)}`) : '';
+                  return (
+                    <Pressable key={`pago@${cuenta.id}`} onPress={() => registrarPago(cuenta.id, pago.total)}
+                      style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 54, paddingVertical: 6,
+                        borderTopWidth: porVenir.length + i === 0 ? 0 : 1, borderTopColor: c.linea, opacity: pressed ? 0.6 : 1 })}>
+                      <View style={{ width: 6, height: 28, borderRadius: 3, backgroundColor: colorCuenta(cuenta.color) }} />
+                      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                          <Texto tam={15} peso="medio" lineas={1} style={{ flexShrink: 1 }}>Pago de {cuenta.nombre}</Texto>
+                          <Icono nombre="transferir" tam={12} color={c.tenue} />
+                        </View>
+                        <Texto tam={13} color={c.tenue} lineas={2}>
+                          Sugerido · Total {neto(pago.total, d.moneda)}{pago.minimo ? ` · Mínimo ${neto(pago.minimo, d.moneda)}` : ''}{cuando ? ` · ${cuando}` : ''}
+                        </Texto>
+                      </View>
+                      <Texto tam={13} peso="semi" color={c.acento}>Registrar</Texto>
+                    </Pressable>
                   );
                 })}
               </Lista>

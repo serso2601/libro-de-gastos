@@ -8,13 +8,14 @@ import { useAbrir } from '@/dialogos/abrir';
 import { useAcciones } from '@/lib/acciones';
 import { ORDEN_SALDOS, saldos } from '@/lib/calculos';
 import { useAlmacen, useDatos } from '@/lib/datos';
-import { conSigno, dineroCorto, fechaISO, inicialDe, neto } from '@/lib/formato';
+import { conSigno, dineroCorto, fechaISO, neto } from '@/lib/formato';
 import type { TipoCategoria } from '@/lib/tipos';
 import { textoRegla } from '@/pantallas/Proximos';
-import { BotonSuave, Campo, colorDeSaldo, FilaSimple, Inicial, Lista, Num, Segmentos, Tarjeta, Texto, TituloSeccion } from '@/ui/componentes';
+import { BotonSuave, Campo, colorDeSaldo, FilaSimple, Lista, Num, Segmentos, Tarjeta, Texto, TituloSeccion } from '@/ui/componentes';
 import { ACENTOS } from '@/ui/estilos';
 import { Icono } from '@/ui/iconos';
 import { Marco, ProveedorApilada } from '@/ui/pantalla';
+import { SimboloCategoria } from '@/ui/simbolos';
 import { usePreferencias, useTema, type Modo } from '@/ui/tema';
 
 function mover(ids: string[], i: number, delta: number): string[] {
@@ -161,7 +162,7 @@ function ContenidoAjustes() {
               {lista.map((x, i) => (
                 <FilaSimple key={x.id} primera={i === 0} texto={x.nombre} onPress={() => abrir({ tipo: 'categoria', inicial: x })}
                   detalle={x.presupuesto ? `tope ${dineroCorto(x.presupuesto, d.moneda)} al mes` : undefined}
-                  izquierda={<Inicial texto={inicialDe(x.nombre)} color={x.color} tam={30} />}
+                  izquierda={<SimboloCategoria categoria={x} tam={30} />}
                   derecha={<Ordenar alSubir={i > 0 ? () => reordenarCategorias(tipo, mover(ids, i, -1)) : undefined}
                     alBajar={i < lista.length - 1 ? () => reordenarCategorias(tipo, mover(ids, i, 1)) : undefined} />} />
               ))}
