@@ -6,14 +6,16 @@ import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAbrir, useAnotar } from '@/dialogos/abrir';
-import { deudaTarjeta, flujoCuenta, gastadoEnCorte, montoEnCuenta, pagoSugerido, porDia } from '@/lib/calculos';
+import { deudaTarjeta, flujoCuenta, gastadoEnCorte, montoEnCuenta, pagoSugerido, porDia, porVenirDelMes } from '@/lib/calculos';
 import { useDatos } from '@/lib/datos';
-import { MESES, neto, ordenarPorFecha, saldo, tituloDia } from '@/lib/formato';
+import { conSigno, MESES, neto, ordenarPorFecha, saldo, tituloDia } from '@/lib/formato';
 import type { Cuenta as TCuenta } from '@/lib/tipos';
-import { BotonRedondo, Buscador, CabeceraDia, FilaMovimiento, Lista, Num, Texto, Vacio } from '@/ui/componentes';
+import { BotonRedondo, Buscador, CabeceraDia, FilaMovimiento, Lista, Num, Rotulo, Tarjeta, Texto, Vacio } from '@/ui/componentes';
 import { Icono } from '@/ui/iconos';
 import { Marco, useApilada, Volver } from '@/ui/pantalla';
+import { SimboloCategoria } from '@/ui/simbolos';
 import { alfa, sobre, useTema } from '@/ui/tema';
+import { cuandoViene } from './Proximos';
 
 function useMovsDeCuenta(cuenta: TCuenta | undefined, busqueda: string) {
   const d = useDatos();
@@ -56,6 +58,86 @@ function Grupos({ cuenta, grupos, separadas }: { cuenta: TCuenta; grupos: Return
         );
       })}
     </>
+  );
+}
+
+/** Lo que se repite y todavía falta este mes en esta cuenta (el pago sugerido de una tarjeta ya va en la cabecera). */
+function LoQueViene({ cuenta }: { cuenta: TCuenta }) {
+  const d = useDatos();
+  const abrir = useAbrir();
+  const { c } = useTema();
+  const porVenir = porVenirDelMes(d).filter((p) => p.cuenta_id === cuenta.id || p.cuenta_destino_id === cuenta.id);
+  if (porVenir.length === 0) return null;
+  return (
+    <View style={{ gap: 6 }}>
+      <Rotulo>Lo que viene en {cuenta.nombre}</Rotulo>
+      {/* Borde punteado, igual que arriba en Movimientos: todavía no pasó. */}
+      <Lista style={{ backgroundColor: c.suave, borderWidth: 1.5, borderStyle: 'dashed', borderColor: alfa(c.tenue, 0.35) }}>
+        {porVenir.map((p, i) => {
+          const regla = d.recurrencias.find((r) => r.id === p.recurrencia_id);
+          return (
+            <FilaMovimiento key={`${p.recurrencia_id}@${p.fecha}`} m={p} cuentaId={cuenta.id} primera={i === 0}
+              detalle={`Se anota solo ${cuandoViene(p.fecha, d.hoy)}`}
+              onPress={regla ? () => abrir({ tipo: 'recurrencia', regla }) : undefined} />
+          );
+        })}
+      </Lista>
+    </View>
+  );
+}
+
+const TOP_CATEGORIAS = 5;
+
+/** Los gastos de esta cuenta en el mes, por categoría: las 5 principales con una barra corta y lo gastado. */
+function EnQueSeGasto({ cuenta, mes }: { cuenta: TCuenta; mes: string }) {
+  const d = useDatos();
+  const abrir = useAbrir();
+  const { c, relleno } = useTema();
+  const mesActual = d.hoy.slice(0, 7);
+  const { filas, total, resto } = useMemo(() => {
+    const suma = new Map<string, number>();
+    for (const m of d.movimientos) {
+      if (m.tipo !== 'gasto' || m.cuenta_id !== cuenta.id || !m.fecha.startsWith(mesActual)) continue;
+      const k = m.categoria_id ?? '';
+      suma.set(k, (suma.get(k) ?? 0) + m.monto);
+    }
+    const orden = [...suma.entries()].sort((a, b) => b[1] - a[1]);
+    return {
+      filas: orden.slice(0, TOP_CATEGORIAS),
+      total: orden.reduce((s, [, v]) => s + v, 0),
+      resto: Math.max(orden.length - TOP_CATEGORIAS, 0),
+    };
+  }, [d.movimientos, cuenta.id, mesActual]);
+  if (filas.length === 0) return null;
+  return (
+    <View style={{ gap: 6 }}>
+      <Rotulo>En qué se gastó en {mes.toLowerCase()}</Rotulo>
+      <Tarjeta color={c.suave} style={{ paddingHorizontal: 16, paddingVertical: 6 }}>
+        {filas.map(([catId, monto], i) => {
+          const cat = d.categorias.find((x) => x.id === catId);
+          const nombre = cat?.nombre ?? 'Sin categoría';
+          const pct = total > 0 ? Math.max(monto / total, 0.04) : 0;
+          return (
+            <Pressable key={catId || 'sin'} disabled={!cat} onPress={() => cat && abrir({ tipo: 'detalleCategoria', categoria: cat, mes: mesActual })}
+              accessibilityLabel={`${nombre}: ${neto(monto, d.moneda)}`}
+              style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 50, paddingVertical: 6,
+                borderTopWidth: i === 0 ? 0 : 1, borderTopColor: c.linea, opacity: pressed ? 0.6 : 1 })}>
+              <SimboloCategoria categoria={cat ?? { nombre, color: c.tenue, emoji: '' }} tam={28} />
+              <Texto tam={15} peso="medio" lineas={1} style={{ flex: 1, minWidth: 0 }}>{nombre}</Texto>
+              <View style={{ width: 52, height: 6, borderRadius: 3, backgroundColor: c.linea, overflow: 'hidden' }}>
+                <View style={{ width: `${Math.round(pct * 100)}%`, height: 6, borderRadius: 3, backgroundColor: relleno(cat?.color ?? c.tenue) }} />
+              </View>
+              <Texto num tam={15} peso="medio" color={c.gasto} style={{ minWidth: 76, textAlign: 'right' }}>{conSigno(monto, d.moneda, 'gasto')}</Texto>
+            </Pressable>
+          );
+        })}
+        {resto > 0 && (
+          <View style={{ borderTopWidth: 1, borderTopColor: c.linea, paddingVertical: 10 }}>
+            <Texto tam={13} color={c.tenue}>y {resto} más</Texto>
+          </View>
+        )}
+      </Tarjeta>
+    </View>
   );
 }
 
@@ -129,6 +211,14 @@ function CuentaColor({ cuenta }: { cuenta: TCuenta }) {
         )}
       </View>
       <View style={{ flexGrow: 1, marginTop: -14, backgroundColor: c.tarjeta, borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingTop: 14, paddingHorizontal: 18, paddingBottom: insets.bottom + 30, gap: 8 }}>
+        {/* Lo que no se ve en el Inicio: qué viene y en qué se gastó en ESTA cuenta. Al buscar se esconden. */}
+        {!buscando && (
+          <View style={{ gap: 18, paddingBottom: 10 }}>
+            <LoQueViene cuenta={cuenta} />
+            <EnQueSeGasto cuenta={cuenta} mes={mes} />
+          </View>
+        )}
+        <Rotulo>Movimientos</Rotulo>
         {buscando && <Buscador valor={busqueda} alCambiar={setBusqueda} placeholder="Buscar en esta cuenta" fondo={c.suave} autoFocus />}
         <Grupos cuenta={cuenta} grupos={grupos} separadas={false} />
       </View>

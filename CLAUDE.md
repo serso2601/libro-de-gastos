@@ -82,11 +82,15 @@ Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
   estados. Sobre el color de una cuenta se usa la tinta de contraste, no rojo/verde.
 - **Inicio**: arriba el saldo que el usuario elige (total, libre después de lo que viene, balance,
   gastado o entró del mes: `calculos.saldos`), **solo** tocándolo o en Ajustes. Dos vistas:
-  Tarjetas y Calendario (cada día con lo que entró en verde y salió en rojo). En Tarjetas, **la
-  tarjeta del frente manda**: lo de abajo («Octubre en <cuenta>» con entró/salió rotulados y sus
-  últimos movimientos) es de esa cuenta, y la tarjeta trae Anotar / Transferir (y Pagar si es de
-  crédito con pago sugerido). Nada de barras sin rótulo. **Nada de lo que viene en el Inicio**: va
-  arriba en Movimientos.
+  Tarjetas y Calendario (cada día con lo que entró en verde y salió en rojo). En Tarjetas, la
+  **«pila de estado»** (elegida el 20/oct/2026): la tarjeta del frente muestra el estado de esa
+  cuenta dentro de ella (saldo o deuda y corte, el mes +/−) y sus botones Anotar / Transferir (y
+  Pagar si es de crédito con pago sugerido); abajo, **«Recientes» de TODAS las cuentas** y «Ver todo»
+  va a Movimientos. Lo de abajo NO se filtra por la tarjeta del frente: eso duplicaba la pantalla de
+  la cuenta. Nada de barras sin rótulo. **Nada de lo que viene en el Inicio**: va arriba en Movimientos.
+- **Cada pantalla tiene su trabajo, sin repetir**: Inicio = qué está pasando (saldos, lo último,
+  atajos); una cuenta = qué pasó en ella (lo que viene en ella, en qué se gastó, su historial con
+  buscador); Movimientos = todo el historial con filtros y gráficos; Cuentas = análisis.
 - **Pestaña Cuentas** = el resumen de todas: cada forma de saldo con una estadística corta (reparto
   por cuenta, qué se descuenta, 6 meses de balance, promedio por día, de dónde entró) y las cuentas
   en cuadros. NO se elige ahí el saldo del Inicio (el usuario lo vio como desperdicio).
