@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { useAlmacen } from './datos';
-import type { Categoria, Cuenta, Datos, Movimiento, Recurrencia } from './tipos';
+import type { Categoria, ConfigPresupuesto, Cuenta, Datos, Movimiento, Recurrencia } from './tipos';
 
 function reemplazar<T extends { id: string }>(lista: T[], item: T): T[] {
   return lista.some((x) => x.id === item.id) ? lista.map((x) => (x.id === item.id ? item : x)) : [...lista, item];
@@ -85,7 +85,8 @@ export function useAcciones() {
       guardarCategoria(c: Categoria) {
         cambiar(
           { metodo: 'PUT', ruta: `/api/categorias/${enc(c.id)}`, descripcion: 'Guardar la categoría',
-            cuerpo: { nombre: c.nombre, tipo: c.tipo, color: c.color, emoji: c.emoji, presupuesto: c.presupuesto } },
+            cuerpo: { nombre: c.nombre, tipo: c.tipo, color: c.color, emoji: c.emoji, presupuesto: c.presupuesto,
+              acumula: !!c.acumula, acumula_desde: c.acumula ? c.acumula_desde ?? null : null } },
           (d) => ({ ...d, categorias: reemplazar(d.categorias, c) }),
         );
       },
@@ -107,6 +108,13 @@ export function useAcciones() {
       guardarMoneda(moneda: string) {
         cambiar({ metodo: 'PUT', ruta: '/api/ajustes', cuerpo: { moneda }, descripcion: 'Guardar la moneda' },
           (d) => ({ ...d, moneda }));
+      },
+
+      /** Cambiar el periodo del presupuesto. Convertir los topes, si se quiere, va aparte (guardarCategoria). */
+      guardarPeriodo(config: ConfigPresupuesto) {
+        cambiar({ metodo: 'PUT', ruta: '/api/ajustes', cuerpo: { presupuesto_periodo: config.periodo, presupuesto_inicio: config.inicio },
+          descripcion: 'Guardar el periodo del presupuesto' },
+          (d) => ({ ...d, presupuesto: config }));
       },
     }),
     [cambiar],

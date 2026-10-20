@@ -1,13 +1,13 @@
-// Las hojas del presupuesto: el tope de una categoría y todos los topes juntos.
+// Las hojas del presupuesto: el tope de una categoría (con si pasa lo que sobra) y todos los topes juntos.
 
 import { useState } from 'react';
 import { TextInput, View } from 'react-native';
 import { useAcciones } from '@/lib/acciones';
-import { gastadoEn } from '@/lib/calculos';
+import { configPresupuesto, gastadoEn, NOMBRES_PERIODO, periodoDe, POR_PERIODO } from '@/lib/calculos';
 import { useDatos } from '@/lib/datos';
 import { aCentavos, aTexto, dinero } from '@/lib/formato';
 import type { Categoria } from '@/lib/tipos';
-import { BotonBorrar, BotonPrincipal, Hoja, MontoGrande, Texto, TextoError, familia } from '@/ui/componentes';
+import { BotonBorrar, BotonPrincipal, Etiqueta, Hoja, MontoGrande, Segmentos, Texto, TextoError, familia } from '@/ui/componentes';
 import { SimboloCategoria } from '@/ui/simbolos';
 import { useTema } from '@/ui/tema';
 
@@ -17,9 +17,16 @@ export function DialogoPresupuesto({ categoria, alCerrar }: { categoria: Categor
   const { guardarCategoria } = useAcciones();
   const [monto, setMonto] = useState(categoria.presupuesto ? aTexto(categoria.presupuesto) : '');
   const [error, setError] = useState('');
-  const gastado = gastadoEn(d, categoria.id, d.hoy.slice(0, 7));
+  const [acumula, setAcumula] = useState(!!categoria.acumula);
+  const config = configPresupuesto(d);
+  const periodo = periodoDe(config, d.hoy);
+  const gastado = gastadoEn(d, categoria.id, periodo);
   function guardar(valor: number | null) {
-    guardarCategoria({ ...categoria, presupuesto: valor });
+    // Sin tope no hay nada que pasar. Al activarlo se empieza a contar desde el periodo de hoy;
+    // si ya estaba activo, se conserva desde cuándo.
+    const pasa = valor !== null && acumula;
+    guardarCategoria({ ...categoria, presupuesto: valor, acumula: pasa,
+      acumula_desde: pasa ? (categoria.acumula && categoria.acumula_desde ? categoria.acumula_desde : periodo.desde) : null });
     alCerrar();
   }
   return (
@@ -37,9 +44,14 @@ export function DialogoPresupuesto({ categoria, alCerrar }: { categoria: Categor
         </>
       )}>
       <Texto tam={14} color={c.tenue} style={{ lineHeight: 20 }}>
-        Cuánto quieres gastar como mucho en {categoria.nombre.toLowerCase()} cada mes. Este mes llevas {dinero(gastado, d.moneda)}.
+        Cuánto quieres gastar como mucho en {categoria.nombre.toLowerCase()} {NOMBRES_PERIODO[config.periodo].toLowerCase()}. En este periodo llevas {dinero(gastado, d.moneda)}.
       </Texto>
       <MontoGrande valor={monto} alCambiar={setMonto} moneda={d.moneda} autoFocus />
+      <View style={{ gap: 8 }}>
+        <Etiqueta>Pasar lo que sobra</Etiqueta>
+        <Segmentos opciones={[['no', 'No'], ['si', 'Sí']]} valor={acumula ? 'si' : 'no'} alCambiar={(v) => setAcumula(v === 'si')} />
+        <Texto tam={13} color={c.tenue} style={{ lineHeight: 18 }}>Lo que no gastes se suma al periodo siguiente; si te pasas, se resta.</Texto>
+      </View>
     </Hoja>
   );
 }
@@ -52,6 +64,7 @@ export function DialogoTopes({ alCerrar }: { alCerrar: () => void }) {
   const deGasto = d.categorias.filter((x) => x.tipo === 'gasto');
   const [valores, setValores] = useState<Record<string, string>>(() => Object.fromEntries(deGasto.map((x) => [x.id, x.presupuesto ? aTexto(x.presupuesto) : ''])));
   const [error, setError] = useState('');
+  const periodo = configPresupuesto(d).periodo;
 
   function guardar() {
     for (const cat of deGasto) {
@@ -59,7 +72,7 @@ export function DialogoTopes({ alCerrar }: { alCerrar: () => void }) {
       const nuevo = texto === '' ? null : aCentavos(texto);
       if (nuevo !== null && Number.isNaN(nuevo)) return setError(`El tope de ${cat.nombre} no es un número`);
       const final = nuevo && nuevo > 0 ? nuevo : null;
-      if (final !== cat.presupuesto) guardarCategoria({ ...cat, presupuesto: final });
+      if (final !== cat.presupuesto) guardarCategoria({ ...cat, presupuesto: final, ...(final ? {} : { acumula: false, acumula_desde: null }) });
     }
     alCerrar();
   }
@@ -67,8 +80,8 @@ export function DialogoTopes({ alCerrar }: { alCerrar: () => void }) {
   const total = deGasto.reduce((s, x) => { const v = aCentavos(valores[x.id] ?? ''); return s + (v > 0 ? v : 0); }, 0);
 
   return (
-    <Hoja titulo="Topes por mes" alCerrar={alCerrar} pie={<><TextoError texto={error} /><BotonPrincipal onPress={guardar}>Guardar topes</BotonPrincipal></>}>
-      <Texto tam={14} color={c.tenue} style={{ lineHeight: 20 }}>Deja vacío lo que no quieras limitar. En total: {dinero(total, d.moneda)} al mes.</Texto>
+    <Hoja titulo="Topes" alCerrar={alCerrar} pie={<><TextoError texto={error} /><BotonPrincipal onPress={guardar}>Guardar topes</BotonPrincipal></>}>
+      <Texto tam={14} color={c.tenue} style={{ lineHeight: 20 }}>{NOMBRES_PERIODO[periodo]}. Deja vacío lo que no quieras limitar. En total: {dinero(total, d.moneda)} {POR_PERIODO[periodo]}.</Texto>
       <View style={{ backgroundColor: c.suave, borderRadius: 14 }}>
         {deGasto.map((cat, i) => (
           <View key={cat.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, height: 54, paddingHorizontal: 14, borderTopWidth: i ? 1 : 0, borderTopColor: c.tarjeta }}>

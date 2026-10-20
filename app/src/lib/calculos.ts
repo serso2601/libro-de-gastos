@@ -1,8 +1,8 @@
 // Cuentas que comparten las pantallas: lo del mes, el calor de cada día, el presupuesto, las formas
 // de ver el saldo y las próximas veces de una regla. Todo en centavos.
 
-import { aFecha, dinero, fechaISO, MESES, saldo } from './formato';
-import type { Categoria, Cuenta, Datos, Frecuencia, Movimiento, Proximo, Recurrencia } from './tipos';
+import { aFecha, dinero, fechaISO, MESES, MESES_CORTOS, saldo } from './formato';
+import type { Categoria, ConfigPresupuesto, Cuenta, Datos, Frecuencia, Movimiento, PeriodoPresupuesto, Proximo, Recurrencia } from './tipos';
 
 export const claveMes = (anio: number, mes: number) => `${anio}-${String(mes).padStart(2, '0')}`;
 
@@ -42,27 +42,152 @@ export function nivelador(valores: number[]): (v: number) => 0 | 1 | 2 | 3 | 4 {
   return (v) => (v <= 0 ? 0 : v < promedio * 0.5 ? 1 : v < promedio ? 2 : v < promedio * 2 ? 3 : 4);
 }
 
-export function gastadoEn(d: Datos, categoriaId: string, clave: string): number {
-  return d.movimientos.reduce((s, m) => s + (m.tipo === 'gasto' && m.categoria_id === categoriaId && m.fecha.startsWith(clave) ? m.monto : 0), 0);
+// --- Periodos del presupuesto ---------------------------------------------------------------------
+
+/** Un periodo del presupuesto, con sus dos puntas incluidas ('YYYY-MM-DD'). */
+export interface Periodo {
+  desde: string;
+  hasta: string;
+}
+
+const POR_ANIO: Record<PeriodoPresupuesto, number> = { semanal: 52, catorcenal: 26, quincenal: 24, mensual: 12 };
+export const NOMBRES_PERIODO: Record<PeriodoPresupuesto, string> = {
+  semanal: 'Cada semana', catorcenal: 'Cada 2 semanas', quincenal: 'Cada quincena', mensual: 'Cada mes',
+};
+/** «al mes», «a la semana»…: para «tope $400 al mes». */
+export const POR_PERIODO: Record<PeriodoPresupuesto, string> = {
+  semanal: 'a la semana', catorcenal: 'cada 2 semanas', quincenal: 'por quincena', mensual: 'al mes',
+};
+
+export function configPresupuesto(d: Datos): ConfigPresupuesto {
+  return d.presupuesto ?? { periodo: 'mensual', inicio: '1' };
+}
+
+function sumarDias(iso: string, n: number): string {
+  const f = aFecha(iso);
+  f.setDate(f.getDate() + n);
+  return fechaISO(f);
+}
+
+/** Los días de un periodo, contando sus dos puntas. */
+export function diasDelPeriodo(p: Periodo): number {
+  return Math.round((aFecha(p.hasta).getTime() - aFecha(p.desde).getTime()) / 86_400_000) + 1;
+}
+
+/** Los días que le quedan al periodo contando hoy (1 el último día; 0 si ya terminó). */
+export function diasQueQuedanEn(p: Periodo, hoy: string): number {
+  if (hoy > p.hasta) return 0;
+  if (hoy < p.desde) return diasDelPeriodo(p);
+  return diasDelPeriodo({ desde: hoy, hasta: p.hasta });
+}
+
+/** El periodo del presupuesto en el que cae `fecha`. */
+export function periodoDe(config: ConfigPresupuesto, fecha: string): Periodo {
+  const f = aFecha(fecha);
+  switch (config.periodo) {
+    case 'semanal': {
+      const atras = (f.getDay() - (Number(config.inicio) || 0) + 7) % 7;
+      const desde = sumarDias(fecha, -atras);
+      return { desde, hasta: sumarDias(desde, 6) };
+    }
+    case 'catorcenal': {
+      const ancla = /^\d{4}-\d{2}-\d{2}$/.test(config.inicio) ? config.inicio : fecha;
+      const dias = Math.round((f.getTime() - aFecha(ancla).getTime()) / 86_400_000);
+      const desde = sumarDias(ancla, Math.floor(dias / 14) * 14);
+      return { desde, hasta: sumarDias(desde, 13) };
+    }
+    case 'quincenal': {
+      const [anio, mes] = [f.getFullYear(), f.getMonth() + 1];
+      return f.getDate() <= 15
+        ? { desde: `${claveMes(anio, mes)}-01`, hasta: `${claveMes(anio, mes)}-15` }
+        : { desde: `${claveMes(anio, mes)}-16`, hasta: `${claveMes(anio, mes)}-${String(diasDelMes(anio, mes)).padStart(2, '0')}` };
+    }
+    case 'mensual': {
+      const dia = Math.min(Math.max(Number(config.inicio) || 1, 1), 28);
+      const desde = f.getDate() >= dia ? new Date(f.getFullYear(), f.getMonth(), dia) : new Date(f.getFullYear(), f.getMonth() - 1, dia);
+      const hasta = new Date(desde.getFullYear(), desde.getMonth() + 1, dia - 1);
+      return { desde: fechaISO(desde), hasta: fechaISO(hasta) };
+    }
+  }
+}
+
+/** El periodo anterior (delta = -1) o siguiente (+1) a `p`. */
+export function periodoVecino(config: ConfigPresupuesto, p: Periodo, delta: number): Periodo {
+  let actual = p;
+  for (let i = 0; i < Math.abs(delta); i++) actual = periodoDe(config, delta < 0 ? sumarDias(actual.desde, -1) : sumarDias(actual.hasta, 1));
+  return actual;
+}
+
+/** «Octubre 2026» si el periodo es un mes entero; si no, «13 – 19 oct» o «25 sep – 24 oct». */
+export function nombrePeriodo(p: Periodo): string {
+  const a = aFecha(p.desde);
+  const b = aFecha(p.hasta);
+  if (a.getDate() === 1 && b.getDate() === diasDelMes(b.getFullYear(), b.getMonth() + 1) && a.getMonth() === b.getMonth()) {
+    return `${MESES[a.getMonth()].charAt(0).toUpperCase()}${MESES[a.getMonth()].slice(1)} ${a.getFullYear()}`;
+  }
+  const mesB = MESES_CORTOS[b.getMonth()];
+  return a.getMonth() === b.getMonth() ? `${a.getDate()} – ${b.getDate()} ${mesB}` : `${a.getDate()} ${MESES_CORTOS[a.getMonth()]} – ${b.getDate()} ${mesB}`;
+}
+
+/** Un monto de un periodo llevado a otro con la misma proporción por año ($400 al mes ≈ $92 a la semana). */
+export function convertirTope(centavos: number, de: PeriodoPresupuesto, a: PeriodoPresupuesto): number {
+  return Math.round((centavos * POR_ANIO[de]) / POR_ANIO[a] / 100) * 100;
+}
+
+/** Un mes calendario 'YYYY-MM' como periodo (para lo que todavía mira meses). */
+function periodoDeMes(clave: string): Periodo {
+  const [anio, mes] = clave.split('-').map(Number);
+  return { desde: `${clave}-01`, hasta: `${clave}-${String(diasDelMes(anio, mes)).padStart(2, '0')}` };
+}
+
+const comoPeriodo = (p: Periodo | string): Periodo => (typeof p === 'string' ? periodoDeMes(p) : p);
+
+/** Lo gastado en una categoría en un periodo (o en un mes 'YYYY-MM'). */
+export function gastadoEn(d: Datos, categoriaId: string, periodo: Periodo | string): number {
+  const p = comoPeriodo(periodo);
+  return d.movimientos.reduce((s, m) => s + (m.tipo === 'gasto' && m.categoria_id === categoriaId && m.fecha >= p.desde && m.fecha <= p.hasta ? m.monto : 0), 0);
+}
+
+/**
+ * Lo que una categoría que «pasa lo que sobra» trae de los periodos anteriores a `p`: la suma de
+ * (tope − gastado) desde el periodo de `acumula_desde`. Puede ser negativo si se pasó. Usa el tope de
+ * hoy para los periodos viejos (no se guarda el historial de topes).
+ */
+export function arrastre(d: Datos, categoria: Categoria, p: Periodo): number {
+  if (!categoria.acumula || !categoria.acumula_desde || !categoria.presupuesto) return 0;
+  const config = configPresupuesto(d);
+  let actual = periodoDe(config, categoria.acumula_desde);
+  let total = 0;
+  for (let i = 0; i < 400 && actual.desde < p.desde; i++) {
+    total += categoria.presupuesto - gastadoEn(d, categoria.id, actual);
+    actual = periodoVecino(config, actual, 1);
+  }
+  return total;
 }
 
 export interface EstadoTope {
   categoria: Categoria;
   gastado: number;
+  /** El tope de este periodo: el de la categoría más lo que trae (si pasa lo que sobra). */
   tope: number;
+  /** Lo que trae de periodos anteriores (0 si no acumula; negativo si se pasó). */
+  arrastre: number;
   /** 0 a 100+ */
   pct: number;
   casiAlTope: boolean;
   pasado: boolean;
 }
 
-export function topes(d: Datos, clave: string): { conTope: EstadoTope[]; sinTope: Categoria[]; tope: number; gastado: number } {
+/** El estado de cada tope en un periodo (o en un mes 'YYYY-MM'). */
+export function topes(d: Datos, periodo: Periodo | string): { conTope: EstadoTope[]; sinTope: Categoria[]; tope: number; gastado: number } {
+  const p = comoPeriodo(periodo);
   const deGasto = d.categorias.filter((c) => c.tipo === 'gasto');
   const conTope = deGasto.filter((c) => c.presupuesto).map((c): EstadoTope => {
-    const gastado = gastadoEn(d, c.id, clave);
-    const tope = c.presupuesto ?? 0;
-    const pct = tope > 0 ? Math.round((gastado / tope) * 100) : 0;
-    return { categoria: c, gastado, tope, pct, casiAlTope: pct >= 90 && gastado <= tope, pasado: gastado > tope };
+    const gastado = gastadoEn(d, c.id, p);
+    const extra = arrastre(d, c, p);
+    const tope = Math.max(0, (c.presupuesto ?? 0) + extra);
+    const pct = tope > 0 ? Math.round((gastado / tope) * 100) : gastado > 0 ? 100 : 0;
+    return { categoria: c, gastado, tope, arrastre: extra, pct, casiAlTope: pct >= 90 && gastado <= tope, pasado: gastado > tope };
   });
   return {
     conTope,

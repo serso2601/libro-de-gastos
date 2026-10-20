@@ -105,7 +105,15 @@ Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
 - **Categorías con símbolo** (`ui/simbolos.tsx`, ~39 íconos de línea) o emoji; `categoria.emoji` guarda
   `i:<clave>`, un emoji, o '💰' = sin elegir (se ve la inicial).
 - **Presupuesto**: tocar una categoría abre su detalle (lo gastado, el tope, por día, las compras del
-  mes); editar el tope es la opción secundaria de ahí, no lo primero.
+  periodo); editar el tope es la opción secundaria de ahí, no lo primero.
+- **Periodo del presupuesto** (uno para todo; ajuste `presupuesto_periodo`/`presupuesto_inicio`):
+  cada semana (día en que empieza), cada 2 semanas (desde una fecha), cada quincena (1–15 y 16–fin)
+  o cada mes (día 1–28). Por defecto mensual desde el 1: nada obligatorio, hay quien no cobra en
+  fechas fijas. Los topes son por periodo; al cambiarlo la app ofrece convertirlos
+  (`calculos.convertirTope`). Todo sale de `calculos.periodoDe/periodoVecino/nombrePeriodo`.
+- **Pasar lo que sobra** por categoría (`acumula`, `acumula_desde`): suma (tope − gastado) de los
+  periodos desde `acumula_desde` (`calculos.arrastre`; usa el tope de hoy, no hay historial de
+  topes). Al cambiar el periodo, el arrastre empieza de nuevo.
 - Vasos de presupuesto: un solo color, sin raya en el borde. Nada del concepto "libro contable".
 - Ideas sueltas para después: `IDEAS.md`.
 - **Tutorial** único (`pantallas/Tutorial.tsx`) la primera vez; se repite desde Ajustes → «Ver cómo
@@ -115,9 +123,10 @@ Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
 
 ## Estado (20/oct/2026)
 
-- Servidor con 33 pruebas (esquema v3). App con un solo estilo, modo oscuro, color principal,
+- Servidor con 39 pruebas (esquema v4). App con un solo estilo, modo oscuro, color principal,
   tutorial, anotar/editar, reglas que se repiten, lo que viene del mes arriba de Movimientos,
-  buscador, gráficos, presupuesto con topes (mensual) y detalle por categoría, tarjeta de crédito,
+  buscador, gráficos, presupuesto por periodo (semana/2 semanas/quincena/mes) con topes, pasar lo
+  que sobra y detalle por categoría, tarjeta de crédito,
   símbolos de categoría, borrar cuentas, exportar, QR para conectar.
 - `app.json` pasó a `userInterfaceStyle: automatic`, compilado en `ios-dev-3`
   (`app-iphone\gastos-dev-3.ipa`). Con `ios-dev-2`, «Automático» se ve oscuro; Claro y Oscuro
@@ -129,10 +138,9 @@ Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
 ## Qué sigue (ideas acordadas)
 
 1. Usar la app y pulir lo que salga (el usuario va anotando cambios de diseño).
-1b. **Funciones acordadas tras investigar** (Money Manager, Buddy, Copilot, YNAB…). Hecha: la
-   tarjeta de crédito. Falta: **presupuestos con periodo configurable** (semanal, cada 2 semanas, quincenal, mensual con día de inicio, personalizado;
-   por defecto mensual, nada obligatorio: hay quien no tiene fechas de cobro), pasar lo que sobra,
-   «te quedan $X para N días». Luego favoritos/plantillas, subcategorías, metas y fondos.
+1b. **Funciones acordadas tras investigar** (Money Manager, Buddy, Copilot, YNAB…). Hechas: la
+   tarjeta de crédito y los presupuestos por periodo. Siguen: favoritos/plantillas, subcategorías,
+   metas y fondos (ver `IDEAS.md`).
 2. **Gasto por voz** (en veremos: el usuario la usa poco; si se hace, que use las categorías ya
    creadas): grabar en la app → Whisper en la PC → `claude -p --model sonnet` lo vuelve
    movimiento → bandeja «Por revisar» (nada entra solo).

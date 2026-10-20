@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { Alert, Pressable, View } from 'react-native';
 import { useAbrir } from '@/dialogos/abrir';
 import { useAcciones } from '@/lib/acciones';
-import { ORDEN_SALDOS, saldos } from '@/lib/calculos';
+import { configPresupuesto, ORDEN_SALDOS, POR_PERIODO, saldos } from '@/lib/calculos';
 import { useAlmacen, useDatos } from '@/lib/datos';
 import { conSigno, dineroCorto, fechaISO, neto } from '@/lib/formato';
 import type { TipoCategoria } from '@/lib/tipos';
@@ -161,7 +161,7 @@ function ContenidoAjustes() {
               {lista.length === 0 && <Texto tam={14} color={c.tenue} style={{ paddingVertical: 14 }}>Ninguna todavía.</Texto>}
               {lista.map((x, i) => (
                 <FilaSimple key={x.id} primera={i === 0} texto={x.nombre} onPress={() => abrir({ tipo: 'categoria', inicial: x })}
-                  detalle={x.presupuesto ? `tope ${dineroCorto(x.presupuesto, d.moneda)} al mes` : undefined}
+                  detalle={x.presupuesto ? `tope ${dineroCorto(x.presupuesto, d.moneda)} ${POR_PERIODO[configPresupuesto(d).periodo]}` : undefined}
                   izquierda={<SimboloCategoria categoria={x} tam={30} />}
                   derecha={<Ordenar alSubir={i > 0 ? () => reordenarCategorias(tipo, mover(ids, i, -1)) : undefined}
                     alBajar={i < lista.length - 1 ? () => reordenarCategorias(tipo, mover(ids, i, 1)) : undefined} />} />

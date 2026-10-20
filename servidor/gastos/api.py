@@ -73,6 +73,14 @@ class CategoriaIn(BaseModel):
     color: str = Color
     emoji: str = Field(default="💰", min_length=1, max_length=16)
     presupuesto: int | None = Field(default=None, ge=0)
+    acumula: bool = False  # pasa lo que sobra del periodo al siguiente
+    acumula_desde: date | None = None  # inicio del periodo desde el que se acumula; sin acumular, se descarta
+
+    @model_validator(mode="after")
+    def _acumula(self):
+        if not self.acumula:
+            self.acumula_desde = None
+        return self
 
 
 class MovimientoIn(BaseModel):
@@ -103,7 +111,11 @@ class OrdenIn(BaseModel):
 
 
 class AjustesIn(BaseModel):
-    moneda: str = Field(min_length=1, max_length=4)
+    """Solo se guarda lo que llega: `{"moneda": "$"}` no toca el periodo del presupuesto."""
+
+    moneda: str | None = Field(default=None, min_length=1, max_length=4)
+    presupuesto_periodo: Literal["semanal", "catorcenal", "quincenal", "mensual"] | None = None
+    presupuesto_inicio: str | None = Field(default=None, max_length=10)
 
 
 def _existe(con: sqlite3.Connection, tabla: str, id_: str | None) -> bool:
@@ -134,6 +146,38 @@ def _cuenta(fila: sqlite3.Row | dict) -> dict:
     return {**dict(fila), "es_credito": bool(fila["es_credito"])}
 
 
+def _categoria(fila: sqlite3.Row | dict) -> dict:
+    """Una categoría como la ve la API: `acumula` sale como booleano, no como 0/1."""
+    return {**dict(fila), "acumula": bool(fila["acumula"])}
+
+
+def _presupuesto(con: sqlite3.Connection) -> dict:
+    """El periodo del presupuesto; sin nada guardado, mensual desde el día 1."""
+    ajustes = {f["clave"]: f["valor"] for f in con.execute(
+        "SELECT clave, valor FROM ajuste WHERE clave IN ('presupuesto_periodo', 'presupuesto_inicio')")}
+    return {"periodo": ajustes.get("presupuesto_periodo", "mensual"), "inicio": ajustes.get("presupuesto_inicio", "1")}
+
+
+def _inicio_valido(periodo: str, inicio: str | None) -> str:
+    """Revisa `presupuesto_inicio` según el periodo y lo devuelve listo para guardar."""
+    if periodo == "quincenal":
+        return ""
+    if inicio is None:
+        raise HTTPException(422, "Falta el inicio del periodo del presupuesto")
+    if periodo == "semanal":
+        if inicio not in ("0", "1", "2", "3", "4", "5", "6"):
+            raise HTTPException(422, "En un presupuesto semanal el inicio es el día de la semana, de 0 (domingo) a 6 (sábado)")
+    elif periodo == "mensual":
+        if not (inicio.isascii() and inicio.isdigit() and 1 <= int(inicio) <= 28):
+            raise HTTPException(422, "En un presupuesto mensual el inicio es el día del mes, de 1 a 28")
+    else:  # catorcenal
+        try:
+            date.fromisoformat(inicio)
+        except ValueError:
+            raise HTTPException(422, "En un presupuesto cada 2 semanas el inicio es una fecha (AAAA-MM-DD)")
+    return inicio
+
+
 def leer_todo(con: sqlite3.Connection, hoy: date) -> dict:
     cuentas = [_cuenta(f) for f in con.execute(
         """SELECT c.*, c.saldo_inicial
@@ -148,9 +192,10 @@ def leer_todo(con: sqlite3.Connection, hoy: date) -> dict:
         "hoy": hoy.isoformat(),
         "moneda": moneda["valor"] if moneda else "$",
         "cuentas": cuentas,
-        "categorias": [dict(f) for f in con.execute("SELECT * FROM categoria ORDER BY tipo, orden, creado")],
+        "categorias": [_categoria(f) for f in con.execute("SELECT * FROM categoria ORDER BY tipo, orden, creado")],
         "movimientos": [dict(f) for f in con.execute("SELECT * FROM movimiento ORDER BY fecha DESC, hora DESC, creado DESC")],
         "recurrencias": [dict(f) for f in con.execute("SELECT * FROM recurrencia ORDER BY fecha_inicio")],
+        "presupuesto": _presupuesto(con),
         "proximos": recurrencias.proximas(con, hoy),
     }
 
@@ -257,13 +302,16 @@ def create_app(config: Config | None = None, hoy=date.today) -> FastAPI:
         with con:
             orden = con.execute("SELECT COALESCE(MAX(orden) + 1, 0) FROM categoria WHERE tipo = ?", (c.tipo,)).fetchone()[0]
             con.execute(
-                """INSERT INTO categoria (id, nombre, tipo, color, emoji, presupuesto, orden, creado, actualizado)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """INSERT INTO categoria (id, nombre, tipo, color, emoji, presupuesto, orden, creado, actualizado,
+                     acumula, acumula_desde)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                    ON CONFLICT (id) DO UPDATE SET nombre = excluded.nombre, color = excluded.color,
-                     emoji = excluded.emoji, presupuesto = excluded.presupuesto, actualizado = excluded.actualizado""",
-                (id_, c.nombre.strip(), c.tipo, c.color, c.emoji, presupuesto, orden, marca, marca),
+                     emoji = excluded.emoji, presupuesto = excluded.presupuesto, actualizado = excluded.actualizado,
+                     acumula = excluded.acumula, acumula_desde = excluded.acumula_desde""",
+                (id_, c.nombre.strip(), c.tipo, c.color, c.emoji, presupuesto, orden, marca, marca,
+                 int(c.acumula), c.acumula_desde.isoformat() if c.acumula_desde else None),
             )
-        return dict(con.execute("SELECT * FROM categoria WHERE id = ?", (id_,)).fetchone())
+        return _categoria(con.execute("SELECT * FROM categoria WHERE id = ?", (id_,)).fetchone())
 
     @r.delete("/categorias/{id_}")
     def borrar_categoria(id_: str, con: sqlite3.Connection = Depends(conexion)):
@@ -357,10 +405,17 @@ def create_app(config: Config | None = None, hoy=date.today) -> FastAPI:
     # --- Ajustes, importar y exportar --------------------------------------------------------
     @r.put("/ajustes")
     def guardar_ajustes(a: AjustesIn, con: sqlite3.Connection = Depends(conexion)):
+        guardar = {}
+        if a.moneda is not None:
+            guardar["moneda"] = a.moneda.strip()
+        if a.presupuesto_periodo is not None:
+            guardar["presupuesto_periodo"] = a.presupuesto_periodo
+            guardar["presupuesto_inicio"] = _inicio_valido(a.presupuesto_periodo, a.presupuesto_inicio)
         with con:
-            con.execute("INSERT INTO ajuste VALUES ('moneda', ?) ON CONFLICT (clave) DO UPDATE SET valor = excluded.valor",
-                        (a.moneda.strip(),))
-        return {"moneda": a.moneda.strip()}
+            con.executemany("INSERT INTO ajuste VALUES (?, ?) ON CONFLICT (clave) DO UPDATE SET valor = excluded.valor",
+                            list(guardar.items()))
+        moneda = con.execute("SELECT valor FROM ajuste WHERE clave = 'moneda'").fetchone()
+        return {"moneda": moneda["valor"] if moneda else "$", "presupuesto": _presupuesto(con)}
 
     @r.post("/importar")
     async def importar_vieja(request: Request, simular: bool = False, con: sqlite3.Connection = Depends(conexion)):

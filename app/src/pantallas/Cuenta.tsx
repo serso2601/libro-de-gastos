@@ -6,7 +6,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAbrir, useAnotar } from '@/dialogos/abrir';
-import { deudaTarjeta, flujoCuenta, gastadoEnCorte, montoEnCuenta, pagoSugerido, porDia, porVenirDelMes } from '@/lib/calculos';
+import { configPresupuesto, deudaTarjeta, flujoCuenta, gastadoEnCorte, montoEnCuenta, pagoSugerido, periodoDe, porDia, porVenirDelMes } from '@/lib/calculos';
 import { useDatos } from '@/lib/datos';
 import { conSigno, MESES, neto, ordenarPorFecha, saldo, tituloDia } from '@/lib/formato';
 import type { Cuenta as TCuenta } from '@/lib/tipos';
@@ -118,7 +118,7 @@ function EnQueSeGasto({ cuenta, mes }: { cuenta: TCuenta; mes: string }) {
           const nombre = cat?.nombre ?? 'Sin categoría';
           const pct = total > 0 ? Math.max(monto / total, 0.04) : 0;
           return (
-            <Pressable key={catId || 'sin'} disabled={!cat} onPress={() => cat && abrir({ tipo: 'detalleCategoria', categoria: cat, mes: mesActual })}
+            <Pressable key={catId || 'sin'} disabled={!cat} onPress={() => cat && abrir({ tipo: 'detalleCategoria', categoria: cat, periodo: periodoDe(configPresupuesto(d), d.hoy) })}
               accessibilityLabel={`${nombre}: ${neto(monto, d.moneda)}`}
               style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 50, paddingVertical: 6,
                 borderTopWidth: i === 0 ? 0 : 1, borderTopColor: c.linea, opacity: pressed ? 0.6 : 1 })}>
