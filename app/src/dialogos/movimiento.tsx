@@ -1,11 +1,11 @@
 import * as Haptics from 'expo-haptics';
 import { useState } from 'react';
-import { Alert, Pressable, TextInput, View } from 'react-native';
+import { Alert, Pressable, View } from 'react-native';
 import { useAcciones } from '@/lib/acciones';
 import { useDatos } from '@/lib/datos';
 import { aCentavos, aFecha, aTexto, DIAS, nuevoId } from '@/lib/formato';
 import { FRECUENCIAS, type Frecuencia, type Movimiento, type Recurrencia, type TipoMovimiento } from '@/lib/tipos';
-import { BotonPrincipal, familia, Ficha, Hoja, MontoGrande, Segmentos, Texto, TextoError } from '@/ui/componentes';
+import { BotonPrincipal, Campo, Ficha, Hoja, MontoGrande, Segmentos, Texto, TextoError } from '@/ui/componentes';
 import { Icono } from '@/ui/iconos';
 import { useTema } from '@/ui/tema';
 import { Desplegable, ElegirCategoria, ElegirCuenta, ElegirFecha } from './piezas';
@@ -15,8 +15,10 @@ type Repetir = 'no' | Frecuencia;
 const REPETIR: [Repetir, string][] = [['no', 'No'], ...FRECUENCIAS];
 
 /** Anotar o editar un gasto, ingreso o transferencia. Al anotar, se puede volver una regla que se repite. */
-export function DialogoMovimiento({ inicial, tipoInicial = 'gasto', fechaInicial, cuentaInicial, alCerrar, alEditarRegla }: {
+export function DialogoMovimiento({ inicial, tipoInicial = 'gasto', fechaInicial, cuentaInicial, destinoInicial, montoInicial, notaInicial, alCerrar, alEditarRegla }: {
   inicial?: Movimiento; tipoInicial?: TipoMovimiento; fechaInicial?: string; cuentaInicial?: string;
+  /** Para el pago sugerido de una tarjeta: la transferencia ya armada, que el usuario confirma. */
+  destinoInicial?: string; montoInicial?: number; notaInicial?: string;
   alCerrar: () => void; alEditarRegla: (r: Recurrencia) => void;
 }) {
   const { cuentas, categorias, moneda, hoy, recurrencias } = useDatos();
@@ -25,11 +27,11 @@ export function DialogoMovimiento({ inicial, tipoInicial = 'gasto', fechaInicial
   const editando = !!inicial;
   const primeraDe = (t: TipoMovimiento) => categorias.find((x) => x.tipo === t)?.id ?? '';
   const [tipo, setTipo] = useState<TipoMovimiento>(inicial?.tipo ?? tipoInicial);
-  const [monto, setMonto] = useState(inicial ? aTexto(inicial.monto) : '');
+  const [monto, setMonto] = useState(inicial ? aTexto(inicial.monto) : montoInicial ? aTexto(montoInicial) : '');
   const [cuenta, setCuenta] = useState(inicial?.cuenta_id ?? (cuentas.some((x) => x.id === cuentaInicial) ? cuentaInicial! : cuentas[0]?.id ?? ''));
-  const [destino, setDestino] = useState(inicial?.cuenta_destino_id ?? cuentas.find((x) => x.id !== cuenta)?.id ?? '');
+  const [destino, setDestino] = useState(inicial?.cuenta_destino_id ?? (cuentas.some((x) => x.id === destinoInicial) ? destinoInicial! : cuentas.find((x) => x.id !== cuenta)?.id ?? ''));
   const [categoria, setCategoria] = useState(inicial?.categoria_id ?? primeraDe(inicial?.tipo ?? tipoInicial));
-  const [nota, setNota] = useState(inicial?.nota ?? '');
+  const [nota, setNota] = useState(inicial?.nota ?? notaInicial ?? '');
   const [fecha, setFecha] = useState(inicial?.fecha ?? fechaInicial ?? hoy);
   const [hora, setHora] = useState(inicial?.hora ?? '');
   const [repetir, setRepetir] = useState<Repetir>('no');
@@ -97,9 +99,9 @@ export function DialogoMovimiento({ inicial, tipoInicial = 'gasto', fechaInicial
       <Segmentos opciones={TIPOS} valor={tipo} alCambiar={cambiarTipo} />
 
       <View style={{ alignItems: 'stretch' }}>
-        <MontoGrande valor={monto} alCambiar={(v) => { setMonto(v); setError(''); }} moneda={moneda} autoFocus={!editando} />
-        <TextInput value={nota} onChangeText={setNota} placeholder="¿De qué se trata?" placeholderTextColor={c.tenue} accessibilityLabel="Descripción"
-          style={{ textAlign: 'center', fontSize: 16, height: 36, paddingVertical: 0, color: c.tinta, fontFamily: familia('normal') }} returnKeyType="done" />
+        <MontoGrande valor={monto} alCambiar={(v) => { setMonto(v); setError(''); }} moneda={moneda} autoFocus={!editando && !montoInicial} />
+        <Campo value={nota} onChangeText={setNota} placeholder="¿De qué se trata?" accessibilityLabel="Descripción" returnKeyType="done"
+          style={{ height: 40, backgroundColor: 'transparent', textAlign: 'center' }} />
       </View>
 
       <ElegirFecha fecha={fecha} alCambiar={setFecha} rotulo={repetir === 'no' ? 'Fecha' : 'Primera vez'}

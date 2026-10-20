@@ -134,8 +134,10 @@ def importar(con: sqlite3.Connection, datos: dict, hoy: date | None = None, simu
         con.execute("DELETE FROM recurrencia")
         con.execute("DELETE FROM categoria")
         con.execute("DELETE FROM cuenta")
-        con.executemany("INSERT INTO cuenta VALUES (?, ?, ?, ?, ?, ?, ?)", filas_cuentas)
-        con.executemany("INSERT INTO categoria VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", filas_categorias)
+        con.executemany("INSERT INTO cuenta (id, nombre, color, saldo_inicial, orden, creado, actualizado) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?)", filas_cuentas)
+        con.executemany("INSERT INTO categoria (id, nombre, tipo, color, emoji, presupuesto, orden, creado, actualizado) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", filas_categorias)
         con.executemany(
             """INSERT INTO recurrencia (id, tipo, monto, cuenta_id, cuenta_destino_id, categoria_id, nota, frecuencia,
                fecha_inicio, fecha_fin, generada_hasta, creado, actualizado) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",

@@ -13,6 +13,7 @@ import type { Categoria, TipoCategoria } from '@/lib/tipos';
 import { Campo, Colores, Etiqueta, Num, Texto } from '@/ui/componentes';
 import { PALETA } from '@/ui/estilos';
 import { Icono } from '@/ui/iconos';
+import { SimboloCategoria, sugerirSimbolo } from '@/ui/simbolos';
 import { sobre, useTema } from '@/ui/tema';
 
 /** Hijos en columnas iguales; la última fila se completa con huecos. */
@@ -99,7 +100,7 @@ export function ElegirFecha({ fecha, alCambiar, hora, alCambiarHora, rotulo = 'F
   );
 }
 
-/** La grilla de categorías, con lo que le queda a cada una y la opción de crear otra ahí mismo. */
+/** La grilla de categorías (con su símbolo, y lo que falta para el tope de las que lo tienen) y la opción de crear otra ahí mismo. */
 export function ElegirCategoria({ tipo, valor, alCambiar, fecha, rotulo = true }: {
   tipo: TipoCategoria; valor: string; alCambiar: (id: string) => void; fecha: string; rotulo?: boolean;
 }) {
@@ -114,7 +115,8 @@ export function ElegirCategoria({ tipo, valor, alCambiar, fecha, rotulo = true }
 
   function crear() {
     if (!nombre.trim()) return;
-    const cat: Categoria = { id: nuevoId(), nombre: nombre.trim(), tipo, color, emoji: '💰', presupuesto: null, orden: 999 };
+    const sugerido = sugerirSimbolo(nombre);
+    const cat: Categoria = { id: nuevoId(), nombre: nombre.trim(), tipo, color, emoji: sugerido ? `i:${sugerido}` : '💰', presupuesto: null, orden: 999 };
     guardarCategoria(cat);
     alCambiar(cat.id);
     setNueva(false);
@@ -123,19 +125,21 @@ export function ElegirCategoria({ tipo, valor, alCambiar, fecha, rotulo = true }
 
   return (
     <View style={{ gap: 8 }}>
-      {rotulo && <Etiqueta derecha={tipo === 'gasto' && estados.size > 0 ? <Texto tam={13} color={c.tenue}>y lo que le queda</Texto> : undefined}>Categoría</Etiqueta>}
+      {rotulo && <Etiqueta>Categoría</Etiqueta>}
       <Grilla columnas={3}>
         {disponibles.map((cat) => {
           const activa = cat.id === valor;
           const t = estados.get(cat.id);
-          const aviso = t ? (t.pasado ? 'te pasaste' : t.casiAlTope ? 'casi al tope' : `quedan ${dineroCorto(t.tope - t.gastado, d.moneda)}`) : null;
+          // Solo las que tienen tope dicen algo debajo del nombre: cuánto les falta para llegar a él.
+          const aviso = t ? (t.pasado ? 'tope pasado' : t.casiAlTope ? 'casi al tope' : `${dineroCorto(t.tope - t.gastado, d.moneda)} libres`) : null;
           return (
             <Pressable key={cat.id} onPress={() => { Haptics.selectionAsync(); alCambiar(cat.id); }}
-              style={{ height: 54, borderRadius: 14, backgroundColor: c.suave, paddingHorizontal: 11,
-                justifyContent: 'center', borderWidth: 2, borderColor: activa ? c.tinta : 'transparent', alignItems: 'flex-start', gap: 2 }}>
-              <View style={{ gap: 1 }}>
-                <Texto tam={14} peso={activa ? 'semi' : 'medio'} lineas={1}>{cat.nombre}</Texto>
-                {aviso && <Texto tam={12} peso={t?.pasado || t?.casiAlTope ? 'semi' : 'normal'} color={t?.pasado || t?.casiAlTope ? c.alerta : c.tenue} lineas={1}>{aviso}</Texto>}
+              style={{ height: 54, borderRadius: 14, backgroundColor: c.suave, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', gap: 6,
+                borderWidth: 2, borderColor: activa ? c.tinta : 'transparent' }}>
+              <SimboloCategoria categoria={cat} tam={22} />
+              <View style={{ flex: 1, gap: 1 }}>
+                <Texto tam={13} peso={activa ? 'semi' : 'medio'} lineas={1}>{cat.nombre}</Texto>
+                {aviso && <Texto tam={11} peso={t?.pasado || t?.casiAlTope ? 'semi' : 'normal'} color={t?.pasado || t?.casiAlTope ? c.alerta : c.tenue} lineas={1}>{aviso}</Texto>}
               </View>
             </Pressable>
           );

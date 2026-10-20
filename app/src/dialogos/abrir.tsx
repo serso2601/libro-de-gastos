@@ -3,16 +3,27 @@
 
 import { createContext, useContext, useState, type ReactNode } from 'react';
 import type { Categoria, Cuenta, Movimiento, Recurrencia, TipoCategoria, TipoMovimiento } from '@/lib/tipos';
-import { DialogoCategoria, DialogoCuenta, DialogoPresupuesto, DialogoTopes } from './ajustes';
+import { DialogoCategoria } from './categoria';
+import { DialogoCuenta } from './cuenta';
+import { DialogoDetalleCategoria } from './detalleCategoria';
 import { DialogoMovimiento } from './movimiento';
+import { DialogoPresupuesto, DialogoTopes } from './presupuesto';
 import { DialogoRecurrencia } from './recurrencia';
 
+/** Lo que se puede dejar listo al abrir la hoja de anotar (el pago sugerido de una tarjeta, por ejemplo). */
+export interface OpcionesAnotar {
+  tipoInicial?: TipoMovimiento; fechaInicial?: string; cuentaInicial?: string;
+  destinoInicial?: string; montoInicial?: number; notaInicial?: string;
+}
+
 export type Dialogo =
-  | { tipo: 'movimiento'; inicial?: Movimiento; tipoInicial?: TipoMovimiento; fechaInicial?: string; cuentaInicial?: string }
+  | ({ tipo: 'movimiento'; inicial?: Movimiento } & OpcionesAnotar)
   | { tipo: 'recurrencia'; regla: Recurrencia }
   | { tipo: 'cuenta'; inicial?: Cuenta }
   | { tipo: 'categoria'; inicial?: Categoria; tipoInicial?: TipoCategoria }
   | { tipo: 'presupuesto'; categoria: Categoria }
+  /** El detalle de una categoría del presupuesto en el mes `mes` ('YYYY-MM'). */
+  | { tipo: 'detalleCategoria'; categoria: Categoria; mes: string }
   | { tipo: 'topes' };
 
 const Contexto = createContext<((d: Dialogo) => void) | null>(null);
@@ -31,7 +42,7 @@ export function AnfitrionDialogos({ children }: { children: ReactNode }) {
       {children}
       {d?.tipo === 'movimiento' && (
         <DialogoMovimiento key={d.inicial?.id ?? 'nuevo'} inicial={d.inicial} tipoInicial={d.tipoInicial} fechaInicial={d.fechaInicial}
-          cuentaInicial={d.cuentaInicial} alCerrar={cerrar}
+          cuentaInicial={d.cuentaInicial} destinoInicial={d.destinoInicial} montoInicial={d.montoInicial} notaInicial={d.notaInicial} alCerrar={cerrar}
           alEditarRegla={(regla) => {
             // iOS no deja presentar una hoja mientras otra se está cerrando: se espera a que baje.
             setD(null);
@@ -42,6 +53,14 @@ export function AnfitrionDialogos({ children }: { children: ReactNode }) {
       {d?.tipo === 'cuenta' && <DialogoCuenta inicial={d.inicial} alCerrar={cerrar} />}
       {d?.tipo === 'categoria' && <DialogoCategoria inicial={d.inicial} tipoInicial={d.tipoInicial} alCerrar={cerrar} />}
       {d?.tipo === 'presupuesto' && <DialogoPresupuesto categoria={d.categoria} alCerrar={cerrar} />}
+      {d?.tipo === 'detalleCategoria' && (
+        <DialogoDetalleCategoria categoria={d.categoria} mes={d.mes} alCerrar={cerrar}
+          alEditarTope={() => {
+            const categoria = d.categoria;
+            setD(null);
+            setTimeout(() => setD({ tipo: 'presupuesto', categoria }), 600);
+          }} />
+      )}
       {d?.tipo === 'topes' && <DialogoTopes alCerrar={cerrar} />}
     </Contexto.Provider>
   );
@@ -50,5 +69,5 @@ export function AnfitrionDialogos({ children }: { children: ReactNode }) {
 /** Abrir la hoja de anotar, con el día o la cuenta ya elegidos si hace falta. */
 export function useAnotar() {
   const abrir = useAbrir();
-  return (o: { fechaInicial?: string; cuentaInicial?: string; tipoInicial?: TipoMovimiento } = {}) => abrir({ tipo: 'movimiento', ...o });
+  return (o: OpcionesAnotar = {}) => abrir({ tipo: 'movimiento', ...o });
 }

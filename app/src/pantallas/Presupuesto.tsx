@@ -4,19 +4,21 @@
 import { Pressable, View } from 'react-native';
 import { useAbrir } from '@/dialogos/abrir';
 import { Grilla } from '@/dialogos/piezas';
-import { diasQueQuedan, topes, type EstadoTope } from '@/lib/calculos';
+import { diasQueQuedan, gastadoEn, topes, type EstadoTope } from '@/lib/calculos';
 import { useDatos } from '@/lib/datos';
 import { dinero, dineroCorto } from '@/lib/formato';
 import { useMes } from '@/lib/mes';
 import type { Categoria } from '@/lib/tipos';
 import { Barra, BotonPrincipal, NavegadorMes, Num, Tarjeta, Texto, Vaso } from '@/ui/componentes';
 import { Marco } from '@/ui/pantalla';
+import { SimboloCategoria } from '@/ui/simbolos';
 import { mezclar, useTema } from '@/ui/tema';
 
+/** Corto a propósito: en un vaso de media pantalla tiene que caber junto al porcentaje. Los montos ya van en el subtítulo. */
 function avisoDe(t: EstadoTope, moneda: string): string {
-  if (t.pasado) return `te pasaste ${dineroCorto(t.gastado - t.tope, moneda)}`;
+  if (t.pasado) return 'Te pasaste';
   if (t.casiAlTope) return 'Casi al tope';
-  return `quedan ${dineroCorto(t.tope - t.gastado, moneda)}`;
+  return `Quedan ${dineroCorto(t.tope - t.gastado, moneda)}`;
 }
 
 function BotonTopes() {
@@ -69,42 +71,58 @@ export function Presupuesto() {
   const { c, relleno } = useTema();
   const t = topes(d, mes.clave);
   const alto = 150;
+  const ver = (categoria: Categoria) => abrir({ tipo: 'detalleCategoria', categoria, mes: mes.clave });
+  // Las categorías sin tope van aparte, en cuadros bajitos: no tienen nada que llenar.
+  const sinTope = t.sinTope.length > 0 && (
+    <Grilla columnas={2} gap={12}>
+      {t.sinTope.map((cat) => <CuadroSinTope key={cat.id} categoria={cat} gastado={gastadoEn(d, cat.id, mes.clave)} moneda={d.moneda} onPress={() => ver(cat)} />)}
+    </Grilla>
+  );
 
   return (
     <Marco titulo="Presupuesto" derecha={<BotonTopes />}>
       <NavegadorMes nombre={mes.nombre} anio={mes.anio} mover={mes.mover} />
-      {t.conTope.length === 0 ? <SinTopes /> : (
+      {t.conTope.length === 0 ? (
+        <>
+          <SinTopes />
+          {sinTope}
+        </>
+      ) : (
         <>
           <Resumen gastado={t.gastado} tope={t.tope} moneda={d.moneda} dias={mes.esActual ? diasQueQuedan(d.hoy) : null} />
           <Grilla columnas={2} gap={12}>
-            {[
-              ...t.conTope.map((x) => {
-                const malo = x.pasado || x.casiAlTope;
-                return (
-                  <Vaso key={x.categoria.id} nombre={x.categoria.nombre} sub={`${dineroCorto(x.gastado, d.moneda)} de ${dineroCorto(x.tope, d.moneda)}`}
-                    pct={x.pct} aviso={avisoDe(x, d.moneda)} alerta={malo} relleno={malo ? relleno(c.alerta) : relleno(x.categoria.color)}
-                    alto={alto} onPress={() => abrir({ tipo: 'presupuesto', categoria: x.categoria })} />
-                );
-              }),
-              ...t.sinTope.map((cat) => <VasoVacio key={cat.id} categoria={cat} alto={alto} />),
-            ]}
+            {t.conTope.map((x) => {
+              const malo = x.pasado || x.casiAlTope;
+              return (
+                <Vaso key={x.categoria.id} nombre={x.categoria.nombre} sub={`${dineroCorto(x.gastado, d.moneda)} de ${dineroCorto(x.tope, d.moneda)}`}
+                  pct={x.pct} aviso={avisoDe(x, d.moneda)} alerta={malo} relleno={malo ? relleno(c.alerta) : relleno(x.categoria.color)}
+                  alto={alto} onPress={() => ver(x.categoria)} />
+              );
+            })}
           </Grilla>
-          <Texto tam={13} color={c.tenue} centro style={{ marginTop: 6 }}>Cada vaso se llena con lo que gastas. Tócalo para cambiar su tope.</Texto>
+          {sinTope}
+          <Texto tam={13} color={c.tenue} centro style={{ marginTop: 6 }}>Toca una categoría para ver sus compras del mes.</Texto>
         </>
       )}
     </Marco>
   );
 }
 
-function VasoVacio({ categoria, alto }: { categoria: Categoria; alto: number }) {
-  const abrir = useAbrir();
+/** Una categoría sin tope: su nombre arriba y abajo «Sin tope» con lo gastado ese mes, si hay. */
+function CuadroSinTope({ categoria, gastado, moneda, onPress }: { categoria: Categoria; gastado: number; moneda: string; onPress: () => void }) {
   const { c, estilo } = useTema();
   return (
-    <Pressable onPress={() => abrir({ tipo: 'presupuesto', categoria })}
-      style={({ pressed }) => ({ height: alto, borderRadius: estilo.m.esquinas, borderWidth: 1.5, borderStyle: 'dashed', borderColor: mezclar(c.fondo, c.tenue, 0.35),
-        padding: 14, paddingHorizontal: 16, justifyContent: 'space-between', opacity: pressed ? 0.6 : 1 })}>
-      <Texto tam={15} peso="semi" lineas={1}>{categoria.nombre}</Texto>
-      <Texto tam={13} color={c.tenue}>Sin tope · tócalo para ponerle uno</Texto>
+    <Pressable onPress={onPress} accessibilityLabel={`${categoria.nombre}, sin tope${gastado > 0 ? `, ${dinero(gastado, moneda)} este mes` : ''}`}
+      style={({ pressed }) => ({ height: 84, borderRadius: estilo.m.esquinas, borderWidth: 1.5, borderStyle: 'dashed', borderColor: mezclar(c.fondo, c.tenue, 0.35),
+        paddingVertical: 12, paddingHorizontal: 14, justifyContent: 'space-between', opacity: pressed ? 0.6 : 1 })}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <SimboloCategoria categoria={categoria} tam={24} />
+        <Texto tam={15} peso="semi" lineas={1} style={{ flex: 1 }}>{categoria.nombre}</Texto>
+      </View>
+      <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 6 }}>
+        <Texto tam={12} color={c.tenue} lineas={1}>Sin tope</Texto>
+        {gastado > 0 && <Num tam={13} peso="medio" color={c.gasto} lineas={1} style={{ flexShrink: 1 }}>{dineroCorto(gastado, moneda)}</Num>}
+      </View>
     </Pressable>
   );
 }

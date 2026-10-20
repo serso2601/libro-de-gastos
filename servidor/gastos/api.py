@@ -20,7 +20,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from . import db, importar, pagina, recurrencias
 from .config import Config
@@ -53,6 +53,18 @@ class CuentaIn(BaseModel):
     nombre: str = Field(min_length=1, max_length=60)
     color: str = Color
     saldo_inicial: int = 0
+    es_credito: bool = False
+    dia_corte: int | None = Field(default=None, ge=1, le=31)
+    dia_pago: int | None = Field(default=None, ge=1, le=31)
+    pago_minimo: int | None = Field(default=None, ge=0)  # centavos; lo copia el usuario de su estado de cuenta
+
+    @model_validator(mode="after")
+    def _credito(self):
+        if self.es_credito and self.dia_corte is None:
+            raise ValueError("Una tarjeta de crédito necesita su día de corte")
+        if not self.es_credito:
+            self.dia_corte = self.dia_pago = self.pago_minimo = None
+        return self
 
 
 class CategoriaIn(BaseModel):
@@ -117,8 +129,13 @@ def _validar(con: sqlite3.Connection, m: MovimientoIn | RecurrenciaIn) -> None:
         raise HTTPException(422, f"Esa categoría es de {fila['tipo']}s, no de {m.tipo}s")
 
 
+def _cuenta(fila: sqlite3.Row | dict) -> dict:
+    """Una cuenta como la ve la API: `es_credito` sale como booleano, no como 0/1."""
+    return {**dict(fila), "es_credito": bool(fila["es_credito"])}
+
+
 def leer_todo(con: sqlite3.Connection, hoy: date) -> dict:
-    cuentas = [dict(f) for f in con.execute(
+    cuentas = [_cuenta(f) for f in con.execute(
         """SELECT c.*, c.saldo_inicial
              + COALESCE((SELECT SUM(CASE WHEN m.tipo = 'ingreso' THEN m.monto
                                          WHEN m.tipo = 'gasto' THEN -m.monto
@@ -198,16 +215,21 @@ def create_app(config: Config | None = None, hoy=date.today) -> FastAPI:
         with con:
             orden = con.execute("SELECT COALESCE(MAX(orden) + 1, 0) FROM cuenta").fetchone()[0]
             con.execute(
-                """INSERT INTO cuenta (id, nombre, color, saldo_inicial, orden, creado, actualizado)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)
+                """INSERT INTO cuenta (id, nombre, color, saldo_inicial, orden, creado, actualizado,
+                     es_credito, dia_corte, dia_pago, pago_minimo)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                    ON CONFLICT (id) DO UPDATE SET nombre = excluded.nombre, color = excluded.color,
-                     saldo_inicial = excluded.saldo_inicial, actualizado = excluded.actualizado""",
-                (id_, c.nombre.strip(), c.color, c.saldo_inicial, orden, marca, marca),
+                     saldo_inicial = excluded.saldo_inicial, actualizado = excluded.actualizado,
+                     es_credito = excluded.es_credito, dia_corte = excluded.dia_corte,
+                     dia_pago = excluded.dia_pago, pago_minimo = excluded.pago_minimo""",
+                (id_, c.nombre.strip(), c.color, c.saldo_inicial, orden, marca, marca,
+                 int(c.es_credito), c.dia_corte, c.dia_pago, c.pago_minimo),
             )
-        return dict(con.execute("SELECT * FROM cuenta WHERE id = ?", (id_,)).fetchone())
+        return _cuenta(con.execute("SELECT * FROM cuenta WHERE id = ?", (id_,)).fetchone())
 
     @r.delete("/cuentas/{id_}")
-    def borrar_cuenta(id_: str, con: sqlite3.Connection = Depends(conexion)):
+    def borrar_cuenta(id_: str, con_todo: bool = False, con: sqlite3.Connection = Depends(conexion)):
+        """Con `con_todo`, se van también los movimientos y las reglas que la tocan (de origen o de destino)."""
         if con.execute("SELECT COUNT(*) FROM cuenta").fetchone()[0] <= 1:
             raise HTTPException(409, "Es la única cuenta: no se puede borrar")
         usada = con.execute(
@@ -215,9 +237,12 @@ def create_app(config: Config | None = None, hoy=date.today) -> FastAPI:
                    OR EXISTS (SELECT 1 FROM recurrencia WHERE cuenta_id = :id OR cuenta_destino_id = :id)""",
             {"id": id_},
         ).fetchone()[0]
-        if usada:
+        if usada and not con_todo:
             raise HTTPException(409, "La cuenta tiene movimientos o recurrencias: no se puede borrar")
         with con:
+            if con_todo:
+                con.execute("DELETE FROM movimiento WHERE cuenta_id = :id OR cuenta_destino_id = :id", {"id": id_})
+                con.execute("DELETE FROM recurrencia WHERE cuenta_id = :id OR cuenta_destino_id = :id", {"id": id_})
             con.execute("DELETE FROM cuenta WHERE id = ?", (id_,))
         return {"ok": True}
 

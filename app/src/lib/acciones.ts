@@ -62,14 +62,24 @@ export function useAcciones() {
       guardarCuenta(c: Cuenta) {
         cambiar(
           { metodo: 'PUT', ruta: `/api/cuentas/${enc(c.id)}`, descripcion: 'Guardar la cuenta',
-            cuerpo: { nombre: c.nombre, color: c.color, saldo_inicial: c.saldo_inicial } },
+            cuerpo: { nombre: c.nombre, color: c.color, saldo_inicial: c.saldo_inicial, es_credito: !!c.es_credito,
+              dia_corte: c.es_credito ? c.dia_corte ?? null : null, dia_pago: c.es_credito ? c.dia_pago ?? null : null,
+              pago_minimo: c.es_credito ? c.pago_minimo ?? null : null } },
           (d) => ({ ...d, cuentas: reemplazar(d.cuentas, c) }),
         );
       },
 
-      borrarCuenta(c: Cuenta) {
-        cambiar({ metodo: 'DELETE', ruta: `/api/cuentas/${enc(c.id)}`, descripcion: 'Borrar la cuenta' },
-          (d) => ({ ...d, cuentas: d.cuentas.filter((x) => x.id !== c.id) }));
+      /** Con `conTodo` se van también sus movimientos (y las transferencias que la tocan) y sus reglas. */
+      borrarCuenta(c: Cuenta, conTodo = false) {
+        const toca = (x: { cuenta_id: string; cuenta_destino_id: string | null }) => x.cuenta_id === c.id || x.cuenta_destino_id === c.id;
+        cambiar({ metodo: 'DELETE', ruta: `/api/cuentas/${enc(c.id)}${conTodo ? '?con_todo=true' : ''}`, descripcion: 'Borrar la cuenta' },
+          (d) => ({
+            ...d,
+            cuentas: d.cuentas.filter((x) => x.id !== c.id),
+            movimientos: d.movimientos.filter((m) => !toca(m)),
+            recurrencias: d.recurrencias.filter((r) => !toca(r)),
+            proximos: d.proximos.filter((p) => !toca(p)),
+          }));
       },
 
       guardarCategoria(c: Categoria) {

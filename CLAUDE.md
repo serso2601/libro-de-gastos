@@ -81,20 +81,40 @@ Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
 - **Verde = ingreso, rojo = gasto en toda la app** (`c.ingreso`, `c.gasto`); `bien`/`alerta` son para
   estados. Sobre el color de una cuenta se usa la tinta de contraste, no rojo/verde.
 - **Inicio**: arriba el saldo que el usuario elige (total, libre después de lo que viene, balance,
-  gastado o entró del mes: `calculos.saldos`), tocándolo o en Ajustes. Dos vistas: Tarjetas (+
-  recientes) y Calendario (cada día con lo que entró en verde y salió en rojo). **Nada de lo que
-  viene en el Inicio**: va arriba en Movimientos. La pestaña Cuentas muestra todas las formas de saldo.
+  gastado o entró del mes: `calculos.saldos`), **solo** tocándolo o en Ajustes. Dos vistas:
+  Tarjetas y Calendario (cada día con lo que entró en verde y salió en rojo). En Tarjetas, **la
+  tarjeta del frente manda**: lo de abajo («Octubre en <cuenta>» con entró/salió rotulados y sus
+  últimos movimientos) es de esa cuenta, y la tarjeta trae Anotar / Transferir (y Pagar si es de
+  crédito con pago sugerido). Nada de barras sin rótulo. **Nada de lo que viene en el Inicio**: va
+  arriba en Movimientos.
+- **Pestaña Cuentas** = el resumen de todas: cada forma de saldo con una estadística corta (reparto
+  por cuenta, qué se descuenta, 6 meses de balance, promedio por día, de dónde entró) y las cuentas
+  en cuadros. NO se elige ahí el saldo del Inicio (el usuario lo vio como desperdicio).
+- **Tarjeta de crédito** = interruptor «Es tarjeta de crédito» en la cuenta (no hay tipos de cuenta):
+  día de corte obligatorio; día de pago y pago mínimo opcionales (el usuario los copia, no se
+  calculan). Su saldo es deuda. Se ve «Debes», «Gastado en este corte» (`calculos.cicloTarjeta`,
+  `gastadoEnCorte`, `deudaTarjeta`). El pago es una transferencia que la app **sugiere**
+  (`pagoSugerido`: en la tarjeta, su pantalla y «Por venir» de Movimientos) y el usuario confirma;
+  nunca se anota sola.
+- **Borrar una cuenta** siempre se puede (salvo la única): si tiene historia, avisa cuántos
+  movimientos y reglas se van con ella (`DELETE ?con_todo=true`).
+- **Categorías con símbolo** (`ui/simbolos.tsx`, ~39 íconos de línea) o emoji; `categoria.emoji` guarda
+  `i:<clave>`, un emoji, o '💰' = sin elegir (se ve la inicial).
+- **Presupuesto**: tocar una categoría abre su detalle (lo gastado, el tope, por día, las compras del
+  mes); editar el tope es la opción secundaria de ahí, no lo primero.
 - Vasos de presupuesto: un solo color, sin raya en el borde. Nada del concepto "libro contable".
+- Ideas sueltas para después: `IDEAS.md`.
 - **Tutorial** único (`pantallas/Tutorial.tsx`) la primera vez; se repite desde Ajustes → «Ver cómo
   funciona». Si el manejo cambia, el tutorial se actualiza.
 - **Recurrencias**: semanal, cada 2 semanas (`catorcenal`, 26 al año), cada quincena (`quincenal`,
   dos veces al mes: el día de inicio y 15 días después), mensual, anual.
 
-## Estado (19/oct/2026)
+## Estado (20/oct/2026)
 
-- Servidor con 27 pruebas (esquema v2). App con un solo estilo, modo oscuro, color principal,
-  tutorial, anotar/editar, reglas que se repiten, lo que viene del mes arriba de Movimientos, buscador, gráficos, presupuesto con
-  topes (mensual), exportar, QR para conectar.
+- Servidor con 33 pruebas (esquema v3). App con un solo estilo, modo oscuro, color principal,
+  tutorial, anotar/editar, reglas que se repiten, lo que viene del mes arriba de Movimientos,
+  buscador, gráficos, presupuesto con topes (mensual) y detalle por categoría, tarjeta de crédito,
+  símbolos de categoría, borrar cuentas, exportar, QR para conectar.
 - `app.json` pasó a `userInterfaceStyle: automatic`, compilado en `ios-dev-3`
   (`app-iphone\gastos-dev-3.ipa`). Con `ios-dev-2`, «Automático» se ve oscuro; Claro y Oscuro
   funcionan con cualquier build.
@@ -105,12 +125,8 @@ Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
 ## Qué sigue (ideas acordadas)
 
 1. Usar la app y pulir lo que salga (el usuario va anotando cambios de diseño).
-1b. **Funciones acordadas tras investigar** (Money Manager, Buddy, Copilot, YNAB…), después del
-   diseño: **tarjeta de crédito** = interruptor «Es tarjeta de crédito» en la cuenta (no hay tipos
-   de cuenta): día de corte obligatorio, «gastado en este corte» y deuda total; pago mínimo y fecha
-   de pago opcionales (el usuario los copia, no se calculan); el pago es una transferencia que la
-   app **sugiere** y el usuario confirma, nunca automática. **Presupuestos con periodo
-   configurable** (semanal, cada 2 semanas, quincenal, mensual con día de inicio, personalizado;
+1b. **Funciones acordadas tras investigar** (Money Manager, Buddy, Copilot, YNAB…). Hecha: la
+   tarjeta de crédito. Falta: **presupuestos con periodo configurable** (semanal, cada 2 semanas, quincenal, mensual con día de inicio, personalizado;
    por defecto mensual, nada obligatorio: hay quien no tiene fechas de cobro), pasar lo que sobra,
    «te quedan $X para N días». Luego favoritos/plantillas, subcategorías, metas y fondos.
 2. **Gasto por voz** (en veremos: el usuario la usa poco; si se hace, que use las categorías ya

@@ -11,6 +11,12 @@ export interface Cuenta {
   color: string;
   saldo_inicial: number;
   orden: number;
+  /** Tarjeta de crédito: su saldo es deuda y tiene día de corte. Lo de abajo solo vale si es true. */
+  es_credito?: boolean;
+  dia_corte?: number | null;
+  /** Opcionales: el usuario los copia de su estado de cuenta; la app no los calcula. */
+  dia_pago?: number | null;
+  pago_minimo?: number | null;
 }
 
 export interface Categoria {
@@ -18,6 +24,7 @@ export interface Categoria {
   nombre: string;
   tipo: TipoCategoria;
   color: string;
+  /** Un emoji o un símbolo de la app con la forma 'i:<clave>' (ver ui/simbolos.tsx). */
   emoji: string;
   presupuesto: number | null;
   orden: number;
