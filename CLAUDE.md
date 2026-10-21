@@ -83,10 +83,16 @@ Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
 - **Inicio**: arriba el saldo que el usuario elige (total, libre después de lo que viene, balance,
   gastado o entró del mes: `calculos.saldos`), **solo** tocándolo o en Ajustes. Dos vistas:
   Tarjetas y Calendario (cada día con lo que entró en verde y salió en rojo). En Tarjetas, la
-  **«pila de estado»** (elegida el 20/oct/2026): la tarjeta del frente muestra el estado de esa
-  cuenta dentro de ella (saldo o deuda y corte, el mes +/−) y sus botones Anotar / Transferir (y
-  Pagar si es de crédito con pago sugerido); abajo, **«Recientes» de TODAS las cuentas** y «Ver todo»
-  va a Movimientos. Lo de abajo NO se filtra por la tarjeta del frente: eso duplicaba la pantalla de
+  **«pila de estado»** (elegida el 20/oct/2026), al estilo de Wallet (21/oct): la cuenta elegida queda
+  **sola arriba**, con su estado dentro (saldo o deuda y corte, el mes +/−) y sus botones Anotar /
+  Transferir (y Pagar si es de crédito con pago sugerido); las demás quedan **apiñadas debajo, cada
+  una en su lugar fijo** (el orden de las cuentas nunca cambia) y todas tienen la misma vista, solo
+  tapada. **Tirar de la pila hacia abajo la abre** (cada tarjeta se pone casi de pie, vista desde
+  arriba, con canto y una cartera con sombra detrás), sigue al dedo y al soltar se asienta con la
+  velocidad; tocar una abierta la pasa arriba con un salto por encima de las demás. Todo es de
+  resortes (`ui/resorte.ts`, respuesta .5 y amortiguación .82) y la pila bloquea el scroll de la
+  pantalla mientras se toca (`useBloquearScroll`). Abajo, **«Recientes» de TODAS las cuentas** y «Ver todo»
+  va a Movimientos. Lo de abajo NO se filtra por la tarjeta de arriba: eso duplicaba la pantalla de
   la cuenta. Nada de barras sin rótulo. **Nada de lo que viene en el Inicio**: va arriba en Movimientos.
 - **Cada pantalla tiene su trabajo, sin repetir**: Inicio = qué está pasando (saldos, lo último,
   atajos); una cuenta = qué pasó en ella (lo que viene en ella, en qué se gastó, su historial con
