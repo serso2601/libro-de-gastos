@@ -1,11 +1,12 @@
 // La vista «Tarjetas» del Inicio: las cuentas apiladas y, debajo, lo último de todas. Tocar una de
-// atrás la pasa al frente; la del frente muestra el estado de esa cuenta (saldo, el mes y Anotar,
-// Pagar y Transferir) y, tocada, abre la cuenta. «Recientes» es de todas las cuentas: el resumen de
+// atrás abre la pila (se inclina, como vista desde arriba, y se despliega); tocar entonces una
+// tarjeta la hace saltar por encima de las demás hasta el frente. La del frente muestra el estado de
+// esa cuenta (saldo, el mes y Anotar, Pagar y Transferir) y, tocada, abre la cuenta. «Recientes» es de todas las cuentas: el resumen de
 // cada una está en la pestaña Cuentas.
 
 import * as Haptics from 'expo-haptics';
-import { useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { Animated, Easing, Pressable, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { useAbrir, useAnotar } from '@/dialogos/abrir';
 import { cicloTarjeta, deudaTarjeta, flujoCuenta, gastadoEnCorte, pagoSugerido } from '@/lib/calculos';
@@ -20,6 +21,10 @@ import { alfa, sobre, useTema } from '@/ui/tema';
 /** Cuántos movimientos salen en «Recientes». */
 const RECIENTES = 6;
 
+/** Lo que asoma de cada tarjeta de atrás: apilada y con la pila abierta (la alta es de 196). */
+const ASOMA_CERRADA = 62;
+const ASOMA_ABIERTA = 92;
+
 /** La cuenta que quedó al frente: se recuerda mientras la app esté abierta (aunque se pase al Calendario). */
 let recordada: string | null = null;
 
@@ -28,13 +33,43 @@ export function Tarjetas() {
   const abrir = useAbrir();
   const { colorCuenta } = useTema();
   const [elegida, setElegida] = useState<string | null>(recordada);
+  const [saltando, setSaltando] = useState<string | null>(null);
+  const [abierta, setAbierta] = useState(false);
+  // 0 = apilada, 1 = abierta (inclinada y desplegada); `salto` recorre el brinco de la tarjeta elegida.
+  const abierto = useRef(new Animated.Value(0)).current;
+  const salto = useRef(new Animated.Value(0)).current;
   const frente = d.cuentas.find((x) => x.id === elegida) ?? d.cuentas[0];
   const atras = d.cuentas.filter((x) => x.id !== frente?.id).reverse();
 
-  function alFrente(id: string) {
+  function mover(a: boolean) {
+    setAbierta(a);
+    Animated.spring(abierto, { toValue: a ? 1 : 0, friction: 8, tension: 70, useNativeDriver: false }).start();
+  }
+
+  function tocarAtras(id: string) {
+    if (saltando) return;
+    if (!abierta) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      mover(true);
+      return;
+    }
+    // Con la pila abierta: la tarjeta salta por encima de las demás hasta el frente y la pila se cierra.
     Haptics.selectionAsync();
-    recordada = id;
-    setElegida(id);
+    setSaltando(id);
+    salto.setValue(0);
+    Animated.timing(salto, { toValue: 1, duration: 420, easing: Easing.inOut(Easing.cubic), useNativeDriver: false }).start(() => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      recordada = id;
+      setElegida(id);
+      setSaltando(null);
+      mover(false);
+    });
+  }
+
+  function tocarFrente() {
+    if (saltando) return;
+    if (abierta) { mover(false); return; }
+    abrirCuenta(frente.id);
   }
 
   if (!frente) {
@@ -48,22 +83,39 @@ export function Tarjetas() {
 
   return (
     <>
-      <View>
+      <Animated.View style={{ zIndex: 1, transform: [
+        { perspective: 900 },
+        { rotateX: abierto.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '14deg'] }) },
+        { scale: abierto.interpolate({ inputRange: [0, 1], outputRange: [1, 0.96] }) },
+      ] }}>
         {atras.map((x, i) => {
           const fondo = colorCuenta(x.color);
           const tinta = sobre(fondo);
+          const brinca = saltando === x.id;
+          // Cuánto le falta para llegar al frente (con la pila abierta), y su arco: sube, pasa por encima y cae.
+          const falta = (atras.length - i) * ASOMA_ABIERTA;
           return (
-            <Pressable key={x.id} onPress={() => alFrente(x.id)} accessibilityLabel={`Pasar ${x.nombre} al frente`}
-              style={{ marginTop: i === 0 ? 0 : -134, height: 196, borderRadius: 22, backgroundColor: fondo, paddingVertical: 18, paddingHorizontal: 20,
-                flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start',
-                shadowColor: '#000', shadowOpacity: i === 0 ? 0 : 0.12, shadowRadius: 8, shadowOffset: { width: 0, height: -6 } }}>
-              <Texto tam={17} peso="semi" color={tinta} lineas={1} style={{ flex: 1 }}>{x.nombre}</Texto>
-              <Num tam={17} peso="medio" color={tinta}>{neto(saldo(x, d.movimientos), d.moneda)}</Num>
-            </Pressable>
+            <Animated.View key={x.id} style={{
+              marginTop: i === 0 ? 0 : abierto.interpolate({ inputRange: [0, 1], outputRange: [ASOMA_CERRADA - 196, ASOMA_ABIERTA - 196] }),
+              zIndex: brinca ? 10 : 0,
+              transform: brinca ? [
+                { translateY: salto.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1],
+                    outputRange: [0, falta * 0.25 - 34, falta * 0.5 - 46, falta * 0.75 - 26, falta] }) },
+                { scale: salto.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 1.08, 1] }) },
+              ] : [],
+            }}>
+              <Pressable onPress={() => tocarAtras(x.id)} accessibilityLabel={abierta ? `Pasar ${x.nombre} al frente` : 'Abrir las tarjetas'}
+                style={{ height: 196, borderRadius: 22, backgroundColor: fondo, paddingVertical: 18, paddingHorizontal: 20,
+                  flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start',
+                  shadowColor: '#000', shadowOpacity: i === 0 && !brinca ? 0 : brinca ? 0.3 : 0.12, shadowRadius: brinca ? 14 : 8, shadowOffset: { width: 0, height: brinca ? 8 : -6 } }}>
+                <Texto tam={17} peso="semi" color={tinta} lineas={1} style={{ flex: 1 }}>{x.nombre}</Texto>
+                <Num tam={17} peso="medio" color={tinta}>{neto(saldo(x, d.movimientos), d.moneda)}</Num>
+              </Pressable>
+            </Animated.View>
           );
         })}
-        <Frente cuenta={frente} arriba={atras.length > 0} />
-      </View>
+        <Frente cuenta={frente} arriba={atras.length > 0} abierto={abierto} alPulsar={tocarFrente} />
+      </Animated.View>
 
       <Recientes />
     </>
@@ -71,7 +123,7 @@ export function Tarjetas() {
 }
 
 /** La tarjeta del frente: el estado de la cuenta (saldo o deuda, lo del mes) y las acciones sobre ella. */
-function Frente({ cuenta, arriba }: { cuenta: Cuenta; arriba: boolean }) {
+function Frente({ cuenta, arriba, abierto, alPulsar }: { cuenta: Cuenta; arriba: boolean; abierto: Animated.Value; alPulsar: () => void }) {
   const d = useDatos();
   const anotar = useAnotar();
   const { colorCuenta } = useTema();
@@ -87,8 +139,8 @@ function Frente({ cuenta, arriba }: { cuenta: Cuenta; arriba: boolean }) {
   const compacto = !!sugerido;
 
   return (
-    <View style={{ marginTop: arriba ? -134 : 0, borderRadius: 22, shadowColor: '#000', shadowOpacity: arriba ? 0.14 : 0, shadowRadius: 8, shadowOffset: { width: 0, height: -6 } }}>
-    <Pressable onPress={() => abrirCuenta(cuenta.id)} accessibilityLabel={`Abrir ${cuenta.nombre}`}
+    <Animated.View style={{ marginTop: arriba ? abierto.interpolate({ inputRange: [0, 1], outputRange: [ASOMA_CERRADA - 196, ASOMA_ABIERTA - 196] }) : 0, borderRadius: 22, shadowColor: '#000', shadowOpacity: arriba ? 0.14 : 0, shadowRadius: 8, shadowOffset: { width: 0, height: -6 } }}>
+    <Pressable onPress={alPulsar} accessibilityLabel={`Abrir ${cuenta.nombre}`}
       style={({ pressed }) => ({ minHeight: 216, borderRadius: 22, backgroundColor: fondo, paddingVertical: 18, paddingHorizontal: 20,
         justifyContent: 'space-between', gap: 14, overflow: 'hidden', opacity: pressed ? 0.92 : 1 })}>
       <Svg width={220} height={220} style={{ position: 'absolute', right: -70, bottom: -90 }}>
@@ -142,7 +194,7 @@ function Frente({ cuenta, arriba }: { cuenta: Cuenta; arriba: boolean }) {
         <Accion icono="transferir" texto="Transferir" soloIcono={compacto} tinta={tinta} onPress={() => anotar({ tipoInicial: 'transferencia', cuentaInicial: cuenta.id })} />
       </View>
     </Pressable>
-    </View>
+    </Animated.View>
   );
 }
 
