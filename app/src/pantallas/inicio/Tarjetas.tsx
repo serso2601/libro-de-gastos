@@ -38,6 +38,7 @@ const INCLINACION = 58;      // grados que se levanta cada tarjeta al abrir (90 
 const GROSOR = 6;            // canto de la tarjeta cuando está de pie
 const ARCO = 46;             // cuánto sube el salto por encima de las demás
 const PERSPECTIVA = 1400;
+const AIRE_ARRIBA = 12;      // lo que puede asomar la cartera por encima de la pila
 const CASCADA = 0.35;        // las tarjetas se abren una tras otra dentro del mismo avance
 const RESPUESTA = 0.5;       // el resorte de la pila: segundos que tarda en llegar…
 const AMORTIGUACION = 0.6;   // …y cuánto rebota (1 = nada)
@@ -134,8 +135,9 @@ export function Tarjetas() {
   const altoPila = altoReposo + (altoAbierta - altoReposo) * pc;
   const saltando = !!salto.current;
   // La pila recorta siempre lo que se sale (las tarjetas de atrás miden 216 pero solo asoman unos 40) y deja holgura
-  // solo donde la animación la pide: la cartera abierta, lo que el rebote pasa de abierta y el arco del salto.
-  const holgura = { arriba: saltando ? 20 + ARCO + 12 : 20, abajo: 14 * pc + Math.max(0, p - 1) * 280 };
+  // solo donde la animación la pide: la cartera abierta y lo que el rebote pasa de abierta. Arriba cabe en el aire
+  // que hay sobre la pila (16): nada se dibuja sobre las pestañas de Tarjetas y Calendario.
+  const holgura = { arriba: AIRE_ARRIBA, abajo: 14 * pc + Math.max(0, p - 1) * 280 };
 
   const cartas = d.cuentas.map((x, k) => {
     const esta = x.id === frente.id;
@@ -157,11 +159,13 @@ export function Tarjetas() {
       const s = Math.sin(Math.PI * acotar(t, 0, 1));
       top = salto.current.top * (1 - t) - ARCO * s;
       ang = salto.current.ang * (1 - t);
-      esc = 1 + 0.06 * s;
+      esc = 1 + 0.04 * s;
       z = 100;
       shy = 12 - 34 * s;
       lpc = Math.max(lpc, 1 - t);
     }
+    // Ninguna tarjeta sube por encima del borde de la pila (ni en el arco del salto ni en el rebote de abrir).
+    top = Math.max(top, colocar(0, ang));
     pos.current[x.id] = { top, ang };
 
     const escala = (PERSPECTIVA - ALTO * Math.sin(rad(ang))) / PERSPECTIVA;
@@ -197,7 +201,7 @@ export function Tarjetas() {
         <View style={{ height: altoPila }}>
           {/* El fondo de la cartera: sombra por dentro, para que las tarjetas se vean metidas en algo. */}
           <View pointerEvents="none" style={{
-            position: 'absolute', left: -14, right: -14, top: -20, bottom: -14, borderRadius: 30, backgroundColor: c.suave, opacity: pc,
+            position: 'absolute', left: -14, right: -14, top: -AIRE_ARRIBA, bottom: -14, borderRadius: 30, backgroundColor: c.suave, opacity: pc,
             boxShadow: [
               { offsetX: 0, offsetY: 24, blurRadius: 30, spreadDistance: -6, color: 'rgba(0,0,0,0.5)', inset: true },
               { offsetX: 0, offsetY: -10, blurRadius: 18, color: 'rgba(0,0,0,0.14)', inset: true },
