@@ -130,8 +130,12 @@ export function Tarjetas() {
   d.cuentas.forEach((x) => { if (x.id !== frente.id) rank[x.id] = r++; });
   const altoAbierta = (N - 1) * SEPARACION + VISTO;
   const altoReposo = N > 1 ? ALTO + HUECO + (N - 2) * APINADO + 64 : ALTO;
-  const altoPila = altoReposo + (altoAbierta - altoReposo) * acotar(p, 0, 1.05);
+  // La altura sigue al resorte pero sin su rebote, para que lo de abajo («Recientes») no se mueva más de lo necesario.
+  const altoPila = altoReposo + (altoAbierta - altoReposo) * pc;
   const saltando = !!salto.current;
+  // La pila recorta siempre lo que se sale (las tarjetas de atrás miden 216 pero solo asoman unos 40) y deja holgura
+  // solo donde la animación la pide: la cartera abierta, lo que el rebote pasa de abierta y el arco del salto.
+  const holgura = { arriba: saltando ? 20 + ARCO + 12 : 20, abajo: 14 * pc + Math.max(0, p - 1) * 280 };
 
   const cartas = d.cuentas.map((x, k) => {
     const esta = x.id === frente.id;
@@ -186,16 +190,21 @@ export function Tarjetas() {
 
   return (
     <>
-      <View style={{ height: altoPila, zIndex: 1, overflow: p < 0.05 && !saltando ? 'hidden' : 'visible' }}>
-        {/* El fondo de la cartera: sombra por dentro, para que las tarjetas se vean metidas en algo. */}
-        <View pointerEvents="none" style={{
-          position: 'absolute', left: -14, right: -14, top: -20, bottom: -14, borderRadius: 30, backgroundColor: c.suave, opacity: pc,
-          boxShadow: [
-            { offsetX: 0, offsetY: 24, blurRadius: 30, spreadDistance: -6, color: 'rgba(0,0,0,0.5)', inset: true },
-            { offsetX: 0, offsetY: -10, blurRadius: 18, color: 'rgba(0,0,0,0.14)', inset: true },
-          ],
-        }} />
-        {cartas}
+      <View style={{
+        zIndex: 1, overflow: 'hidden', marginHorizontal: -14, paddingHorizontal: 14,
+        marginTop: -holgura.arriba, paddingTop: holgura.arriba, marginBottom: -holgura.abajo, paddingBottom: holgura.abajo,
+      }}>
+        <View style={{ height: altoPila }}>
+          {/* El fondo de la cartera: sombra por dentro, para que las tarjetas se vean metidas en algo. */}
+          <View pointerEvents="none" style={{
+            position: 'absolute', left: -14, right: -14, top: -20, bottom: -14, borderRadius: 30, backgroundColor: c.suave, opacity: pc,
+            boxShadow: [
+              { offsetX: 0, offsetY: 24, blurRadius: 30, spreadDistance: -6, color: 'rgba(0,0,0,0.5)', inset: true },
+              { offsetX: 0, offsetY: -10, blurRadius: 18, color: 'rgba(0,0,0,0.14)', inset: true },
+            ],
+          }} />
+          {cartas}
+        </View>
       </View>
 
       <Recientes />
