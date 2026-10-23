@@ -24,13 +24,6 @@ export function useApilada(): string | null {
   return useContext(Apilada);
 }
 
-const BloqueoScroll = createContext<(bloqueado: boolean) => void>(() => {});
-
-/** Quien arrastra algo vertical (la pila de tarjetas) bloquea el desplazamiento de la pantalla mientras lo toca. */
-export function useBloquearScroll() {
-  return useContext(BloqueoScroll);
-}
-
 /** Ir a una sección: cambia de pestaña; Gráficos abre Movimientos en esa vista. */
 export function useIr() {
   return useCallback((s: Seccion) => {
@@ -72,7 +65,6 @@ export function Marco({ titulo, subtitulo, derecha, children, pie, cabecera, sin
   const volver = useApilada();
   const { recargar } = useAlmacen();
   const [actualizando, setActualizando] = useState(false);
-  const [bloqueado, setBloqueado] = useState(false);
 
   async function actualizar() {
     setActualizando(true);
@@ -82,7 +74,7 @@ export function Marco({ titulo, subtitulo, derecha, children, pie, cabecera, sin
 
   return (
     <View style={{ flex: 1, backgroundColor: c.fondo }}>
-      <ScrollView style={{ flex: 1 }} scrollEnabled={!bloqueado} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" automaticallyAdjustKeyboardInsets
+      <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" automaticallyAdjustKeyboardInsets
         contentContainerStyle={{ paddingTop: insets.top + 4, paddingHorizontal: estilo.m.margen, paddingBottom: pie ? 16 : volver ? insets.bottom + 24 : 24, gap }}
         refreshControl={<RefreshControl refreshing={actualizando} onRefresh={actualizar} tintColor={c.tenue} />}>
         {cabecera ?? (
@@ -103,7 +95,7 @@ export function Marco({ titulo, subtitulo, derecha, children, pie, cabecera, sin
           </>
         )}
         <Avisos />
-        <BloqueoScroll.Provider value={setBloqueado}>{children}</BloqueoScroll.Provider>
+        {children}
       </ScrollView>
       {pie && <View style={{ paddingTop: 10, paddingBottom: Math.max(insets.bottom, 16) + 2 }}>{pie}</View>}
     </View>

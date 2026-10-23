@@ -87,11 +87,12 @@ Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
   **sola arriba**, con su estado dentro (saldo o deuda y corte, el mes +/−) y sus botones Anotar /
   Transferir (y Pagar si es de crédito con pago sugerido); las demás quedan **apiñadas debajo, cada
   una en su lugar fijo** (el orden de las cuentas nunca cambia) y todas tienen la misma vista, solo
-  tapada. **Tirar de la pila hacia abajo la abre** (cada tarjeta se pone casi de pie, vista desde
-  arriba, con canto y una cartera con sombra detrás), sigue al dedo y al soltar se asienta con la
-  velocidad; tocar una abierta la pasa arriba con un salto por encima de las demás. Todo es de
-  resortes (`ui/resorte.ts`, respuesta .5 y amortiguación .82) y la pila bloquea el scroll de la
-  pantalla mientras se toca (`useBloquearScroll`). Abajo, **«Recientes» de TODAS las cuentas** y «Ver todo»
+  tapada. **Tocar la pila la abre** («Wallet normal», elegido el 23/oct; el usuario descartó
+  arrastrar): cada tarjeta se pone casi de pie, vista desde arriba (58°), con canto y una cartera
+  con sombra detrás, y se despliegan en cascada; tocar una abierta la pasa arriba con un salto por
+  encima de las demás y la que estaba arriba vuelve a su lugar. Todo es de resortes
+  (`ui/resorte.ts`, respuesta .5 y amortiguación .6; separación 88, grosor 6, apiñado 40, arco 46:
+  son los valores que eligió en la maqueta). Abajo, **«Recientes» de TODAS las cuentas** y «Ver todo»
   va a Movimientos. Lo de abajo NO se filtra por la tarjeta de arriba: eso duplicaba la pantalla de
   la cuenta. Nada de barras sin rótulo. **Nada de lo que viene en el Inicio**: va arriba en Movimientos.
 - **Cada pantalla tiene su trabajo, sin repetir**: Inicio = qué está pasando (saldos, lo último,

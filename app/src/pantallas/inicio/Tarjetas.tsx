@@ -1,8 +1,8 @@
 // La vista «Tarjetas» del Inicio, al estilo de la pila de Wallet. La cuenta elegida queda sola arriba, con
 // su estado (saldo, el mes y Anotar, Pagar y Transferir); las demás quedan apiñadas debajo, cada una en su
-// lugar de siempre. Tirar de la pila hacia abajo la abre: las tarjetas se ponen casi de pie, vistas desde
-// arriba, y la pila sigue al dedo (al soltar se asienta con la velocidad del gesto). Tocar una abierta la
-// pasa arriba con un salto por encima de las demás; tocar la de arriba abre la cuenta. «Recientes» es de
+// lugar de siempre. Tocar la pila la abre: las tarjetas se ponen casi de pie, vistas desde arriba, y se
+// despliegan en cascada. Tocar una abierta la pasa arriba con un salto por encima de las demás (tocar la
+// de arriba cierra la pila); tocar la de arriba, con la pila cerrada, abre la cuenta. «Recientes» es de
 // todas las cuentas: el resumen de cada una está en la pestaña Cuentas.
 //
 // Todo el movimiento sale de resortes (`ui/resorte.ts`) y se calcula cuadro a cuadro: `P` es cuánto está
@@ -10,7 +10,7 @@
 
 import * as Haptics from 'expo-haptics';
 import { memo, useRef, useState } from 'react';
-import { PanResponder, Pressable, StyleSheet, View, type BoxShadowValue } from 'react-native';
+import { Pressable, StyleSheet, View, type BoxShadowValue } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { useAbrir, useAnotar } from '@/dialogos/abrir';
 import { cicloTarjeta, deudaTarjeta, flujoCuenta, gastadoEnCorte, pagoSugerido } from '@/lib/calculos';
@@ -19,7 +19,7 @@ import { dinero, MESES, mayuscula, neto, ordenarPorFecha, saldo } from '@/lib/fo
 import type { Cuenta } from '@/lib/tipos';
 import { BotonPrincipal, Enlace, FilaMovimiento, Lista, Num, Rotulo, Tarjeta, Texto, Vacio } from '@/ui/componentes';
 import { Icono, type NombreIcono } from '@/ui/iconos';
-import { abrirCuenta, useBloquearScroll, useIr } from '@/ui/pantalla';
+import { abrirCuenta, useIr } from '@/ui/pantalla';
 import { Resorte, useMotor } from '@/ui/resorte';
 import { alfa, mezclar, sobre, useTema } from '@/ui/tema';
 
@@ -32,14 +32,15 @@ let recordada: string | null = null;
 // Geometría ---------------------------------------------------------------------------------------------
 const ALTO = 216;            // alto de cada tarjeta
 const HUECO = 14;            // aire entre la tarjeta de arriba y la pila
-const APINADO = 38;          // lo que asoma de cada tarjeta de la pila cerrada
-const SEPARACION = 84;       // lo que se ve de cada tarjeta con la pila abierta
+const APINADO = 40;          // lo que asoma de cada tarjeta de la pila cerrada
+const SEPARACION = 88;       // lo que se ve de cada tarjeta con la pila abierta
 const INCLINACION = 58;      // grados que se levanta cada tarjeta al abrir (90 = de pie)
-const GROSOR = 4;            // canto de la tarjeta cuando está de pie
+const GROSOR = 6;            // canto de la tarjeta cuando está de pie
 const ARCO = 46;             // cuánto sube el salto por encima de las demás
 const PERSPECTIVA = 1400;
 const CASCADA = 0.35;        // las tarjetas se abren una tras otra dentro del mismo avance
-const DIST = 150;            // lo que hay que arrastrar para abrir la pila entera
+const RESPUESTA = 0.5;       // el resorte de la pila: segundos que tarda en llegar…
+const AMORTIGUACION = 0.6;   // …y cuánto rebota (1 = nada)
 
 const rad = (a: number) => (a * Math.PI) / 180;
 const acotar = (x: number, a: number, b: number) => Math.max(a, Math.min(b, x));
@@ -63,7 +64,6 @@ export function Tarjetas() {
   const d = useDatos();
   const abrir = useAbrir();
   const { c, colorCuenta } = useTema();
-  const bloquear = useBloquearScroll();
   const motor = useMotor();
   const [elegida, setElegida] = useState<string | null>(recordada);
 
@@ -71,19 +71,19 @@ export function Tarjetas() {
   if (!resortes.current) {
     const J = new Resorte(0, motor);
     J.amort = 1;
-    resortes.current = { P: new Resorte(0, motor), J };
+    const P = new Resorte(0, motor);
+    P.resp = RESPUESTA;
+    P.amort = AMORTIGUACION;
+    resortes.current = { P, J };
   }
   const { P, J } = resortes.current;
   /** El brinco en curso: quién salta y desde dónde arrancó. */
   const salto = useRef<{ id: string; top: number; ang: number } | null>(null);
   /** Dónde está dibujada cada tarjeta (para arrancar el brinco justo desde ahí). */
   const pos = useRef<Record<string, { top: number; ang: number }>>({});
-  const base = useRef(0);
-  const cuantas = useRef(0);
 
   const frente = d.cuentas.find((x) => x.id === elegida) ?? d.cuentas[0];
   const N = d.cuentas.length;
-  cuantas.current = N;
 
   function tocar(id: string) {
     if (!frente || salto.current) return;
@@ -111,28 +111,6 @@ export function Tarjetas() {
     J.alAcabar = () => { salto.current = null; Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); };
     J.ir(1);
     P.ir(0);
-  }
-
-  // Arrastrar: la pila sigue al dedo; pasado el límite ofrece resistencia; al soltar se asienta con la velocidad.
-  const pan = useRef(PanResponder.create({
-    onMoveShouldSetPanResponderCapture: (_, g) => !salto.current && cuantas.current > 1 && Math.abs(g.dy) > 6 && Math.abs(g.dy) > Math.abs(g.dx) * 1.2,
-    onPanResponderTerminationRequest: () => false,
-    onPanResponderGrant: () => { base.current = P.x; P.fijar(P.x); },
-    onPanResponderMove: (_, g) => {
-      let p = base.current + g.dy / DIST;
-      if (p > 1) p = 1 + (p - 1) * 0.3;
-      if (p < 0) p *= 0.15;
-      P.fijar(p);
-    },
-    onPanResponderRelease: (_, g) => soltar(g.vy),
-    onPanResponderTerminate: (_, g) => soltar(g.vy),
-  })).current;
-
-  function soltar(vy: number) {
-    const v = (vy * 1000) / DIST;   // vy viene en px/ms; el resorte va en «pila abierta» por segundo
-    const meta = P.x + v * 0.2 > 0.5 ? 1 : 0;
-    if (meta !== (base.current > 0.5 ? 1 : 0)) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    P.ir(meta, v);
   }
 
   if (!frente) {
@@ -208,10 +186,7 @@ export function Tarjetas() {
 
   return (
     <>
-      <View
-        {...pan.panHandlers}
-        onTouchStart={() => bloquear(true)} onTouchEnd={() => bloquear(false)} onTouchCancel={() => bloquear(false)}
-        style={{ height: altoPila, zIndex: 1, overflow: p < 0.05 && !saltando ? 'hidden' : 'visible' }}>
+      <View style={{ height: altoPila, zIndex: 1, overflow: p < 0.05 && !saltando ? 'hidden' : 'visible' }}>
         {/* El fondo de la cartera: sombra por dentro, para que las tarjetas se vean metidas en algo. */}
         <View pointerEvents="none" style={{
           position: 'absolute', left: -14, right: -14, top: -20, bottom: -14, borderRadius: 30, backgroundColor: c.suave, opacity: pc,
