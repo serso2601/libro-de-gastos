@@ -13,7 +13,7 @@ interface Paso { icono: NombreIcono; titulo: string; texto: string }
 
 const PASOS: Paso[] = [
   { icono: 'inicio', titulo: 'Tu saldo, arriba', texto: 'En el Inicio ves tu saldo. Tócalo para elegir cuál ver: el total, lo libre después de lo que viene, el balance del mes… Debajo hay dos vistas: Tarjetas o Calendario.' },
-  { icono: 'cuentas', titulo: 'Tus tarjetas', texto: 'Toca una tarjeta de atrás para pasarla al frente: ves cómo va esa cuenta este mes y desde ahí anotas o transfieres. Tócala para abrirla: lo que viene en ella, en qué se gastó y todo su historial. Abajo, lo último de todas tus cuentas.' },
+  { icono: 'cuentas', titulo: 'Tus tarjetas', texto: 'La cuenta elegida queda sola arriba: ves cómo va este mes y desde ahí anotas o transfieres. Tócala para abrirla: lo que viene en ella, en qué se gastó y todo su historial. Las demás están apiñadas debajo: tócalas para abrir la pila y toca la que quieras para pasarla arriba. Más abajo, lo último de todas tus cuentas.' },
   { icono: 'calendario', titulo: 'El mes en un calendario', texto: 'Cada día muestra en verde lo que entró y en rojo lo que salió. Toca un día para ver sus movimientos; el + anota en ese día.' },
   { icono: 'lista', titulo: 'Movimientos', texto: 'Arriba de la lista sale lo que todavía falta este mes (lo que se repite); cuando llega su día pasa a la lista. Al lado, los Gráficos.' },
   { icono: 'presupuesto', titulo: 'Presupuesto y cuentas', texto: 'El presupuesto va en cuadros que se llenan con lo que gastas; toca uno para ver sus compras. Puede ser por semana, cada 2 semanas, por quincena o por mes (toca el periodo arriba). En Cuentas están todas tus cuentas y cada forma de ver tu saldo.' },
