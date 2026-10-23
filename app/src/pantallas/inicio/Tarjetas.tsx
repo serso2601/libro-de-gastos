@@ -41,7 +41,7 @@ const PERSPECTIVA = 1400;
 const MARCO = 14;            // aire dentro del cuadro de la pila: las sombras, el rebote y el arco caben ahí
 const CASCADA = 0.35;        // las tarjetas se abren una tras otra dentro del mismo avance
 const RESPUESTA = 0.5;       // el resorte de la pila: segundos que tarda en llegar…
-const AMORTIGUACION = 0.6;   // …y cuánto rebota (1 = nada)
+const AMORTIGUACION = 1;     // …y cuánto rebota (1 = nada; menos de 1 vibra al llegar)
 
 const rad = (a: number) => (a * Math.PI) / 180;
 const acotar = (x: number, a: number, b: number) => Math.max(a, Math.min(b, x));
@@ -52,7 +52,7 @@ const colocar = (visible: number, ang: number) => visible - ALTO + ALTO * Math.c
 
 /** Canto, sombra hacia la tarjeta de atrás y un filo de luz. */
 function sombras(g: number, shy: number, shb: number, sh: number, hl: number, borde: string): BoxShadowValue[] {
-  const canto: BoxShadowValue[] = g < 0.05 ? [] : [0.25, 0.5, 0.75, 1].map((f) => ({ offsetX: 0, offsetY: -g * f, blurRadius: 0, color: borde }));
+  const canto: BoxShadowValue[] = g < 0.05 ? [] : [0.5, 1].map((f) => ({ offsetX: 0, offsetY: -g * f, blurRadius: 0, color: borde }));
   return [
     ...canto,
     { offsetX: 0, offsetY: -shy, blurRadius: shb, color: `rgba(0,0,0,${sh.toFixed(3)})` },
@@ -72,9 +72,13 @@ export function Tarjetas() {
   if (!resortes.current) {
     const J = new Resorte(0, motor);
     J.amort = 1;
+    J.eps = 0.003;   // el salto se da por terminado en cuanto ya no se nota, sin esperar la cola del resorte
+    J.epsV = 0.06;
     const P = new Resorte(0, motor);
     P.resp = RESPUESTA;
     P.amort = AMORTIGUACION;
+    P.eps = 0.002;
+    P.epsV = 0.03;
     resortes.current = { P, J };
   }
   const { P, J } = resortes.current;
@@ -86,8 +90,20 @@ export function Tarjetas() {
   const frente = d.cuentas.find((x) => x.id === elegida) ?? d.cuentas[0];
   const N = d.cuentas.length;
 
+  /** El salto ya llegó: la tarjeta queda arriba y se vuelve a poder tocar. */
+  function terminarSalto() {
+    salto.current = null;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  }
+
   function tocar(id: string) {
-    if (!frente || salto.current) return;
+    if (!frente) return;
+    if (salto.current) {
+      // Tocar rápido no debe sentirse trabado: pasado el primer tramo el salto se da por llegado y se atiende el toque.
+      if (J.x < 0.6) return;
+      J.fijar(1);
+      terminarSalto();
+    }
     if (P.t < 0.5) {
       if (id === frente.id) { abrirCuenta(id); return; }
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -109,7 +125,7 @@ export function Tarjetas() {
     setElegida(id);
     J.fijar(0);
     J.resp = P.resp * 1.25;
-    J.alAcabar = () => { salto.current = null; Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); };
+    J.alAcabar = terminarSalto;
     J.ir(1);
     P.ir(0);
   }
@@ -132,7 +148,7 @@ export function Tarjetas() {
   const altoAbierta = (N - 1) * SEPARACION + VISTO;
   const altoReposo = N > 1 ? ALTO + HUECO + (N - 2) * APINADO + 52 : ALTO;
   // La altura sigue al resorte pero sin su rebote, para que lo de abajo («Recientes») no se mueva más de lo necesario.
-  const altoPila = altoReposo + (altoAbierta - altoReposo) * pc;
+  const altoPila = Math.round(altoReposo + (altoAbierta - altoReposo) * pc);
   const saltando = !!salto.current;
 
   const cartas = d.cuentas.map((x, k) => {
@@ -166,15 +182,18 @@ export function Tarjetas() {
 
     const escala = (PERSPECTIVA - ALTO * Math.sin(rad(ang))) / PERSPECTIVA;
     const velo = ((0.30 * (N - 1 - k)) / N) * lpc;
+    // Las sombras (con desenfoque) son lo más caro de dibujar: cambian por pasos, no en cada cuadro.
+    const q = Math.round(lpc * 8) / 8;
     const activa = esta && p < 0.02 && !saltando;
 
     return (
       <View key={x.id} style={{
-        position: 'absolute', left: 0, right: 0, top, height: ALTO, zIndex: z, borderRadius: 22, backgroundColor: fondo,
+        position: 'absolute', left: 0, right: 0, top: 0, height: ALTO, zIndex: z, borderRadius: 22, backgroundColor: fondo,
         transformOrigin: '50% 100%',
-        // Primero se compensa la perspectiva (así el borde de arriba mide lo mismo que la tarjeta plana) y luego se gira.
-        transform: [{ scale: escala }, { perspective: PERSPECTIVA }, { rotateX: `${-ang}deg` }, { scale: esc }],
-        boxShadow: sombras(GROSOR * lpc, shy, 16 + 4 * lpc, 0.16 + 0.14 * lpc, 0.34 * lpc, mezclar(fondo, '#000000', 0.42)),
+        // Se coloca con translateY (no con `top`): así no se recalcula el layout en cada cuadro. Luego se compensa la
+        // perspectiva (el borde de arriba mide lo mismo que la tarjeta plana) y se gira.
+        transform: [{ translateY: top }, { scale: escala }, { perspective: PERSPECTIVA }, { rotateX: `${-ang}deg` }, { scale: esc }],
+        boxShadow: sombras(GROSOR * q, Math.round(shy / 2) * 2, 16 + 4 * q, 0.16 + 0.14 * q, 0.34 * q, mezclar(fondo, '#000000', 0.42)),
       }}>
         <Pressable onPress={() => tocar(x.id)} accessibilityLabel={esta ? (p > 0.5 ? 'Cerrar las tarjetas' : `Abrir ${x.nombre}`) : (p > 0.5 ? `Pasar ${x.nombre} arriba` : 'Ver todas las tarjetas')}
           style={{ flex: 1, borderRadius: 22, overflow: 'hidden' }}>
@@ -190,16 +209,17 @@ export function Tarjetas() {
 
   return (
     <>
-      {/* El cuadro de la pila: todo lo que hacen las tarjetas (abrir, rebotar, saltar) pasa dentro de él y se recorta en
-          sus bordes, así nunca se dibuja sobre otra cosa del Inicio. Se ensancha y se alarga un poco por los lados y el
+      {/* El cuadro de la pila: todo lo que hacen las tarjetas (abrir, saltar) pasa dentro de él y se recorta en sus
+          bordes (recorte recto: con esquinas redondeadas iOS redibuja todo lo de dentro en cada cuadro), así nunca se
+          dibuja sobre otra cosa del Inicio. Se ensancha y se alarga un poco por los lados y el
           alto (margen negativo, dentro del aire que ya hay entre bloques) para que la cartera tenga marco. */}
       <View style={{
-        zIndex: 1, overflow: 'hidden', borderRadius: 30, padding: MARCO,
+        zIndex: 1, overflow: 'hidden', padding: MARCO,
         marginHorizontal: -MARCO, marginVertical: -(MARCO - 2),
       }}>
         {/* El fondo de la cartera: sombra por dentro, para que las tarjetas se vean metidas en algo. */}
         <View pointerEvents="none" style={{
-          position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: c.suave, opacity: pc,
+          position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, borderRadius: 30, backgroundColor: c.suave, opacity: pc,
           boxShadow: [
             { offsetX: 0, offsetY: 24, blurRadius: 30, spreadDistance: -6, color: 'rgba(0,0,0,0.5)', inset: true },
             { offsetX: 0, offsetY: -10, blurRadius: 18, color: 'rgba(0,0,0,0.14)', inset: true },
