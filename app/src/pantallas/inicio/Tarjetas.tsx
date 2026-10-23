@@ -9,7 +9,7 @@
 // abierta la pila (0 apilada, 1 abierta) y `J` recorre el salto de la tarjeta elegida.
 
 import * as Haptics from 'expo-haptics';
-import { memo, useRef, useState } from 'react';
+import { memo, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View, type BoxShadowValue } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { useAbrir, useAnotar } from '@/dialogos/abrir';
@@ -21,6 +21,7 @@ import { BotonPrincipal, Enlace, FilaMovimiento, Lista, Num, Rotulo, Tarjeta, Te
 import { Icono, type NombreIcono } from '@/ui/iconos';
 import { abrirCuenta, useIr } from '@/ui/pantalla';
 import { Resorte, useMotor } from '@/ui/resorte';
+import { vibrar } from '@/ui/vibrar';
 import { alfa, mezclar, sobre, useTema } from '@/ui/tema';
 
 /** Cuántos movimientos salen en «Recientes». */
@@ -89,11 +90,17 @@ export function Tarjetas() {
 
   const frente = d.cuentas.find((x) => x.id === elegida) ?? d.cuentas[0];
   const N = d.cuentas.length;
+  // Los colores de cada tarjeta se calculan una vez, no en cada cuadro de la animación.
+  const tonos = useMemo(() => {
+    const m: Record<string, { fondo: string; tinta: string; borde: string }> = {};
+    d.cuentas.forEach((x) => { const fondo = colorCuenta(x.color); m[x.id] = { fondo, tinta: sobre(fondo), borde: mezclar(fondo, '#000000', 0.42) }; });
+    return m;
+  }, [d.cuentas, colorCuenta]);
 
   /** El salto ya llegó: la tarjeta queda arriba y se vuelve a poder tocar. */
   function terminarSalto() {
     salto.current = null;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    vibrar('firme', 350);
   }
 
   function tocar(id: string) {
@@ -106,11 +113,11 @@ export function Tarjetas() {
     }
     if (P.t < 0.5) {
       if (id === frente.id) { abrirCuenta(id); return; }
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      vibrar('suave');
       P.ir(1);
       return;
     }
-    if (id === frente.id) { Haptics.selectionAsync(); P.ir(0); return; }
+    if (id === frente.id) { vibrar('seleccion'); P.ir(0); return; }
     saltar(id);
   }
 
@@ -120,7 +127,7 @@ export function Tarjetas() {
     const q = pos.current[id];
     if (!q) return;
     salto.current = { id, top: q.top, ang: q.ang };
-    Haptics.selectionAsync();
+    vibrar('seleccion');
     recordada = id;
     setElegida(id);
     J.fijar(0);
@@ -153,7 +160,7 @@ export function Tarjetas() {
 
   const cartas = d.cuentas.map((x, k) => {
     const esta = x.id === frente.id;
-    const fondo = colorCuenta(x.color);
+    const { fondo, tinta, borde } = tonos[x.id];
     const reposo = esta ? 0 : ALTO + HUECO + rank[x.id] * APINADO;
     const abierta = colocar(k * SEPARACION, INCLINACION);
     // Cascada: cada tarjeta arranca un poco después de la anterior dentro del mismo avance de la pila.
@@ -193,12 +200,12 @@ export function Tarjetas() {
         // Se coloca con translateY (no con `top`): así no se recalcula el layout en cada cuadro. Luego se compensa la
         // perspectiva (el borde de arriba mide lo mismo que la tarjeta plana) y se gira.
         transform: [{ translateY: top }, { scale: escala }, { perspective: PERSPECTIVA }, { rotateX: `${-ang}deg` }, { scale: esc }],
-        boxShadow: sombras(GROSOR * q, Math.round(shy / 2) * 2, 16 + 4 * q, 0.16 + 0.14 * q, 0.34 * q, mezclar(fondo, '#000000', 0.42)),
+        boxShadow: sombras(GROSOR * q, Math.round(shy / 2) * 2, 16 + 4 * q, 0.16 + 0.14 * q, 0.34 * q, borde),
       }}>
         <Pressable onPress={() => tocar(x.id)} accessibilityLabel={esta ? (p > 0.5 ? 'Cerrar las tarjetas' : `Abrir ${x.nombre}`) : (p > 0.5 ? `Pasar ${x.nombre} arriba` : 'Ver todas las tarjetas')}
           style={{ flex: 1, borderRadius: 22, overflow: 'hidden' }}>
           <View pointerEvents={activa ? 'auto' : 'none'} style={StyleSheet.absoluteFill}>
-            <Contenido cuenta={x} tinta={sobre(fondo)} />
+            <Contenido cuenta={x} tinta={tinta} />
           </View>
           {/* Las del fondo se oscurecen: están más adentro de la cartera. */}
           <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: '#000000', opacity: velo }]} />
