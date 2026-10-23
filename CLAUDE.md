@@ -8,6 +8,14 @@ servidor, puerto, base, datos y repo, y se organiza como mejor le sirva a esta a
 El repo es **público** (github.com/serso2601/libro-de-gastos, rama `master`): nada de datos, tokens
 ni montos reales en el repo.
 
+## Al iniciar cada chat (hazlo primero)
+
+Antes de contestar o hacer cualquier otra cosa, lee `PENDIENTES.md` y dile al usuario, en pocas líneas, qué quedó
+por probar, revisar o retomar, y si en la última sesión se dejó algo a medias, empieza por eso. Pregúntale si
+arrancan por ahí o si va a otra cosa. Al cerrar una sesión, actualiza `PENDIENTES.md`: quita lo que ya se probó y
+anota lo que quedó pendiente. Los cambios de la app se mezclan a `master` y se hace `git pull` en la carpeta
+principal sin preguntar (el usuario es el único que la usa y quiere verlos al instante).
+
 ## Dónde está cada cosa
 
 ```
