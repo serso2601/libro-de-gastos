@@ -91,8 +91,10 @@ Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
   arrastrar): cada tarjeta se pone casi de pie, vista desde arriba (58°), con canto y una cartera
   con sombra detrás, y se despliegan en cascada; tocar una abierta la pasa arriba con un salto por
   encima de las demás y la que estaba arriba vuelve a su lugar. Todo es de resortes
-  (`ui/resorte.ts`, respuesta .5 y amortiguación .6; separación 88, grosor 6, apiñado 40, arco 46:
-  son los valores que eligió en la maqueta). Abajo, **«Recientes» de TODAS las cuentas** y «Ver todo»
+  (`ui/resorte.ts`, respuesta .5 y amortiguación 1, sin rebote: con .6 vibraba al llegar; separación 88,
+  grosor 6, apiñado 40, arco 46: los valores que eligió en la maqueta). El cuadro de la pila recorta
+  recto (con esquinas redondeadas iOS redibuja todo cada cuadro), se coloca con `translateY` y las
+  sombras cambian por pasos, para que tocar rápido varias veces no se trabe. Abajo, **«Recientes» de TODAS las cuentas** y «Ver todo»
   va a Movimientos. Lo de abajo NO se filtra por la tarjeta de arriba: eso duplicaba la pantalla de
   la cuenta. Nada de barras sin rótulo. **Nada de lo que viene en el Inicio**: va arriba en Movimientos.
 - **Cada pantalla tiene su trabajo, sin repetir**: Inicio = qué está pasando (saldos, lo último,

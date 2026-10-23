@@ -13,6 +13,9 @@ export class Resorte {
   resp = 0.5;
   /** 1 = sin rebote; menos de 1 rebota un poco. */
   amort = 0.82;
+  /** Hasta dónde se da por llegado: distancia y velocidad. Más holgado = deja de repintar antes. */
+  eps = 5e-4;
+  epsV = 5e-3;
   alAcabar?: () => void;
 
   constructor(x: number, private motor: Motor) {
@@ -46,7 +49,7 @@ export class Resorte {
       this.v += (k * (this.t - this.x) - c * this.v) * h;
       this.x += this.v * h;
     }
-    if (Math.abs(this.t - this.x) < 5e-4 && Math.abs(this.v) < 5e-3) {
+    if (Math.abs(this.t - this.x) < this.eps && Math.abs(this.v) < this.epsV) {
       this.x = this.t;
       this.v = 0;
       return false;
