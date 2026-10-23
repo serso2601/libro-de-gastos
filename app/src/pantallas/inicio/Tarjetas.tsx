@@ -38,6 +38,7 @@ const INCLINACION = 58;      // grados que se levanta cada tarjeta al abrir (90 
 const GROSOR = 6;            // canto de la tarjeta cuando está de pie
 const ARCO = 46;             // cuánto sube el salto por encima de las demás
 const PERSPECTIVA = 1400;
+const MARCO = 14;            // aire dentro del cuadro de la pila: las sombras, el rebote y el arco caben ahí
 const CASCADA = 0.35;        // las tarjetas se abren una tras otra dentro del mismo avance
 const RESPUESTA = 0.5;       // el resorte de la pila: segundos que tarda en llegar…
 const AMORTIGUACION = 0.6;   // …y cuánto rebota (1 = nada)
@@ -129,8 +130,9 @@ export function Tarjetas() {
   let r = 0;
   d.cuentas.forEach((x) => { if (x.id !== frente.id) rank[x.id] = r++; });
   const altoAbierta = (N - 1) * SEPARACION + VISTO;
-  const altoReposo = N > 1 ? ALTO + HUECO + (N - 2) * APINADO + 64 : ALTO;
-  const altoPila = altoReposo + (altoAbierta - altoReposo) * acotar(p, 0, 1.05);
+  const altoReposo = N > 1 ? ALTO + HUECO + (N - 2) * APINADO + 52 : ALTO;
+  // La altura sigue al resorte pero sin su rebote, para que lo de abajo («Recientes») no se mueva más de lo necesario.
+  const altoPila = altoReposo + (altoAbierta - altoReposo) * pc;
   const saltando = !!salto.current;
 
   const cartas = d.cuentas.map((x, k) => {
@@ -153,11 +155,13 @@ export function Tarjetas() {
       const s = Math.sin(Math.PI * acotar(t, 0, 1));
       top = salto.current.top * (1 - t) - ARCO * s;
       ang = salto.current.ang * (1 - t);
-      esc = 1 + 0.06 * s;
+      esc = 1 + 0.04 * s;
       z = 100;
       shy = 12 - 34 * s;
       lpc = Math.max(lpc, 1 - t);
     }
+    // Ninguna tarjeta sube por encima del borde de la pila (ni en el arco del salto ni en el rebote de abrir).
+    top = Math.max(top, colocar(0, ang));
     pos.current[x.id] = { top, ang };
 
     const escala = (PERSPECTIVA - ALTO * Math.sin(rad(ang))) / PERSPECTIVA;
@@ -186,16 +190,24 @@ export function Tarjetas() {
 
   return (
     <>
-      <View style={{ height: altoPila, zIndex: 1, overflow: p < 0.05 && !saltando ? 'hidden' : 'visible' }}>
+      {/* El cuadro de la pila: todo lo que hacen las tarjetas (abrir, rebotar, saltar) pasa dentro de él y se recorta en
+          sus bordes, así nunca se dibuja sobre otra cosa del Inicio. Se ensancha y se alarga un poco por los lados y el
+          alto (margen negativo, dentro del aire que ya hay entre bloques) para que la cartera tenga marco. */}
+      <View style={{
+        zIndex: 1, overflow: 'hidden', borderRadius: 30, padding: MARCO,
+        marginHorizontal: -MARCO, marginVertical: -(MARCO - 2),
+      }}>
         {/* El fondo de la cartera: sombra por dentro, para que las tarjetas se vean metidas en algo. */}
         <View pointerEvents="none" style={{
-          position: 'absolute', left: -14, right: -14, top: -20, bottom: -14, borderRadius: 30, backgroundColor: c.suave, opacity: pc,
+          position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: c.suave, opacity: pc,
           boxShadow: [
             { offsetX: 0, offsetY: 24, blurRadius: 30, spreadDistance: -6, color: 'rgba(0,0,0,0.5)', inset: true },
             { offsetX: 0, offsetY: -10, blurRadius: 18, color: 'rgba(0,0,0,0.14)', inset: true },
           ],
         }} />
-        {cartas}
+        <View style={{ height: altoPila }}>
+          {cartas}
+        </View>
       </View>
 
       <Recientes />
