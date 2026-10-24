@@ -20,7 +20,7 @@ principal sin preguntar (el usuario es el único que la usa y quiere verlos al i
 
 ```
 Documents\PROYECTO APP DE GASTOS\      ← el repo
-├── app\                     ← la app del iPhone: Expo SDK 58, expo-router, TypeScript
+├── app\                     ← la app del iPhone y la web (la misma): Expo SDK 58, expo-router, TS
 │   └── src\app\             ← rutas: (pestanias)\ (Inicio · Movimientos · Presupuesto · Cuentas),
 │                                cuenta\[id] y ajustes (abiertas encima, con «‹ volver»), conectar
 │       src\pantallas\       ← las pantallas; inicio\ (saldo elegible + vistas Tarjetas y
@@ -28,8 +28,10 @@ Documents\PROYECTO APP DE GASTOS\      ← el repo
 │       src\lib\             ← datos (almacén + cola offline), api, acciones, calculos, formato, tipos
 │       src\dialogos\        ← las hojas: anotar, regla que se repite, cuenta, categoría, topes
 │       src\ui\              ← estilo (uno), tema (claro/oscuro/color), componentes, gráficos, marco
+│       public\index.html    ← la página de la web (pantalla completa en el iPad, ícono)
 ├── servidor\                ← FastAPI + SQLite (uv). Paquete `gastos`. `uv run pytest`
-├── scripts\iniciar.ps1      ← arranca el servidor (8766) y Metro (8082); lo corre el inicio de Windows
+├── scripts\iniciar.ps1      ← arranca el servidor (8766) y Metro (8082) y compila la web si cambió;
+│                                lo corre el inicio de Windows
 ├── scripts\instalar-inicio.ps1 · abrir-firewall.ps1
 └── .github\workflows\ios.yml ← compila el .ipa sin firmar en una Mac de GitHub (etiqueta ios-*)
 ```
@@ -47,8 +49,13 @@ Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
 - **Servidor** en `0.0.0.0:8766`, pero solo atiende a la PC misma y a la tailnet (100.64.0.0/10):
   lo demás recibe 403 antes de mirar el token. Entra con `Authorization: Bearer <token.txt>`.
 - **Página de estado** http://127.0.0.1:8766 (acceso directo en el escritorio). Abierta en la PC
-  muestra el **QR para conectar el iPhone** (`librogastos://conectar?d=<ip>:8766&t=<token>`): la
-  cámara del iPhone lo lee y la app se conecta sola.
+  muestra los **QR para conectar**: el de la web (`http://<ip>:8766/app/conectar?d=...&t=<token>`)
+  y el de la app del iPhone (`librogastos://conectar?d=<ip>:8766&t=<token>`); la cámara lo lee y la
+  app se conecta sola.
+- **La web** en `http://<ip tailscale>:8766/app`: el servidor sirve `app\dist` (el export web de
+  Expo, ignorado por git) y cualquier ruta de /app da la página. En el iPad: Safari → Compartir →
+  «Agregar a pantalla de inicio». Tras cambiar la app: `npx expo export --platform web` en `app\`
+  (o `iniciar.ps1`, que la recompila si el código es más nuevo) y recargar en el iPad.
 - **Metro** en el 8082 (anuncia la IP de Tailscale) para el build de desarrollo.
 - Arranque automático: `Libro de Gastos.lnk` en `shell:startup` → `scripts\iniciar.ps1`.
 - Tras cambiar el servidor: matar el proceso `python -m gastos` y correr `iniciar.ps1`. Los cambios
@@ -65,10 +72,17 @@ Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
 - `development`: carga el código desde Metro de la PC (cambios al instante). `release`
   (`ios-release-N`): lleva el código adentro y abre sola; para cuando la app deje de cambiar tanto.
 - Variable del repo `DEV_SERVER_URL` = `http://<ip tailscale>:8082` (no va en el repo).
+- **23/oct/2026: Apple está bloqueando el acceso de Sideloadly** a las cuentas, así que no se puede
+  volver a firmar. Mientras tanto el usuario usa **la web** (ver «Cómo corre»).
 
 ## Decisiones tomadas (no repreguntarlas)
 
-- **App nativa con Expo**, no web. La web se hará cuando la app esté armada y se vea bien.
+- **App nativa con Expo**, y la **web es la misma app** (react-native-web), hecha el 23/oct/2026
+  porque Apple bloqueó Sideloadly. Lo que no existe en el navegador va en archivos `.web.ts(x)`:
+  `lib/almacen` (localStorage), `lib/compartir` (descarga), `ui/fecha` (calendario dibujado); los
+  avisos de confirmar van por `ui/aviso.avisar` (Alert no hace nada en la web). En el iPad se ve
+  con el ancho de un teléfono, al centro (`COLUMNA_WEB`, 520): adaptarla a tableta es otro trabajo.
+  Por http (Tailscale) Safari no da `crypto.randomUUID`: `formato.nuevoId` arma el UUID a mano.
 - **Montos en centavos (enteros)** en base y API. Fechas ISO. Formato de pantalla $1,234.56.
 - **Recurrencias = reglas**, no copias por adelantado: el servidor anota cada movimiento cuando
   llega su fecha (`recurrencias.materializar`, al pedir datos y cada 30 min) y guarda
@@ -171,7 +185,8 @@ Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
 
 - Un commit = un cambio que se describe en una línea. Pushear el mismo día. Los commits y el push
   los hace Claude (el usuario no usa git).
-- Antes de dar por terminado algo de la app: `npx tsc --noEmit` y `npx expo export --platform ios`
+- Antes de dar por terminado algo de la app: `npx tsc --noEmit`, `npx expo export --platform ios
+  --output-dir <scratchpad>` (sin `--output-dir` pisa la web de `dist\`) y `npx expo export --platform web`
   (que el paquete compile). Del servidor: `uv run pytest`.
 - Expo cambia mucho entre versiones: antes de usar una API, leer la doc de la versión del
   `package.json` (ver `app\AGENTS.md`). Dependencias siempre con `npx expo install`.

@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Grilla } from '@/dialogos/piezas';
 import { MESES_CORTOS, mayuscula } from '@/lib/formato';
 import { Texto } from './componentes';
+import { COLUMNA_WEB } from './estilos';
 import { Icono } from './iconos';
 import { useTema } from './tema';
 
@@ -22,7 +23,7 @@ export function ElegirMes({ visible, anio, mes, hoy, alElegir, alCerrar }: {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={alCerrar} onShow={() => setViendo(anio)}>
       <Pressable style={{ flex: 1, backgroundColor: c.velo, justifyContent: 'flex-end' }} onPress={alCerrar}>
-        <Pressable onPress={() => {}} style={{ backgroundColor: c.tarjeta, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: estilo.m.margen, paddingBottom: abajo + 16, gap: 14 }}>
+        <Pressable onPress={() => {}} style={[{ backgroundColor: c.tarjeta, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: estilo.m.margen, paddingBottom: abajo + 16, gap: 14 }, COLUMNA_WEB]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <Pressable onPress={() => setViendo((a) => a - 1)} hitSlop={8} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }} accessibilityLabel="Año anterior">
               <Icono nombre="atras" tam={20} color={c.tinta} grosor={2} />

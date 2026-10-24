@@ -1,8 +1,9 @@
 """La página de estado en / (sin entrar): para ver de un vistazo si el servidor está vivo.
 
-Abierta desde la misma PC muestra además el QR para conectar el teléfono: la cámara del iPhone lo
-lee y abre `librogastos://conectar?d=<ip de tailscale>:<puerto>&t=<token>` en la app. Como lleva el
-token, a cualquier otro equipo (aunque sea de la tailnet) no se le muestra.
+Abierta desde la misma PC muestra además los QR para conectar: el de la web (iPad o cualquier
+navegador de la tailnet) abre `http://<ip de tailscale>:<puerto>/app/conectar?d=...&t=<token>`, y el
+de la app del iPhone abre `librogastos://conectar?d=<ip de tailscale>:<puerto>&t=<token>`. Como llevan
+el token, a cualquier otro equipo (aunque sea de la tailnet) no se le muestran.
 """
 
 import subprocess
@@ -47,6 +48,11 @@ def enlace_para_conectar(token: str, puerto: int) -> str | None:
     return f"librogastos://conectar?{urlencode({'d': f'{ip}:{puerto}', 't': token})}" if ip else None
 
 
+def enlace_para_la_web(token: str, puerto: int) -> str | None:
+    ip = ip_tailscale()
+    return f"http://{ip}:{puerto}/app/conectar?{urlencode({'d': f'{ip}:{puerto}', 't': token})}" if ip else None
+
+
 PUERTO_METRO = 8082
 
 
@@ -61,15 +67,20 @@ def _qr(enlace: str) -> str:
 
 
 def bloque_qr(token: str, puerto: int) -> str:
-    conectar, abrir = enlace_para_conectar(token, puerto), enlace_para_abrir()
-    if not conectar or not abrir:
+    web, conectar, abrir = enlace_para_la_web(token, puerto), enlace_para_conectar(token, puerto), enlace_para_abrir()
+    if not web or not conectar or not abrir:
         return '<div class="tarjeta"><p class="mal">No encontré la IP de Tailscale de esta PC: revisa que Tailscale esté activo y recarga.</p></div>'
-    return f"""<div class="tarjeta"><h1>1 · Abrir la app</h1>
+    return f"""<div class="tarjeta"><h1>En el navegador (iPad o iPhone)</h1>
+<p>Con Tailscale prendido, apunta la cámara a este código y toca el aviso: se abre la app en Safari, ya
+conectada. Para tenerla como app, en Safari toca Compartir → «Agregar a pantalla de inicio».</p>
+{_qr(web)}
+<p>O abre <b>http://{escape(ip_tailscale() or '')}:{puerto}/app</b> y escribe el token de <b>datos\\token.txt</b>.</p></div>
+<div class="tarjeta"><h1>App del iPhone · 1 · Abrir la app</h1>
 <p>Con Tailscale prendido en el iPhone, apunta la cámara a este código y toca el aviso. La app carga
 su código desde esta PC (tarda unos segundos la primera vez).</p>
 {_qr(abrir)}
 <p>Si sale la pantalla de Expo, toca «Enter URL manually» y escribe <b>http://{escape(ip_tailscale() or '')}:{PUERTO_METRO}</b></p></div>
-<div class="tarjeta"><h1>2 · Conectar con tus datos</h1>
+<div class="tarjeta"><h1>App del iPhone · 2 · Conectar con tus datos</h1>
 <p>Cuando la app muestre «Conectar con la PC», vuelve a la cámara y escanea este:</p>
 {_qr(conectar)}
 <p>O a mano: dirección <b>{escape(ip_tailscale() or '')}:{puerto}</b> y el token de <b>datos\\token.txt</b>.</p></div>"""

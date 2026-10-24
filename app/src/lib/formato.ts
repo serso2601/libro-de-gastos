@@ -1,4 +1,5 @@
 import { randomUUID } from 'expo-crypto';
+import { Platform } from 'react-native';
 import type { Cuenta, Movimiento } from './tipos';
 
 export const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
@@ -115,5 +116,11 @@ export function ordenarPorFecha(a: Movimiento, b: Movimiento): number {
 }
 
 export function nuevoId(): string {
-  return randomUUID();
+  if (Platform.OS !== 'web' || typeof globalThis.crypto.randomUUID === 'function') return randomUUID();
+  // En la web por http (el iPad por Tailscale) el navegador no da randomUUID: se arma uno v4 igual.
+  const b = globalThis.crypto.getRandomValues(new Uint8Array(16));
+  b[6] = (b[6] & 0x0f) | 0x40;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  const h = Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
 }

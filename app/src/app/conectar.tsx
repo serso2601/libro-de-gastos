@@ -5,13 +5,15 @@
 import Constants from 'expo-constants';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, ScrollView, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAlmacen } from '@/lib/datos';
 import { Volver } from '@/ui/pantalla';
 import { BotonPrincipal, Campo, Etiqueta, Tarjeta, Texto, TextoError } from '@/ui/componentes';
 import { Icono } from '@/ui/iconos';
 import { useTema } from '@/ui/tema';
+
+const WEB = Platform.OS === 'web';
 
 function Paso({ n, texto }: { n: number; texto: string }) {
   const { c } = useTema();
@@ -30,9 +32,11 @@ export default function Conectar() {
   const { c, estilo } = useTema();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ d?: string; t?: string }>();
-  // En el build de desarrollo el código viene de Metro, que corre en la misma PC que el servidor.
+  // En el build de desarrollo el código viene de Metro, que corre en la misma PC que el servidor; la
+  // web la sirve el servidor mismo.
   const pcDeMetro = Constants.expoConfig?.hostUri?.split(':')[0];
-  const [direccion, setDireccion] = useState(params.d ?? conexion?.direccion ?? (pcDeMetro ? `${pcDeMetro}:8766` : ''));
+  const aqui = WEB ? window.location.host : pcDeMetro ? `${pcDeMetro}:8766` : '';
+  const [direccion, setDireccion] = useState(params.d ?? conexion?.direccion ?? aqui);
   const [token, setToken] = useState(params.t ?? '');
   const [probando, setProbando] = useState(false);
   const [error, setError] = useState('');
@@ -46,14 +50,14 @@ export default function Conectar() {
       if (router.canGoBack()) router.dismissAll();
       else router.replace('/');
     } catch (e) {
-      setError(`${e instanceof Error ? e.message : e}. Revisa que Tailscale esté activo en el teléfono y que la PC esté prendida.`);
+      setError(`${e instanceof Error ? e.message : e}. Revisa que Tailscale esté activo aquí y que la PC esté prendida.`);
     } finally {
       setProbando(false);
     }
   }
 
   useEffect(() => {
-    if (params.d && params.t) void probar(params.d, params.t);
+    if (params.t && (params.d || WEB)) void probar(params.d ?? aqui, params.t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.d, params.t]);
 
@@ -67,12 +71,12 @@ export default function Conectar() {
             <Icono nombre="libro" tam={28} color={c.sobreBoton} grosor={1.8} />
           </View>
           <Texto tam={estilo.m.titulo} peso={estilo.m.pesoTitulo} style={{ letterSpacing: -0.8 }}>Conectar con la PC</Texto>
-          <Texto tam={14} color={c.tenue} style={{ lineHeight: 20 }}>Tus datos viven en tu PC. El teléfono llega a ella por Tailscale, en casa y afuera.</Texto>
+          <Texto tam={14} color={c.tenue} style={{ lineHeight: 20 }}>Tus datos viven en tu PC. {WEB ? 'Este aparato' : 'El teléfono'} llega a ella por Tailscale, en casa y afuera.</Texto>
         </View>
         <Tarjeta style={{ padding: 18, gap: 14 }}>
           <Paso n={1} texto="En la PC, abre «Libro de Gastos» desde el escritorio." />
-          <Paso n={2} texto="Apunta la cámara del iPhone al código QR que aparece." />
-          <Paso n={3} texto="Toca el aviso que sale: la app se conecta sola." />
+          <Paso n={2} texto={WEB ? 'Apunta la cámara al código «En el navegador».' : 'Apunta la cámara del iPhone al código QR que aparece.'} />
+          <Paso n={3} texto={WEB ? 'Toca el aviso que sale: se abre ya conectada.' : 'Toca el aviso que sale: la app se conecta sola.'} />
           <View style={{ alignItems: 'center', paddingTop: 6 }}>
             <View style={{ width: 108, height: 108, borderRadius: 18, borderWidth: 2, borderStyle: 'dashed', borderColor: c.linea, alignItems: 'center', justifyContent: 'center' }}>
               <Icono nombre="qr" tam={56} color={c.tinta} grosor={1.6} />

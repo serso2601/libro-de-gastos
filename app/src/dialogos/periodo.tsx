@@ -1,14 +1,15 @@
 // Cada cuánto se reinicia el presupuesto: semana, 2 semanas, quincena o mes, y desde cuándo.
 
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { useState } from 'react';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 import { useAcciones } from '@/lib/acciones';
 import { configPresupuesto, convertirTope, NOMBRES_PERIODO, nombrePeriodo, periodoDe, periodoVecino, POR_PERIODO } from '@/lib/calculos';
 import { useDatos } from '@/lib/datos';
-import { aFecha, dinero, fechaISO } from '@/lib/formato';
+import { dinero } from '@/lib/formato';
 import type { ConfigPresupuesto, PeriodoPresupuesto } from '@/lib/tipos';
+import { avisar } from '@/ui/aviso';
 import { BotonPrincipal, Etiqueta, Ficha, Hoja, Texto } from '@/ui/componentes';
+import { CalendarioFecha } from '@/ui/fecha';
 import { useTema } from '@/ui/tema';
 import { Grilla } from './piezas';
 
@@ -19,7 +20,7 @@ const NOMBRE_DIA: Record<string, string> = { '0': 'domingo', '1': 'lunes', '2': 
 
 export function DialogoPeriodo({ alCerrar }: { alCerrar: () => void }) {
   const d = useDatos();
-  const { c, oscuro } = useTema();
+  const { c } = useTema();
   const { guardarPeriodo, guardarCategoria } = useAcciones();
   const actual = configPresupuesto(d);
   const [periodo, setPeriodo] = useState<PeriodoPresupuesto>(actual.periodo);
@@ -52,7 +53,7 @@ export function DialogoPeriodo({ alCerrar }: { alCerrar: () => void }) {
     if (!primera?.presupuesto) return aplicar(false);
     const nuevo = Math.max(100, convertirTope(primera.presupuesto, actual.periodo, periodo));
     const ejemplo = `${primera.nombre}: ${dinero(primera.presupuesto, d.moneda)} ${POR_PERIODO[actual.periodo]} → ${dinero(nuevo, d.moneda)} ${POR_PERIODO[periodo]}`;
-    Alert.alert('¿Convertir tus topes?', `Tus topes están puestos ${POR_PERIODO[actual.periodo]}. Convertidos quedarían, por ejemplo:\n${ejemplo}`, [
+    avisar('¿Convertir tus topes?', `Tus topes están puestos ${POR_PERIODO[actual.periodo]}. Convertidos quedarían, por ejemplo:\n${ejemplo}`, [
       { text: 'Dejarlos igual', onPress: () => aplicar(false) },
       { text: 'Convertir', onPress: () => aplicar(true) },
     ]);
@@ -81,8 +82,7 @@ export function DialogoPeriodo({ alCerrar }: { alCerrar: () => void }) {
       {periodo === 'catorcenal' && (
         <View style={{ gap: 8 }}>
           <Etiqueta>¿Cuándo empieza un periodo?</Etiqueta>
-          <DateTimePicker value={aFecha(fecha)} mode="date" display="inline" locale="es-PA" accentColor={c.acento} themeVariant={oscuro ? 'dark' : 'light'}
-            onChange={(_, f) => f && setFecha(fechaISO(f))} />
+          <CalendarioFecha valor={fecha} alCambiar={setFecha} />
           <Texto tam={13} color={c.tenue} style={{ lineHeight: 18 }}>Duran 14 días: {nombrePeriodo(ancla)}, {nombrePeriodo(siguiente)}.</Texto>
         </View>
       )}

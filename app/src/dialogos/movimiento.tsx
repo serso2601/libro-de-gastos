@@ -1,10 +1,11 @@
 import * as Haptics from 'expo-haptics';
 import { useState } from 'react';
-import { Alert, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useAcciones } from '@/lib/acciones';
 import { useDatos } from '@/lib/datos';
 import { aCentavos, aFecha, aTexto, DIAS, nuevoId } from '@/lib/formato';
 import { FRECUENCIAS, type Frecuencia, type Movimiento, type Recurrencia, type TipoMovimiento } from '@/lib/tipos';
+import { avisar } from '@/ui/aviso';
 import { BotonPrincipal, Campo, Ficha, Hoja, MontoGrande, Segmentos, Texto, TextoError } from '@/ui/componentes';
 import { Icono } from '@/ui/iconos';
 import { useTema } from '@/ui/tema';
@@ -77,13 +78,13 @@ export function DialogoMovimiento({ inicial, tipoInicial = 'gasto', fechaInicial
       alCerrar();
     };
     if (inicial.recurrencia_id) {
-      Alert.alert('¿Borrar este movimiento?', 'Viene de algo que se repite.', [
+      avisar('¿Borrar este movimiento?', 'Viene de algo que se repite.', [
         { text: 'Cancelar', style: 'cancel' },
         { text: 'Solo este', style: 'destructive', onPress: () => hacer(false) },
         { text: 'Este y los siguientes', style: 'destructive', onPress: () => hacer(true) },
       ]);
     } else {
-      Alert.alert('¿Borrar este movimiento?', undefined, [{ text: 'Cancelar', style: 'cancel' }, { text: 'Borrar', style: 'destructive', onPress: () => hacer(false) }]);
+      avisar('¿Borrar este movimiento?', undefined, [{ text: 'Cancelar', style: 'cancel' }, { text: 'Borrar', style: 'destructive', onPress: () => hacer(false) }]);
     }
   }
 

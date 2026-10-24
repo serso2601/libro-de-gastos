@@ -121,7 +121,7 @@ function Avisos() {
           : ' Lo que anotes se guarda aquí y se manda después.'}`} />
       )}
       {estado === 'token-malo' && (
-        <Aviso color={c.alerta} onPress={() => router.push('/conectar')} texto="La PC no reconoce la clave de este teléfono. Toca para conectar de nuevo." />
+        <Aviso color={c.alerta} onPress={() => router.push('/conectar')} texto="La PC no reconoce la clave guardada aquí. Toca para conectar de nuevo." />
       )}
       {aviso ? <Aviso color={c.alerta} onPress={cerrarAviso} texto={`${aviso} · tocar para cerrar`} /> : null}
     </>

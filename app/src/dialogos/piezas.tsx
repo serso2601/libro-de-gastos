@@ -1,7 +1,6 @@
 // Lo que comparten las hojas de anotar y de la regla que se repite: elegir día (fichas), categoría
 // (una grilla) y cuenta (tarjetas de colores con su saldo).
 
-import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Haptics from 'expo-haptics';
 import { Children, useState, type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
@@ -12,6 +11,7 @@ import { aFecha, diaCorto, dineroCorto, fechaISO, horaTexto, nuevoId, saldo } fr
 import type { Categoria, TipoCategoria } from '@/lib/tipos';
 import { Campo, Colores, Etiqueta, Num, Texto } from '@/ui/componentes';
 import { PALETA } from '@/ui/estilos';
+import { CalendarioFecha, SelectorHora } from '@/ui/fecha';
 import { Icono } from '@/ui/iconos';
 import { SimboloCategoria, sugerirSimbolo } from '@/ui/simbolos';
 import { sobre, useTema } from '@/ui/tema';
@@ -44,7 +44,7 @@ export function ElegirFecha({ fecha, alCambiar, hora, alCambiarHora, rotulo = 'F
   fecha: string; alCambiar: (f: string) => void; hora?: string; alCambiarHora?: (h: string) => void; rotulo?: string;
 }) {
   const { hoy } = useDatos();
-  const { c, oscuro } = useTema();
+  const { c } = useTema();
   const [calendario, setCalendario] = useState(false);
   const elegir = (f: string) => { Haptics.selectionAsync(); alCambiar(f); setCalendario(false); };
 
@@ -80,16 +80,13 @@ export function ElegirFecha({ fecha, alCambiar, hora, alCambiarHora, rotulo = 'F
       ) : undefined}>{rotulo}</Etiqueta>
       {opciones}
       {calendario && (
-        <DateTimePicker value={aFecha(fecha)} mode="date" display="inline" locale="es-PA" accentColor={c.acento} themeVariant={oscuro ? 'dark' : 'light'}
-          onChange={(_, d) => d && elegir(fechaISO(d))} />
+        <CalendarioFecha valor={fecha} alCambiar={elegir} />
       )}
       {alCambiarHora && hora ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 44, borderRadius: 14, backgroundColor: c.suave, paddingLeft: 14, paddingRight: 6 }}>
           <Texto tam={15}>Hora</Texto>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <DateTimePicker value={(() => { const d = new Date(); const [h, m] = hora.split(':').map(Number); d.setHours(h, m, 0, 0); return d; })()}
-              mode="time" display="compact" locale="es-PA" accentColor={c.acento} themeVariant={oscuro ? 'dark' : 'light'}
-              onChange={(_, d) => d && alCambiarHora(horaTexto(d))} />
+            <SelectorHora valor={hora} alCambiar={alCambiarHora} />
             <Pressable onPress={() => alCambiarHora('')} hitSlop={8} accessibilityLabel="Quitar la hora" style={{ padding: 8 }}>
               <Icono nombre="cerrar" tam={16} color={c.tenue} />
             </Pressable>

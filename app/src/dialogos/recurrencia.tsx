@@ -1,12 +1,13 @@
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { useState } from 'react';
-import { Alert, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useAcciones } from '@/lib/acciones';
 import { proximasVeces } from '@/lib/calculos';
 import { useDatos } from '@/lib/datos';
 import { aCentavos, aFecha, aTexto, DIAS, diaCorto, fechaISO, MESES, MESES_CORTOS } from '@/lib/formato';
 import { FRECUENCIAS, type Frecuencia, type Recurrencia } from '@/lib/tipos';
+import { avisar } from '@/ui/aviso';
 import { BotonPrincipal, Campo, Etiqueta, Ficha, Hoja, MontoGrande, Texto, TextoError } from '@/ui/componentes';
+import { CalendarioFecha } from '@/ui/fecha';
 import { Icono } from '@/ui/iconos';
 import { useTema } from '@/ui/tema';
 import { Desplegable, ElegirCategoria, ElegirCuenta, Grilla } from './piezas';
@@ -31,7 +32,7 @@ const fechaLarga = (iso: string) => { const d = aFecha(iso); return `${d.getDate
 /** Editar una regla que se repite. Lo que cambie vale para lo que viene; lo ya anotado no se toca. */
 export function DialogoRecurrencia({ regla, alCerrar }: { regla: Recurrencia; alCerrar: () => void }) {
   const { cuentas, categorias, moneda, hoy } = useDatos();
-  const { c, oscuro } = useTema();
+  const { c } = useTema();
   const acciones = useAcciones();
   const [monto, setMonto] = useState(aTexto(regla.monto));
   const [cuenta, setCuenta] = useState(regla.cuenta_id);
@@ -61,7 +62,7 @@ export function DialogoRecurrencia({ regla, alCerrar }: { regla: Recurrencia; al
   }
 
   function dejar() {
-    Alert.alert('¿Dejar de repetir?', 'Lo que ya se anotó se queda. No se anota nada más de aquí en adelante.', [
+    avisar('¿Dejar de repetir?', 'Lo que ya se anotó se queda. No se anota nada más de aquí en adelante.', [
       { text: 'Cancelar', style: 'cancel' },
       { text: 'Dejar de repetir', style: 'destructive', onPress: () => { acciones.borrarRecurrencia(regla); alCerrar(); } },
     ]);
@@ -129,8 +130,7 @@ export function DialogoRecurrencia({ regla, alCerrar }: { regla: Recurrencia; al
             </Pressable>
           </View>
           {abierto === 'fin' && fin ? (
-            <DateTimePicker value={aFecha(fin)} mode="date" display="inline" locale="es-PA" accentColor={c.acento} themeVariant={oscuro ? 'dark' : 'light'}
-              minimumDate={aFecha(regla.fecha_inicio)} onChange={(_, d) => d && setFin(fechaISO(d))} />
+            <CalendarioFecha valor={fin} alCambiar={setFin} minimo={regla.fecha_inicio} />
           ) : null}
         </View>
       </View>

@@ -2,9 +2,9 @@
 // en el Inicio, la vista del Inicio y si ya se vio el tutorial) se guardan en el teléfono; cada
 // pantalla lee el tema con useTema() y las preferencias con usePreferencias().
 
-import Storage from 'expo-sqlite/kv-store';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Appearance, useColorScheme } from 'react-native';
+import { Appearance, Platform, useColorScheme } from 'react-native';
+import Storage from '@/lib/almacen';
 import { ORDEN_SALDOS, type IdSaldo } from '@/lib/calculos';
 import { ESTILO, type Estilo, type Paleta } from './estilos';
 
@@ -136,9 +136,10 @@ export function ProveedorTema({ children }: { children: ReactNode }) {
   const [prefs, setPrefs] = useState<Preferencias>(leer);
   const sistema = useColorScheme();
 
-  // Los controles nativos (teclado, calendario, avisos) siguen al modo elegido.
+  // Los controles nativos (teclado, calendario, avisos) siguen al modo elegido; en la web, los del navegador.
   useEffect(() => {
-    Appearance.setColorScheme(prefs.modo === 'sistema' ? 'auto' : prefs.modo === 'claro' ? 'light' : 'dark');
+    if (Platform.OS === 'web') document.documentElement.style.colorScheme = prefs.modo === 'sistema' ? 'light dark' : prefs.modo === 'claro' ? 'light' : 'dark';
+    else Appearance.setColorScheme(prefs.modo === 'sistema' ? 'auto' : prefs.modo === 'claro' ? 'light' : 'dark');
   }, [prefs.modo]);
 
   const cambiar = useCallback((p: Partial<Preferencias>) => {

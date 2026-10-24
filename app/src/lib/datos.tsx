@@ -5,9 +5,9 @@
 // solos cuando la PC vuelve a responder. Con la cola vacía se vuelve a pedir todo: la verdad es la
 // del servidor (por ejemplo, los movimientos que van creando las recurrencias).
 
-import Storage from 'expo-sqlite/kv-store';
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
+import Storage from './almacen';
 import { guardarConexion, leerConexion, pedir, pedirDatos, SinConexion, TokenMalo, type Conexion } from './api';
 import type { Datos } from './tipos';
 

@@ -6,6 +6,9 @@ llegado, no se duplica nada. Así la app puede guardar sin conexión y mandar to
 
 Montos en centavos (enteros) y fechas ISO, igual que en la base.
 
+La app web (el export de Expo en `app/dist`) se sirve en /app sin pedir entrar: es solo el código;
+los datos los pide después a /api con el token, igual que la del iPhone.
+
 Quién puede hablarle: solo esta PC y los equipos de la tailnet (ver `RED_PERMITIDA`). El servidor
 escucha en todas las interfaces para que el teléfono llegue por Tailscale, pero un pedido que
 viene de la red de la casa o de cualquier otro lado se rechaza antes de mirar el token.
@@ -16,16 +19,18 @@ import secrets
 import sqlite3
 from collections.abc import Iterator
 from datetime import date
+from pathlib import Path
 from typing import Literal
 
 from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field, model_validator
 
 from . import db, importar, pagina, recurrencias
 from .config import Config
 
 SIN_ENTRADA = "Falta el token o no es el de este servidor"
+WEB = Path(__file__).resolve().parents[2] / "app" / "dist"  # `npx expo export --platform web` en app/
 
 # Loopback y los rangos que Tailscale usa para sus equipos (IPv4 100.64.0.0/10, IPv6 fd7a:115c:a1e0::/48).
 RED_PERMITIDA = [ipaddress.ip_network(r) for r in ("127.0.0.0/8", "::1/128", "100.64.0.0/10", "fd7a:115c:a1e0::/48")]
@@ -200,8 +205,8 @@ def leer_todo(con: sqlite3.Connection, hoy: date) -> dict:
     }
 
 
-def create_app(config: Config | None = None, hoy=date.today) -> FastAPI:
-    """`hoy` es una función para que las pruebas puedan mover el reloj."""
+def create_app(config: Config | None = None, hoy=date.today, web: Path = WEB) -> FastAPI:
+    """`hoy` es una función para que las pruebas puedan mover el reloj; `web`, dónde está la app web."""
     config = config or Config.desde_entorno()
     inicial = db.conectar(config.ruta_db)
     try:
@@ -243,6 +248,24 @@ def create_app(config: Config | None = None, hoy=date.today) -> FastAPI:
         local = host in ("127.0.0.1", "::1") or host.startswith("::ffff:127.")
         qr = pagina.bloque_qr(config.token, request.url.port or 8766) if local else ""
         return pagina.estado(config, conteos, db.ultimo_respaldo(config.respaldos), qr)
+
+    @app.get("/app", include_in_schema=False)
+    def app_web_sin_barra():
+        return RedirectResponse("/app/")
+
+    @app.get("/app/{ruta:path}", include_in_schema=False)
+    def app_web(ruta: str):
+        """Los archivos del export; cualquier otra ruta (/app/ajustes, /app/cuenta/x) es la página de la
+        app, que elige la pantalla. Lo que lleva huella en el nombre (_expo/) no cambia nunca."""
+        raiz = web.resolve()
+        archivo = (raiz / ruta).resolve()
+        if ruta and archivo.is_file() and archivo.is_relative_to(raiz):
+            fija = ruta.startswith(("_expo/", "assets/"))
+            return FileResponse(archivo, headers={"Cache-Control": "public, max-age=31536000, immutable" if fija else "no-cache"})
+        indice = raiz / "index.html"
+        if not indice.is_file():
+            raise HTTPException(404, "Falta compilar la app web: npx expo export --platform web en app/")
+        return FileResponse(indice, headers={"Cache-Control": "no-cache"})
 
     @app.get("/salud")
     def salud():

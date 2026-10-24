@@ -32,6 +32,16 @@
           "backgroundColor": "#0B0E13"
         }
       ]
-    ]
+    ],
+    "web": {
+      "output": "single",
+      "name": "Gastos",
+      "shortName": "Gastos",
+      "backgroundColor": "#0B0E13",
+      "themeColor": "#0B0E13"
+    },
+    "experiments": {
+      "baseUrl": "/app"
+    }
   }
 }

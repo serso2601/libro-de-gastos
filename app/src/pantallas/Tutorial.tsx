@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { Modal, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BotonPrincipal, Texto } from '@/ui/componentes';
+import { COLUMNA_WEB } from '@/ui/estilos';
 import { Icono, type NombreIcono } from '@/ui/iconos';
 import { usePreferencias, useTema } from '@/ui/tema';
 
@@ -35,7 +36,7 @@ export function Tutorial() {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={terminar}>
       <View style={{ flex: 1, backgroundColor: c.velo, justifyContent: 'flex-end' }}>
-        <View style={{ backgroundColor: c.tarjeta, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 22, paddingBottom: abajo + 18, gap: 16 }}>
+        <View style={[{ backgroundColor: c.tarjeta, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 22, paddingBottom: abajo + 18, gap: 16 }, COLUMNA_WEB]}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
             <Texto tam={12} peso="semi" color={c.tenue} lineas={1} style={{ letterSpacing: 0.6, flex: 1 }}>CÓMO FUNCIONA</Texto>
             {!ultimo && <Pressable onPress={terminar} hitSlop={10}><Texto tam={14} color={c.tenue}>Saltar</Texto></Pressable>}

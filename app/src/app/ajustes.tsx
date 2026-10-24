@@ -1,22 +1,24 @@
-import { File, Paths } from 'expo-file-system';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import * as Sharing from 'expo-sharing';
 import { useState } from 'react';
-import { Alert, Pressable, View } from 'react-native';
+import { Platform, Pressable, View } from 'react-native';
 import { useAbrir } from '@/dialogos/abrir';
 import { useAcciones } from '@/lib/acciones';
+import { compartirArchivo } from '@/lib/compartir';
 import { configPresupuesto, ORDEN_SALDOS, POR_PERIODO, saldos } from '@/lib/calculos';
 import { useAlmacen, useDatos } from '@/lib/datos';
 import { conSigno, dineroCorto, fechaISO, neto } from '@/lib/formato';
 import type { TipoCategoria } from '@/lib/tipos';
 import { textoRegla } from '@/pantallas/Proximos';
+import { avisar } from '@/ui/aviso';
 import { BotonSuave, Campo, colorDeSaldo, FilaSimple, Lista, Num, Segmentos, Tarjeta, Texto, TituloSeccion } from '@/ui/componentes';
 import { ACENTOS } from '@/ui/estilos';
 import { Icono } from '@/ui/iconos';
 import { Marco, ProveedorApilada } from '@/ui/pantalla';
 import { SimboloCategoria } from '@/ui/simbolos';
 import { usePreferencias, useTema, type Modo } from '@/ui/tema';
+
+const ESTE = Platform.OS === 'web' ? 'este navegador' : 'este teléfono';
 
 function mover(ids: string[], i: number, delta: number): string[] {
   const copia = [...ids];
@@ -62,13 +64,9 @@ function ContenidoAjustes() {
   async function exportar() {
     try {
       const todo = await pedirYa('GET', '/api/exportar');
-      const archivo = new File(Paths.cache, `gastos-${fechaISO(new Date())}.json`);
-      if (archivo.exists) archivo.delete();
-      archivo.create();
-      archivo.write(JSON.stringify(todo, null, 2));
-      await Sharing.shareAsync(archivo.uri, { mimeType: 'application/json', UTI: 'public.json' });
+      await compartirArchivo(`gastos-${fechaISO(new Date())}.json`, JSON.stringify(todo, null, 2));
     } catch (e) {
-      Alert.alert('No se pudo exportar', e instanceof Error ? e.message : String(e));
+      avisar('No se pudo exportar', e instanceof Error ? e.message : String(e));
     }
   }
 
@@ -193,9 +191,9 @@ function ContenidoAjustes() {
           <Texto tam={14}>{estado === 'ok' ? 'Conectado a la PC por Tailscale' : estado === 'token-malo' ? 'La PC no reconoce la clave' : 'Sin conexión con la PC ahora'}</Texto>
         </View>
         <Texto tam={13} color={c.tenue}>PC: {conexion?.direccion}. Lo que anotes sin señal se manda solo cuando vuelva.</Texto>
-        <BotonSuave color={c.alerta} style={{ marginTop: 8 }} onPress={() => Alert.alert('¿Desconectar este teléfono?', 'Los datos siguen en la PC. Para volver hay que escanear el QR otra vez.',
+        <BotonSuave color={c.alerta} style={{ marginTop: 8 }} onPress={() => avisar(`¿Desconectar ${ESTE}?`, 'Los datos siguen en la PC. Para volver hay que escanear el QR otra vez.',
           [{ text: 'Cancelar', style: 'cancel' }, { text: 'Desconectar', style: 'destructive', onPress: () => { desconectar(); router.dismissAll(); } }])}>
-          Desconectar este teléfono
+          Desconectar {ESTE}
         </BotonSuave>
       </Tarjeta>
       <View style={{ height: 12 }} />

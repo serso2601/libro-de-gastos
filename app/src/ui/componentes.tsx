@@ -9,7 +9,7 @@ import { useDatos } from '@/lib/datos';
 import { montoEnCuenta, type FormaSaldo } from '@/lib/calculos';
 import { conSigno, neto } from '@/lib/formato';
 import type { Movimiento, Proximo, TipoMovimiento } from '@/lib/tipos';
-import { ESTILO, PALETA, type Peso } from './estilos';
+import { COLUMNA_WEB, ESTILO, PALETA, type Peso } from './estilos';
 import { Icono, type NombreIcono } from './iconos';
 import { alfa, sobre, useTema, type Colores as ColoresTema } from './tema';
 
@@ -393,7 +393,8 @@ export function Hoja({ titulo, alCerrar, children, pie, derecha }: { titulo: str
   const [arriba, setArriba] = useState(0);
   return (
     <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={alCerrar}>
-      <View ref={caja} style={{ flex: 1, backgroundColor: c.tarjeta }} onLayout={() => caja.current?.measureInWindow((_x, y) => setArriba(Math.max(0, y)))}>
+      <View style={{ flex: 1, backgroundColor: COLUMNA_WEB ? c.fondo : c.tarjeta }}>
+      <View ref={caja} style={[{ flex: 1, backgroundColor: c.tarjeta }, COLUMNA_WEB]} onLayout={() => caja.current?.measureInWindow((_x, y) => setArriba(Math.max(0, y)))}>
       <KeyboardAvoidingView behavior="padding" keyboardVerticalOffset={arriba} style={{ flex: 1 }}>
         <View style={{ alignSelf: 'center', width: 36, height: 5, borderRadius: 3, backgroundColor: alfa(c.tenue, 0.35), marginTop: 8 }} />
         <View style={{ height: 44, marginHorizontal: estilo.m.margen, flexDirection: 'row', alignItems: 'center' }}>
@@ -409,6 +410,7 @@ export function Hoja({ titulo, alCerrar, children, pie, derecha }: { titulo: str
         </ScrollView>
         {pie && <View style={{ paddingHorizontal: estilo.m.margen, paddingTop: 8, paddingBottom: Math.max(abajo, 16) + 4, gap: 6 }}>{pie}</View>}
       </KeyboardAvoidingView>
+      </View>
       </View>
     </Modal>
   );

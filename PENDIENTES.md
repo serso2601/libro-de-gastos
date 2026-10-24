@@ -6,7 +6,21 @@ se probó sale; lo que quedó a medias entra.
 
 Última actualización: 23/oct/2026.
 
-## Por probar en el iPhone (recargando la app)
+## Por probar en la web (iPad), hecha el 23/oct
+
+Apple bloqueó Sideloadly, así que la app del iPhone no se puede volver a firmar por ahora. Se hizo la web: es la
+misma app, servida por la PC en `http://<ip tailscale>:8766/app`. Se probó en Chrome de la PC (anotar con fecha y
+hora, borrar con el aviso, las 4 pestañas, la pila, Ajustes, modo claro); **falta probarla en el iPad y el iPhone**:
+
+1. Con Tailscale prendido en el iPad, escanear el QR «En el navegador» de la página de estado y ver que entra ya
+   conectada. Luego Compartir → «Agregar a pantalla de inicio» y abrirla desde el ícono (pantalla completa).
+2. Anotar algo en el iPad (aquí el UUID se arma a mano porque Safari por http no da `randomUUID`) y verlo en el
+   teléfono.
+3. Que el teclado de Safari no tape el botón Guardar de las hojas, y que el campo de hora abra la rueda de iOS.
+4. En el iPad la app va en una columna del ancho de un teléfono, al centro. Si el usuario la quiere a lo ancho de
+   la tableta, es un trabajo aparte de diseño.
+
+## Por probar en el iPhone (cuando se pueda volver a firmar)
 
 1. **Tocar muy rápido la pila de tarjetas, con varias cuentas** (PR #11). Antes se cargaba y se ponía lenta hasta que
    el usuario descansaba. Se limitaron las vibraciones (`ui/vibrar.ts`: una cada 120 ms; la de aterrizaje solo si no
@@ -22,7 +36,8 @@ se probó sale; lo que quedó a medias entra.
 
 - **Ver el iPhone en la PC en tiempo real.** El usuario lo preguntó; se contestó de memoria y quedó ofrecido
   investigarlo a fondo e instalar la opción más fácil: reflejar la pantalla por AirPlay en Windows (UxPlay, gratis,
-  o AirServer, de pago), la versión web de Expo, o un simulador en la nube (Appetize; pide un build para simulador).
+  o AirServer, de pago) o un simulador en la nube (Appetize; pide un build para simulador). La web ya se puede
+  abrir en la PC misma: http://127.0.0.1:8766/app.
 - **Animaciones en toda la app.** Se eligió la pila al estilo «Wallet normal». Quedaron por decidir las
   microinteracciones de la pestaña F de la maqueta (https://claude.ai/artifact/QeqGTGT8HreSfFrN4bKFBX): botones con
   resorte, saldo que rueda, giro y brillo de la tarjeta, listas que entran, hoja de «Anotar» que se arrastra.

@@ -1,6 +1,7 @@
 ﻿# Arranca en segundo plano, sin ventanas, lo que el Libro de Gastos necesita en la PC:
 #   - el servidor (puerto 8766), que guarda los datos;
-#   - Metro (puerto 8082), que le pasa el código a la app de desarrollo del iPhone.
+#   - Metro (puerto 8082), que le pasa el código a la app de desarrollo del iPhone;
+#   - la app web (app\dist, la sirve el servidor en /app): se compila si falta o si el código cambió.
 # Pensado para correr solo al iniciar sesión (ver instalar-inicio.ps1). Lo que ya está corriendo
 # no se toca. Lo que imprimen queda en <carpeta de datos>\registros.
 
@@ -52,4 +53,18 @@ if (-not (Test-Path (Join-Path $app 'node_modules'))) {
         -WorkingDirectory $app -WindowStyle Hidden `
         -RedirectStandardOutput (Join-Path $registros 'metro.log') -RedirectStandardError (Join-Path $registros 'metro-errores.log')
     Anotar "Metro arrancado en $($env:REACT_NATIVE_PACKAGER_HOSTNAME):8082"
+}
+
+# --- La app web (iPad o cualquier navegador de la tailnet) ---------------------------------
+# El servidor la sirve en /app desde app\dist. Si falta o el código es más nuevo, se vuelve a compilar.
+if (Test-Path (Join-Path $app 'node_modules')) {
+    $indice = Join-Path $app 'dist\index.html'
+    $fuentes = @(Get-ChildItem (Join-Path $app 'src'), (Join-Path $app 'public') -Recurse -File) + @(Get-Item (Join-Path $app 'app.json'))
+    $ultimo = ($fuentes | Measure-Object -Property LastWriteTime -Maximum).Maximum
+    if (-not (Test-Path $indice) -or $ultimo -gt (Get-Item $indice).LastWriteTime) {
+        Start-Process -FilePath (Get-Command npx.cmd).Source -ArgumentList 'expo', 'export', '--platform', 'web' `
+            -WorkingDirectory $app -WindowStyle Hidden `
+            -RedirectStandardOutput (Join-Path $registros 'web.log') -RedirectStandardError (Join-Path $registros 'web-errores.log')
+        Anotar 'Compilando la app web'
+    }
 }

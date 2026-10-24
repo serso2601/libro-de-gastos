@@ -126,6 +126,26 @@ def test_el_qr_con_el_token_solo_se_ve_desde_la_pc(config, reloj, monkeypatch):
         assert "Conectar con tus datos" not in pagina_tailnet and config.token not in pagina_tailnet
     assert pagina.enlace_para_abrir() == "exp+libro-de-gastos://expo-development-client/?url=http%3A%2F%2F100.100.10.1%3A8082"
     assert pagina.enlace_para_conectar("abc", 8766) == "librogastos://conectar?d=100.100.10.1%3A8766&t=abc"
+    assert pagina.enlace_para_la_web("abc", 8766) == "http://100.100.10.1:8766/app/conectar?d=100.100.10.1%3A8766&t=abc"
+
+
+def test_sirve_la_app_web(config, reloj, tmp_path):
+    from fastapi.testclient import TestClient
+
+    from gastos.api import create_app
+
+    web = tmp_path / "dist"
+    (web / "_expo").mkdir(parents=True)
+    (web / "index.html").write_text("<div id=root>", encoding="utf-8")
+    (web / "_expo" / "entry.js").write_text("app()", encoding="utf-8")
+    (tmp_path / "secreto.txt").write_text("no", encoding="utf-8")
+    with TestClient(create_app(config, hoy=reloj, web=web), client=("100.100.20.2", 50000)) as c:
+        assert c.get("/app", follow_redirects=False).headers["location"] == "/app/"
+        assert c.get("/app/").text == "<div id=root>"
+        assert c.get("/app/cuenta/abc").text == "<div id=root>"  # las rutas de la app dan la página
+        js = c.get("/app/_expo/entry.js")
+        assert js.text == "app()" and "immutable" in js.headers["cache-control"]
+        assert c.get("/app/%2e%2e/secreto.txt").text == "<div id=root>"  # nada fuera de la carpeta
 
 
 def test_solo_atiende_a_la_pc_y_a_la_tailnet(config, reloj):

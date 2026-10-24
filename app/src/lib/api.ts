@@ -1,7 +1,7 @@
 // Los pedidos al servidor de la PC. La dirección (IP de Tailscale y puerto) y el token se guardan
 // en el teléfono la primera vez (pantalla Conectar o el QR de la página de estado).
 
-import Storage from 'expo-sqlite/kv-store';
+import Storage from './almacen';
 import type { Datos } from './tipos';
 
 export interface Conexion {

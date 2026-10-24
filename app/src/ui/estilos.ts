@@ -2,6 +2,11 @@
 // fijo), las medidas y los colores en claro y oscuro. Las pantallas leen de aquí con useTema() y
 // todas usan las mismas medidas.
 
+import { Platform } from 'react-native';
+
+/** En la web (el iPad) la app va en una columna del ancho de un teléfono, al centro: está hecha para eso. */
+export const COLUMNA_WEB = Platform.OS === 'web' ? { width: '100%', maxWidth: 520, alignSelf: 'center' } as const : null;
+
 export interface Paleta {
   fondo: string;
   tarjeta: string;

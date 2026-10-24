@@ -2,11 +2,12 @@
 // corte, y de pago y mínimo si el usuario quiere): su saldo es deuda y la pantalla de la cuenta lo muestra así.
 
 import { useState } from 'react';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 import { useAcciones } from '@/lib/acciones';
 import { useDatos } from '@/lib/datos';
 import { aCentavos, aTexto, nuevoId } from '@/lib/formato';
 import type { Cuenta } from '@/lib/tipos';
+import { avisar } from '@/ui/aviso';
 import { BotonBorrar, BotonPrincipal, Campo, Colores, Etiqueta, Ficha, Hoja, limpiarMonto, MontoGrande, Segmentos, Texto, TextoError } from '@/ui/componentes';
 import { PALETA } from '@/ui/estilos';
 import { useTema } from '@/ui/tema';
@@ -70,7 +71,7 @@ export function DialogoCuenta({ inicial, alCerrar }: { inicial?: Cuenta; alCerra
     const nMovs = movimientos.filter(toca).length;
     const nReglas = recurrencias.filter(toca).length;
     if (nMovs === 0 && nReglas === 0) {
-      Alert.alert(`¿Borrar ${inicial.nombre}?`, undefined, [
+      avisar(`¿Borrar ${inicial.nombre}?`, undefined, [
         { text: 'Cancelar', style: 'cancel' },
         { text: 'Borrar', style: 'destructive', onPress: () => { acciones.borrarCuenta(inicial); alCerrar(); } },
       ]);
@@ -78,7 +79,7 @@ export function DialogoCuenta({ inicial, alCerrar }: { inicial?: Cuenta; alCerra
     }
     const movs = `${nMovs} ${nMovs === 1 ? 'movimiento' : 'movimientos'}`;
     const reglas = `${nReglas} ${nReglas === 1 ? 'cosa que se repite' : 'cosas que se repiten'}`;
-    Alert.alert(`¿Borrar ${inicial.nombre}?`, `${inicial.nombre} tiene ${movs} y ${reglas}. Si la borras, se borra todo eso también.`, [
+    avisar(`¿Borrar ${inicial.nombre}?`, `${inicial.nombre} tiene ${movs} y ${reglas}. Si la borras, se borra todo eso también.`, [
       { text: 'Cancelar', style: 'cancel' },
       { text: 'Borrar todo', style: 'destructive', onPress: () => { acciones.borrarCuenta(inicial, true); alCerrar(); } },
     ]);
