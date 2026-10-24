@@ -19,6 +19,8 @@
       #root { display: flex; height: 100%; flex: 1; }
       /* Es una app de tocar: sin el borde que el navegador le pone a lo que tiene el foco. */
       *:focus, *:focus-visible { outline: none; }
+      /* En la computadora, barras de desplazamiento finas y discretas (en el iPhone y el iPad no se ven). */
+      * { scrollbar-width: thin; scrollbar-color: rgba(128, 128, 128, 0.35) transparent; }
     </style>
   </head>
   <body>

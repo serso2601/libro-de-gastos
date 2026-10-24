@@ -7,12 +7,11 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { View } from 'react-native';
+import { Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AnfitrionDialogos } from '@/dialogos/abrir';
 import { ProveedorDatos } from '@/lib/datos';
 import { AnfitrionAvisos } from '@/ui/aviso';
-import { COLUMNA_WEB } from '@/ui/estilos';
 import { ProveedorTema, useTema } from '@/ui/tema';
 
 SplashScreen.preventAutoHideAsync();
@@ -46,25 +45,19 @@ export default function Raiz() {
 
 function Pantallas() {
   const { c, oscuro } = useTema();
+  // En la web, lo que se ve al estirar la página más allá del borde es del color del fondo.
   useEffect(() => {
-    if (COLUMNA_WEB) document.body.style.backgroundColor = c.fondo;
+    if (Platform.OS === 'web') document.body.style.backgroundColor = c.fondo;
   }, [c.fondo]);
-  const pila = (
-    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.fondo } }}>
-      <Stack.Screen name="(pestanias)" />
-      <Stack.Screen name="cuenta/[id]" />
-      <Stack.Screen name="ajustes" />
-      <Stack.Screen name="conectar" options={{ gestureEnabled: false }} />
-    </Stack>
-  );
   return (
     <>
       <StatusBar style={oscuro ? 'light' : 'dark'} />
-      {COLUMNA_WEB ? (
-        <View style={{ flex: 1, backgroundColor: c.fondo }}>
-          <View style={[{ flex: 1 }, COLUMNA_WEB]}>{pila}</View>
-        </View>
-      ) : pila}
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.fondo } }}>
+        <Stack.Screen name="(pestanias)" />
+        <Stack.Screen name="cuenta/[id]" />
+        <Stack.Screen name="ajustes" />
+        <Stack.Screen name="conectar" options={{ gestureEnabled: false }} />
+      </Stack>
     </>
   );
 }

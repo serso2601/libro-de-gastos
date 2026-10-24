@@ -3,7 +3,8 @@
 // lugar de siempre. Tocar la pila la abre: las tarjetas se ponen casi de pie, vistas desde arriba, y se
 // despliegan en cascada. Tocar una abierta la pasa arriba con un salto por encima de las demás (tocar la
 // de arriba cierra la pila); tocar la de arriba, con la pila cerrada, abre la cuenta. «Recientes» es de
-// todas las cuentas: el resumen de cada una está en la pestaña Cuentas.
+// todas las cuentas: el resumen de cada una está en la pestaña Cuentas. En una pantalla ancha, la pila va a la
+// izquierda y «Recientes» a la derecha.
 //
 // Todo el movimiento sale de resortes (`ui/resorte.ts`) y se calcula cuadro a cuadro: `P` es cuánto está
 // abierta la pila (0 apilada, 1 abierta) y `J` recorre el salto de la tarjeta elegida.
@@ -18,14 +19,16 @@ import { useDatos } from '@/lib/datos';
 import { dinero, MESES, mayuscula, neto, ordenarPorFecha, saldo } from '@/lib/formato';
 import type { Cuenta } from '@/lib/tipos';
 import { BotonPrincipal, Enlace, FilaMovimiento, Lista, Num, Rotulo, Tarjeta, Texto, Vacio } from '@/ui/componentes';
+import { useDisposicion } from '@/ui/disposicion';
 import { Icono, type NombreIcono } from '@/ui/iconos';
 import { abrirCuenta, useIr } from '@/ui/pantalla';
 import { Resorte, useMotor } from '@/ui/resorte';
 import { vibrar } from '@/ui/vibrar';
 import { alfa, mezclar, sobre, useTema } from '@/ui/tema';
 
-/** Cuántos movimientos salen en «Recientes». */
+/** Cuántos movimientos salen en «Recientes» (al lado de la pila, en una pantalla ancha, caben más). */
 const RECIENTES = 6;
+const RECIENTES_AL_LADO = 10;
 
 /** La cuenta que quedó arriba: se recuerda mientras la app esté abierta (aunque se pase al Calendario). */
 let recordada: string | null = null;
@@ -66,6 +69,7 @@ export function Tarjetas() {
   const d = useDatos();
   const abrir = useAbrir();
   const { c, colorCuenta } = useTema();
+  const { columnaInicio } = useDisposicion();
   const motor = useMotor();
   const [elegida, setElegida] = useState<string | null>(recordada);
 
@@ -214,7 +218,7 @@ export function Tarjetas() {
     );
   });
 
-  return (
+  const pila = (
     <>
       {/* El cuadro de la pila: todo lo que hacen las tarjetas (abrir, saltar) pasa dentro de él y se recorta en sus
           bordes (recorte recto: con esquinas redondeadas iOS redibuja todo lo de dentro en cada cuadro), así nunca se
@@ -236,8 +240,21 @@ export function Tarjetas() {
           {cartas}
         </View>
       </View>
+    </>
+  );
 
-      <Recientes />
+  if (columnaInicio) {
+    return (
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 28 }}>
+        <View style={{ width: columnaInicio }}>{pila}</View>
+        <View style={{ flex: 1, minWidth: 0 }}><Recientes cuantos={RECIENTES_AL_LADO} /></View>
+      </View>
+    );
+  }
+  return (
+    <>
+      {pila}
+      <Recientes cuantos={RECIENTES} />
     </>
   );
 }
@@ -341,11 +358,11 @@ function Accion({ icono, texto, tinta, onPress, etiqueta, soloIcono }: {
 
 /** Lo último de todas las cuentas (lo que ya pasó, del más nuevo al más viejo); cada fila lleva el color de su cuenta.
  *  Memoizado: la pila se repinta en cada cuadro del movimiento y esto no cambia. */
-const Recientes = memo(function Recientes() {
+const Recientes = memo(function Recientes({ cuantos }: { cuantos: number }) {
   const d = useDatos();
   const abrir = useAbrir();
   const ir = useIr();
-  const ultimos = d.movimientos.filter((m) => m.fecha <= d.hoy).sort(ordenarPorFecha).slice(0, RECIENTES);
+  const ultimos = d.movimientos.filter((m) => m.fecha <= d.hoy).sort(ordenarPorFecha).slice(0, cuantos);
   return (
     <View style={{ gap: 8 }}>
       <Rotulo derecha={<Enlace onPress={() => ir('movimientos')}>Ver todo</Enlace>}>Recientes</Rotulo>

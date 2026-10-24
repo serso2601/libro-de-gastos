@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Grilla } from '@/dialogos/piezas';
 import { MESES_CORTOS, mayuscula } from '@/lib/formato';
 import { Texto } from './componentes';
-import { COLUMNA_WEB } from './estilos';
+import { useDisposicion, VENTANA } from './disposicion';
 import { Icono } from './iconos';
 import { useTema } from './tema';
 
@@ -16,14 +16,15 @@ export function ElegirMes({ visible, anio, mes, hoy, alElegir, alCerrar }: {
 }) {
   const { c, estilo } = useTema();
   const abajo = useSafeAreaInsets().bottom;
+  const { lateral } = useDisposicion();
   const [viendo, setViendo] = useState(anio);
   const [anioHoy, mesHoy] = hoy.split('-').map(Number);
   const limite = anioHoy * 12 + mesHoy; // se puede mirar hasta el mes que viene
   const hayAdelante = (viendo + 1) * 12 + 1 <= limite + 1;
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={alCerrar} onShow={() => setViendo(anio)}>
-      <Pressable style={{ flex: 1, backgroundColor: c.velo, justifyContent: 'flex-end' }} onPress={alCerrar}>
-        <Pressable onPress={() => {}} style={[{ backgroundColor: c.tarjeta, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: estilo.m.margen, paddingBottom: abajo + 16, gap: 14 }, COLUMNA_WEB]}>
+      <Pressable style={{ flex: 1, backgroundColor: c.velo, justifyContent: lateral ? 'center' : 'flex-end', alignItems: lateral ? 'center' : 'stretch', padding: lateral ? 24 : 0 }} onPress={alCerrar}>
+        <Pressable onPress={() => {}} style={[{ backgroundColor: c.tarjeta, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: estilo.m.margen, paddingBottom: lateral ? estilo.m.margen : abajo + 16, gap: 14 }, lateral && VENTANA]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <Pressable onPress={() => setViendo((a) => a - 1)} hitSlop={8} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }} accessibilityLabel="Año anterior">
               <Icono nombre="atras" tam={20} color={c.tinta} grosor={2} />

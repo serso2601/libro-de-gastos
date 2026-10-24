@@ -80,8 +80,18 @@ Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
 - **App nativa con Expo**, y la **web es la misma app** (react-native-web), hecha el 23/oct/2026
   porque Apple bloqueó Sideloadly. Lo que no existe en el navegador va en archivos `.web.ts(x)`:
   `lib/almacen` (localStorage), `lib/compartir` (descarga), `ui/fecha` (calendario dibujado); los
-  avisos de confirmar van por `ui/aviso.avisar` (Alert no hace nada en la web). En el iPad se ve
-  con el ancho de un teléfono, al centro (`COLUMNA_WEB`, 520): adaptarla a tableta es otro trabajo.
+  avisos de confirmar van por `ui/aviso.avisar` (Alert no hace nada en la web).
+- **La web se acomoda al ancho** (24/oct/2026, el usuario dejó la distribución a criterio de Claude;
+  las animaciones no se tocan). Todo sale de `ui/disposicion.useDisposicion()`. Menos de 700 px
+  (teléfono): igual que la app. Desde 700: la barra va al costado (riel de íconos; con nombres y
+  «Anotar» desde 1100), sin botón de Ajustes arriba (está en la barra), y las hojas, el tutorial y
+  el selector de mes salen como ventana al centro. Con contenido de 760 o más, dos columnas:
+  Inicio (pila o calendario | Recientes o el día; el Inicio se parte ya desde 640, porque estiradas
+  las tarjetas pierden su forma), Movimientos (lista | Gráficos, sin el selector), Presupuesto
+  (periodo y resumen | vasos), una cuenta (su color y datos | su historia). Las grillas toman las
+  columnas que caben (`columnasPara`); listas y Ajustes no pasan de 640 (`angosto` en `Marco`).
+  Para probar tamaños: marcos (`iframe`) de 390, 820, 1180 y 1440 en una página del servidor de
+  prueba, porque la ventana de Chrome de Claude se abre maximizada y no se deja achicar.
   Por http (Tailscale) Safari no da `crypto.randomUUID`: `formato.nuevoId` arma el UUID a mano.
   La web va en **un solo archivo** (`asyncRoutes.web: false`: por pantallas sueltas, la de inicio
   del iPad se quedaba en negro) y el servidor la manda **comprimida** (gzip). Si la letra no carga,

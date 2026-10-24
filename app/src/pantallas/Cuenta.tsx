@@ -11,6 +11,7 @@ import { useDatos } from '@/lib/datos';
 import { conSigno, MESES, neto, ordenarPorFecha, saldo, tituloDia } from '@/lib/formato';
 import type { Cuenta as TCuenta } from '@/lib/tipos';
 import { BotonRedondo, Buscador, CabeceraDia, FilaMovimiento, Lista, Num, Rotulo, Tarjeta, Texto, Vacio } from '@/ui/componentes';
+import { ANCHO_COLUMNA, ANCHO_LECTURA, useDisposicion } from '@/ui/disposicion';
 import { Icono } from '@/ui/iconos';
 import { Marco, useApilada, Volver } from '@/ui/pantalla';
 import { SimboloCategoria } from '@/ui/simbolos';
@@ -148,6 +149,9 @@ function CuentaColor({ cuenta }: { cuenta: TCuenta }) {
   const insets = useSafeAreaInsets();
   const volver = useApilada() ?? 'Inicio';
   const { c, colorCuenta } = useTema();
+  const { lateral, dosColumnas, margen } = useDisposicion();
+  // En una pantalla ancha, lo de dentro no se estira de lado a lado.
+  const centro = { width: '100%', maxWidth: ANCHO_LECTURA + margen * 2, alignSelf: 'center' } as const;
   const [buscando, setBuscando] = useState(false);
   const [busqueda, setBusqueda] = useState('');
   const grupos = useMovsDeCuenta(cuenta, busqueda);
@@ -165,62 +169,90 @@ function CuentaColor({ cuenta }: { cuenta: TCuenta }) {
       montoInicial: pago.total, notaInicial: `Pago de ${cuenta.nombre}` });
   }
 
+  // Arriba (o a la izquierda, en una pantalla ancha) va la cuenta con su color; debajo (o a la derecha), su historia.
+  const cabeza = (
+    <>
+    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+      <Volver texto={volver} color={tinta} />
+      <BotonRedondo icono={buscando ? 'cerrar' : 'buscar'} etiqueta={`Buscar en ${cuenta.nombre}`} fondo={alfa(tinta, 0.16)} color={tinta}
+        onPress={() => { setBuscando((v) => !v); setBusqueda(''); }} />
+    </View>
+    <View style={{ gap: 6 }}>
+      <Texto tam={17} peso="semi" color={tinta}>{cuenta.nombre}</Texto>
+      {esTarjeta ? (
+        <>
+          <Num tam={38} color={tinta}>Debes {neto(deudaTarjeta(d, cuenta), d.moneda)}</Num>
+          <Texto tam={14} color={tinta} style={{ marginTop: 4 }}>Gastado en este corte <Texto num tam={14} color={tinta}>{neto(gastadoEnCorte(d, cuenta), d.moneda)}</Texto></Texto>
+          {fechas !== '' && <Texto tam={14} color={tinta}>{fechas}</Texto>}
+          {!!cuenta.pago_minimo && <Texto tam={14} color={tinta}>Pago mínimo <Texto num tam={14} color={tinta}>{neto(cuenta.pago_minimo, d.moneda)}</Texto></Texto>}
+        </>
+      ) : (
+        <>
+          <Num tam={38} color={tinta}>{neto(saldo(cuenta, d.movimientos), d.moneda)}</Num>
+          <Texto tam={14} color={tinta} style={{ marginTop: 4 }}>Entró en {mes} <Texto num tam={14} color={tinta}>+{neto(f.entro, d.moneda)}</Texto></Texto>
+          <Texto tam={14} color={tinta}>Salió en {mes} <Texto num tam={14} color={tinta}>−{neto(f.salio, d.moneda)}</Texto></Texto>
+        </>
+      )}
+    </View>
+    <View style={{ flexDirection: 'row', gap: 10 }}>
+      <Pressable onPress={() => anotar({ cuentaInicial: cuenta.id })}
+        style={({ pressed }) => ({ flex: 1, height: 46, borderRadius: 23, backgroundColor: tinta, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.85 : 1 })}>
+        <Icono nombre="mas" tam={18} color={fondo} grosor={2.2} />
+        <Texto tam={15} peso="semi" color={fondo}>Anotar aquí</Texto>
+      </Pressable>
+      <Pressable onPress={() => abrir({ tipo: 'cuenta', inicial: cuenta })}
+        style={({ pressed }) => ({ flex: 1, height: 46, borderRadius: 23, backgroundColor: alfa(tinta, 0.16), alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1 })}>
+        <Texto tam={15} peso="medio" color={tinta}>Editar cuenta</Texto>
+      </Pressable>
+    </View>
+    {pago && (
+      <Pressable onPress={registrarPago} accessibilityLabel="Registrar el pago de la tarjeta"
+        style={({ pressed }) => ({ height: 46, borderRadius: 23, borderWidth: 1.5, borderColor: tinta, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1 })}>
+        <Icono nombre="transferir" tam={18} color={tinta} />
+        <Texto tam={15} peso="semi" color={tinta}>Registrar pago · {neto(pago.total, d.moneda)}</Texto>
+      </Pressable>
+    )}
+    </>
+  );
+  const resto = (
+    <>
+    {/* Lo que no se ve en el Inicio: qué viene y en qué se gastó en ESTA cuenta. Al buscar se esconden. */}
+    {!buscando && (
+      <View style={{ gap: 18, paddingBottom: 10 }}>
+        <LoQueViene cuenta={cuenta} />
+        <EnQueSeGasto cuenta={cuenta} mes={mes} />
+      </View>
+    )}
+    <Rotulo>Movimientos</Rotulo>
+    {buscando && <Buscador valor={busqueda} alCambiar={setBusqueda} placeholder="Buscar en esta cuenta" fondo={c.suave} autoFocus />}
+    <Grupos cuenta={cuenta} grupos={grupos} separadas={false} />
+    </>
+  );
+
+  if (dosColumnas) {
+    return (
+      <View style={{ flex: 1, flexDirection: 'row', backgroundColor: fondo }}>
+        <StatusBar style={tinta === '#FFFFFF' ? 'light' : 'dark'} />
+        <ScrollView style={{ width: ANCHO_COLUMNA + 56, flexGrow: 0 }} contentContainerStyle={{ paddingTop: insets.top + 20, paddingHorizontal: 28, paddingBottom: 40, gap: 18 }}>
+          {cabeza}
+        </ScrollView>
+        <ScrollView style={{ flex: 1, backgroundColor: c.tarjeta, borderTopLeftRadius: 26, borderBottomLeftRadius: 26 }} keyboardShouldPersistTaps="handled"
+          contentContainerStyle={[{ paddingTop: insets.top + 24, paddingHorizontal: 32, paddingBottom: insets.bottom + 30, gap: 8 }, centro]}>
+          {resto}
+        </ScrollView>
+      </View>
+    );
+  }
   return (
     <ScrollView style={{ flex: 1, backgroundColor: fondo }} contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
       <StatusBar style={tinta === '#FFFFFF' ? 'light' : 'dark'} />
-      <View style={{ paddingTop: insets.top + 4, paddingHorizontal: 18, paddingBottom: 40, gap: 18 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Volver texto={volver} color={tinta} />
-          <BotonRedondo icono={buscando ? 'cerrar' : 'buscar'} etiqueta={`Buscar en ${cuenta.nombre}`} fondo={alfa(tinta, 0.16)} color={tinta}
-            onPress={() => { setBuscando((v) => !v); setBusqueda(''); }} />
-        </View>
-        <View style={{ gap: 6 }}>
-          <Texto tam={17} peso="semi" color={tinta}>{cuenta.nombre}</Texto>
-          {esTarjeta ? (
-            <>
-              <Num tam={38} color={tinta}>Debes {neto(deudaTarjeta(d, cuenta), d.moneda)}</Num>
-              <Texto tam={14} color={tinta} style={{ marginTop: 4 }}>Gastado en este corte <Texto num tam={14} color={tinta}>{neto(gastadoEnCorte(d, cuenta), d.moneda)}</Texto></Texto>
-              {fechas !== '' && <Texto tam={14} color={tinta}>{fechas}</Texto>}
-              {!!cuenta.pago_minimo && <Texto tam={14} color={tinta}>Pago mínimo <Texto num tam={14} color={tinta}>{neto(cuenta.pago_minimo, d.moneda)}</Texto></Texto>}
-            </>
-          ) : (
-            <>
-              <Num tam={38} color={tinta}>{neto(saldo(cuenta, d.movimientos), d.moneda)}</Num>
-              <Texto tam={14} color={tinta} style={{ marginTop: 4 }}>Entró en {mes} <Texto num tam={14} color={tinta}>+{neto(f.entro, d.moneda)}</Texto></Texto>
-              <Texto tam={14} color={tinta}>Salió en {mes} <Texto num tam={14} color={tinta}>−{neto(f.salio, d.moneda)}</Texto></Texto>
-            </>
-          )}
-        </View>
-        <View style={{ flexDirection: 'row', gap: 10 }}>
-          <Pressable onPress={() => anotar({ cuentaInicial: cuenta.id })}
-            style={({ pressed }) => ({ flex: 1, height: 46, borderRadius: 23, backgroundColor: tinta, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.85 : 1 })}>
-            <Icono nombre="mas" tam={18} color={fondo} grosor={2.2} />
-            <Texto tam={15} peso="semi" color={fondo}>Anotar aquí</Texto>
-          </Pressable>
-          <Pressable onPress={() => abrir({ tipo: 'cuenta', inicial: cuenta })}
-            style={({ pressed }) => ({ flex: 1, height: 46, borderRadius: 23, backgroundColor: alfa(tinta, 0.16), alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1 })}>
-            <Texto tam={15} peso="medio" color={tinta}>Editar cuenta</Texto>
-          </Pressable>
-        </View>
-        {pago && (
-          <Pressable onPress={registrarPago} accessibilityLabel="Registrar el pago de la tarjeta"
-            style={({ pressed }) => ({ height: 46, borderRadius: 23, borderWidth: 1.5, borderColor: tinta, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1 })}>
-            <Icono nombre="transferir" tam={18} color={tinta} />
-            <Texto tam={15} peso="semi" color={tinta}>Registrar pago · {neto(pago.total, d.moneda)}</Texto>
-          </Pressable>
-        )}
+      <View style={[{ paddingTop: insets.top + (lateral ? 20 : 4), paddingHorizontal: margen, paddingBottom: 40, gap: 18 }, centro]}>
+        {cabeza}
       </View>
-      <View style={{ flexGrow: 1, marginTop: -14, backgroundColor: c.tarjeta, borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingTop: 14, paddingHorizontal: 18, paddingBottom: insets.bottom + 30, gap: 8 }}>
-        {/* Lo que no se ve en el Inicio: qué viene y en qué se gastó en ESTA cuenta. Al buscar se esconden. */}
-        {!buscando && (
-          <View style={{ gap: 18, paddingBottom: 10 }}>
-            <LoQueViene cuenta={cuenta} />
-            <EnQueSeGasto cuenta={cuenta} mes={mes} />
-          </View>
-        )}
-        <Rotulo>Movimientos</Rotulo>
-        {buscando && <Buscador valor={busqueda} alCambiar={setBusqueda} placeholder="Buscar en esta cuenta" fondo={c.suave} autoFocus />}
-        <Grupos cuenta={cuenta} grupos={grupos} separadas={false} />
+      <View style={{ flexGrow: 1, marginTop: -14, backgroundColor: c.tarjeta, borderTopLeftRadius: 26, borderTopRightRadius: 26 }}>
+        <View style={[{ paddingTop: 14, paddingHorizontal: margen, paddingBottom: insets.bottom + 30, gap: 8 }, centro]}>
+          {resto}
+        </View>
       </View>
     </ScrollView>
   );

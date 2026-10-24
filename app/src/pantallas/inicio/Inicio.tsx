@@ -1,5 +1,6 @@
 // El Inicio: arriba un saldo que se puede cambiar (tocarlo abre las formas de verlo), debajo la vista
-// que se prefiera, Tarjetas o Calendario. Sin cobros por venir: aquí solo se ve lo ya anotado.
+// que se prefiera, Tarjetas o Calendario. Sin cobros por venir: aquí solo se ve lo ya anotado. En una pantalla
+// ancha, cada vista va en dos columnas (ver Tarjetas y Calendario) y Ajustes está en la barra del costado.
 
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
@@ -9,6 +10,7 @@ import { ORDEN_SALDOS, saldos } from '@/lib/calculos';
 import { useDatos } from '@/lib/datos';
 import { neto } from '@/lib/formato';
 import { BotonRedondo, colorDeSaldo, Hoja, Num, Segmentos, Texto } from '@/ui/componentes';
+import { useDisposicion } from '@/ui/disposicion';
 import { Icono } from '@/ui/iconos';
 import { Marco } from '@/ui/pantalla';
 import { usePreferencias, useTema, type VistaInicio } from '@/ui/tema';
@@ -19,6 +21,7 @@ export function InicioPrincipal() {
   const d = useDatos();
   const { c, estilo } = useTema();
   const { saldo, vistaInicio, cambiar } = usePreferencias();
+  const { lateral, columnaInicio } = useDisposicion();
   const [eligiendo, setEligiendo] = useState(false);
   const formas = saldos(d);
   const forma = formas[saldo];
@@ -33,16 +36,20 @@ export function InicioPrincipal() {
         </View>
         <Num tam={estilo.m.cifra} color={colorDeSaldo(forma, c)} lineas={1}>{neto(forma.valor, d.moneda)}</Num>
       </Pressable>
-      <View style={{ marginBottom: 4 }}>
-        <BotonRedondo icono="ajustes" etiqueta="Ajustes" onPress={() => router.push('/ajustes')} />
-      </View>
+      {!lateral && (
+        <View style={{ marginBottom: 4 }}>
+          <BotonRedondo icono="ajustes" etiqueta="Ajustes" onPress={() => router.push('/ajustes')} />
+        </View>
+      )}
     </View>
   );
 
   return (
     <>
-      <Marco cabecera={cabecera} gap={16}>
-        <Segmentos<VistaInicio> opciones={[['tarjetas', 'Tarjetas'], ['calendario', 'Calendario']]} valor={vistaInicio} alCambiar={(v) => cambiar({ vistaInicio: v })} />
+      <Marco cabecera={cabecera} gap={16} angosto={!columnaInicio}>
+        <View style={columnaInicio ? { width: columnaInicio } : undefined}>
+          <Segmentos<VistaInicio> opciones={[['tarjetas', 'Tarjetas'], ['calendario', 'Calendario']]} valor={vistaInicio} alCambiar={(v) => cambiar({ vistaInicio: v })} />
+        </View>
         {vistaInicio === 'calendario' ? <Calendario /> : <Tarjetas />}
       </Marco>
 

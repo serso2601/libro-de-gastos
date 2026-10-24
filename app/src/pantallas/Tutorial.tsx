@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { Modal, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BotonPrincipal, Texto } from '@/ui/componentes';
-import { COLUMNA_WEB } from '@/ui/estilos';
+import { useDisposicion, VENTANA } from '@/ui/disposicion';
 import { Icono, type NombreIcono } from '@/ui/iconos';
 import { usePreferencias, useTema } from '@/ui/tema';
 
@@ -27,6 +27,7 @@ export function Tutorial() {
   const { tutorialVisto, cambiar } = usePreferencias();
   const enFoco = useIsFocused();
   const abajo = useSafeAreaInsets().bottom;
+  const { lateral } = useDisposicion();
   const [paso, setPaso] = useState(0);
   const visible = enFoco && !tutorialVisto;
   const terminar = () => { cambiar({ tutorialVisto: true }); setPaso(0); };
@@ -35,8 +36,8 @@ export function Tutorial() {
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={terminar}>
-      <View style={{ flex: 1, backgroundColor: c.velo, justifyContent: 'flex-end' }}>
-        <View style={[{ backgroundColor: c.tarjeta, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 22, paddingBottom: abajo + 18, gap: 16 }, COLUMNA_WEB]}>
+      <View style={{ flex: 1, backgroundColor: c.velo, justifyContent: lateral ? 'center' : 'flex-end', alignItems: lateral ? 'center' : 'stretch', padding: lateral ? 24 : 0 }}>
+        <View style={[{ backgroundColor: c.tarjeta, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 22, paddingBottom: lateral ? 22 : abajo + 18, gap: 16 }, lateral && VENTANA]}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
             <Texto tam={12} peso="semi" color={c.tenue} lineas={1} style={{ letterSpacing: 0.6, flex: 1 }}>CÓMO FUNCIONA</Texto>
             {!ultimo && <Pressable onPress={terminar} hitSlop={10}><Texto tam={14} color={c.tenue}>Saltar</Texto></Pressable>}

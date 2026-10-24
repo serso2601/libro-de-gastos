@@ -8,6 +8,7 @@ import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAlmacen } from '@/lib/datos';
 import { BotonRedondo, Texto } from './componentes';
+import { ANCHO_LECTURA, ANCHO_MAXIMO, useDisposicion } from './disposicion';
 import { Icono } from './iconos';
 import { alfa, useTema } from './tema';
 
@@ -56,12 +57,17 @@ export function Volver({ texto, color }: { texto: string; color?: string }) {
  * El marco: cabecera (volver o ajustes, y botones a la derecha), título, avisos de conexión,
  * jalar para actualizar y, si hace falta, algo fijo abajo (el botón de anotar).
  */
-export function Marco({ titulo, subtitulo, derecha, children, pie, cabecera, sinAjustes, gap = 12 }: {
+export function Marco({ titulo, subtitulo, derecha, children, pie, cabecera, sinAjustes, angosto, gap = 12 }: {
   titulo?: string; subtitulo?: string; derecha?: ReactNode; children: ReactNode; pie?: ReactNode;
   cabecera?: ReactNode; sinAjustes?: boolean; gap?: number;
+  /** En una pantalla ancha no pasa del ancho de lectura (listas y formularios). */
+  angosto?: boolean;
 }) {
   const insets = useSafeAreaInsets();
   const { c, estilo } = useTema();
+  const { lateral, margen } = useDisposicion();
+  // En una pantalla ancha el contenido queda al centro, sin estirarse de lado a lado.
+  const centro = { width: '100%', maxWidth: angosto ? ANCHO_LECTURA + margen * 2 : ANCHO_MAXIMO, alignSelf: 'center' } as const;
   const volver = useApilada();
   const { recargar } = useAlmacen();
   const [actualizando, setActualizando] = useState(false);
@@ -75,15 +81,24 @@ export function Marco({ titulo, subtitulo, derecha, children, pie, cabecera, sin
   return (
     <View style={{ flex: 1, backgroundColor: c.fondo }}>
       <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" automaticallyAdjustKeyboardInsets
-        contentContainerStyle={{ paddingTop: insets.top + 4, paddingHorizontal: estilo.m.margen, paddingBottom: pie ? 16 : volver ? insets.bottom + 24 : 24, gap }}
+        contentContainerStyle={[{ paddingTop: insets.top + (lateral ? 20 : 4), paddingHorizontal: margen, paddingBottom: pie ? 16 : volver ? insets.bottom + 24 : 24, gap }, centro]}
         refreshControl={<RefreshControl refreshing={actualizando} onRefresh={actualizar} tintColor={c.tenue} />}>
-        {cabecera ?? (
+        {cabecera ?? (lateral && !volver && titulo ? (
+          // Con la barra al costado no hay botón de Ajustes arriba: el título sube y lo de la derecha va a su lado.
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <View style={{ flex: 1, gap: 4 }}>
+              <Texto tam={estilo.m.titulo} peso={estilo.m.pesoTitulo} style={{ letterSpacing: -0.8 }}>{titulo}</Texto>
+              {subtitulo ? <Texto tam={14} color={c.tenue}>{subtitulo}</Texto> : null}
+            </View>
+            <View style={{ flexDirection: 'row', gap: 8 }}>{derecha}</View>
+          </View>
+        ) : (
           <>
             <View style={{ height: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
               {volver ? <Volver texto={volver} /> : <View />}
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 {derecha}
-                {!volver && !sinAjustes && <BotonRedondo icono="ajustes" etiqueta="Ajustes" onPress={() => router.push('/ajustes')} />}
+                {!volver && !sinAjustes && !lateral && <BotonRedondo icono="ajustes" etiqueta="Ajustes" onPress={() => router.push('/ajustes')} />}
               </View>
             </View>
             {titulo && (
@@ -93,11 +108,11 @@ export function Marco({ titulo, subtitulo, derecha, children, pie, cabecera, sin
               </View>
             )}
           </>
-        )}
+        ))}
         <Avisos />
         {children}
       </ScrollView>
-      {pie && <View style={{ paddingTop: 10, paddingBottom: Math.max(insets.bottom, 16) + 2 }}>{pie}</View>}
+      {pie && <View style={[{ paddingTop: 10, paddingBottom: Math.max(insets.bottom, 16) + 2 }, centro]}>{pie}</View>}
     </View>
   );
 }

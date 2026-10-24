@@ -63,7 +63,8 @@ export default function Conectar() {
 
   return (
     <KeyboardAvoidingView behavior="padding" style={{ flex: 1, backgroundColor: c.fondo }}>
-      <ScrollView contentContainerStyle={{ flexGrow: 1, paddingTop: insets.top + (conexion && router.canGoBack() ? 4 : 50), paddingHorizontal: estilo.m.margen, paddingBottom: insets.bottom + 16, gap: 22 }}
+      <ScrollView contentContainerStyle={{ flexGrow: 1, paddingTop: insets.top + (conexion && router.canGoBack() ? 4 : 50), paddingHorizontal: estilo.m.margen, paddingBottom: insets.bottom + 16, gap: 22,
+        width: '100%', maxWidth: 480 + estilo.m.margen * 2, alignSelf: 'center' }}
         keyboardShouldPersistTaps="handled">
         {conexion && router.canGoBack() && <View style={{ height: 44, justifyContent: 'center' }}><Volver texto="Cancelar" /></View>}
         <View style={{ gap: 14 }}>

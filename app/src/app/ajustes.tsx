@@ -76,7 +76,7 @@ function ContenidoAjustes() {
   }
 
   return (
-    <Marco titulo="Ajustes" gap={0}>
+    <Marco titulo="Ajustes" gap={0} angosto>
       <TituloSeccion>Apariencia</TituloSeccion>
       <Tarjeta style={{ padding: 14, gap: 14 }}>
         <View style={{ gap: 8 }}>

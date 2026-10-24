@@ -15,6 +15,7 @@ import { useDatos } from '@/lib/datos';
 import { DIAS, dinero, dineroCorto } from '@/lib/formato';
 import type { Categoria, ConfigPresupuesto } from '@/lib/tipos';
 import { Barra, BotonPrincipal, Num, Tarjeta, Texto, Vaso } from '@/ui/componentes';
+import { ANCHO_COLUMNA, columnasPara, useDisposicion } from '@/ui/disposicion';
 import { Icono, type NombreIcono } from '@/ui/iconos';
 import { Marco } from '@/ui/pantalla';
 import { SimboloCategoria } from '@/ui/simbolos';
@@ -125,6 +126,11 @@ export function Presupuesto() {
   const d = useDatos();
   const abrir = useAbrir();
   const { c, relleno } = useTema();
+  // En una pantalla ancha, el periodo y el resumen van en una columna a la izquierda y los vasos a la derecha,
+  // en tantas columnas como quepan.
+  const { contenido, dosColumnas } = useDisposicion();
+  const anchoVasos = dosColumnas ? contenido - ANCHO_COLUMNA - 36 : contenido;
+  const columnas = columnasPara(anchoVasos, 180, 12, 2, 5);
   const config = configPresupuesto(d);
   // El periodo que se mira. Si cambia la configuración, se vuelve al periodo de hoy.
   const clave = `${config.periodo}|${config.inicio}`;
@@ -138,35 +144,48 @@ export function Presupuesto() {
   const ver = (categoria: Categoria) => abrir({ tipo: 'detalleCategoria', categoria, periodo: p });
   // Las categorías sin tope van aparte, en cuadros bajitos: no tienen nada que llenar.
   const sinTope = t.sinTope.length > 0 && (
-    <Grilla columnas={2} gap={12}>
+    <Grilla columnas={columnas} gap={12}>
       {t.sinTope.map((cat) => <CuadroSinTope key={cat.id} categoria={cat} gastado={gastadoEn(d, cat.id, p)} moneda={d.moneda} onPress={() => ver(cat)} />)}
     </Grilla>
   );
 
-  return (
-    <Marco titulo="Presupuesto" derecha={<BotonTopes />}>
+  const periodo = (
+    <>
       <NavegadorPeriodo nombre={nombrePeriodo(p)} mover={mover} />
       <FichaPeriodo config={config} />
-      {t.conTope.length === 0 ? (
-        <>
-          <SinTopes />
-          {sinTope}
-        </>
+      {t.conTope.length === 0
+        ? <SinTopes />
+        : <Resumen gastado={t.gastado} tope={t.tope} moneda={d.moneda} momento={momento} dias={diasQueQuedanEn(p, d.hoy)} />}
+    </>
+  );
+  const vasos = t.conTope.length === 0 ? sinTope : (
+    <>
+      <Grilla columnas={columnas} gap={12}>
+        {t.conTope.map((x) => {
+          const malo = x.pasado || x.casiAlTope;
+          return (
+            <Vaso key={x.categoria.id} nombre={x.categoria.nombre} sub={`${dineroCorto(x.gastado, d.moneda)} de ${dineroCorto(x.tope, d.moneda)}`}
+              pct={x.pct} aviso={avisoDe(x, d.moneda)} alerta={malo} relleno={malo ? relleno(c.alerta) : relleno(x.categoria.color)}
+              alto={alto} onPress={() => ver(x.categoria)} />
+          );
+        })}
+      </Grilla>
+      {sinTope}
+      <Texto tam={13} color={c.tenue} centro style={{ marginTop: 6 }}>Toca una categoría para ver sus compras de este periodo.</Texto>
+    </>
+  );
+
+  return (
+    <Marco titulo="Presupuesto" derecha={<BotonTopes />}>
+      {dosColumnas ? (
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 36 }}>
+          <View style={{ width: ANCHO_COLUMNA, gap: 12 }}>{periodo}</View>
+          <View style={{ flex: 1, minWidth: 0, gap: 12 }}>{vasos}</View>
+        </View>
       ) : (
         <>
-          <Resumen gastado={t.gastado} tope={t.tope} moneda={d.moneda} momento={momento} dias={diasQueQuedanEn(p, d.hoy)} />
-          <Grilla columnas={2} gap={12}>
-            {t.conTope.map((x) => {
-              const malo = x.pasado || x.casiAlTope;
-              return (
-                <Vaso key={x.categoria.id} nombre={x.categoria.nombre} sub={`${dineroCorto(x.gastado, d.moneda)} de ${dineroCorto(x.tope, d.moneda)}`}
-                  pct={x.pct} aviso={avisoDe(x, d.moneda)} alerta={malo} relleno={malo ? relleno(c.alerta) : relleno(x.categoria.color)}
-                  alto={alto} onPress={() => ver(x.categoria)} />
-              );
-            })}
-          </Grilla>
-          {sinTope}
-          <Texto tam={13} color={c.tenue} centro style={{ marginTop: 6 }}>Toca una categoría para ver sus compras de este periodo.</Texto>
+          {periodo}
+          {vasos}
         </>
       )}
     </Marco>

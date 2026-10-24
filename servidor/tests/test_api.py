@@ -102,6 +102,13 @@ def test_cambiar_la_regla_vale_para_lo_que_viene(cliente, reloj):
     assert cliente.put("/api/recurrencias/r", json={**rec, "fecha_inicio": "2026-09-02"}).status_code == 422
 
 
+def test_los_simbolos_largos_se_pueden_guardar(cliente):
+    # «Entretenimiento» viene con i:entretenimiento (17 letras): ponerle tope no puede rechazarse.
+    cat = {"nombre": "Entretenimiento", "tipo": "gasto", "emoji": "i:entretenimiento", "presupuesto": 8000}
+    assert cliente.put("/api/categorias/entretenimiento", json=cat).status_code == 200
+    assert cliente.put("/api/categorias/casa", json={**cat, "emoji": "i:electrodomestico"}).status_code == 200
+
+
 def test_orden_y_ajustes(cliente):
     cliente.put("/api/cuentas/banco", json={"nombre": "Banco"})
     cliente.put("/api/orden/cuentas", json={"ids": ["banco", "efectivo"]})

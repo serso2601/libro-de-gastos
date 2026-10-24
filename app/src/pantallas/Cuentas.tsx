@@ -13,6 +13,7 @@ import { useDatos } from '@/lib/datos';
 import { aFecha, conSigno, dinero, MESES, MESES_CORTOS, neto, saldo } from '@/lib/formato';
 import type { Categoria, Cuenta, Datos, Movimiento } from '@/lib/tipos';
 import { BotonRedondo, colorDeSaldo, Num, Rotulo, Tarjeta, Texto } from '@/ui/componentes';
+import { columnasPara, useDisposicion } from '@/ui/disposicion';
 import { abrirCuenta, Marco } from '@/ui/pantalla';
 import { SimboloCategoria } from '@/ui/simbolos';
 import { mezclar, useTema } from '@/ui/tema';
@@ -51,13 +52,16 @@ function categoriaPrincipal(d: Datos, movs: Movimiento[], tipo: 'gasto' | 'ingre
  * Una forma de ver el saldo: su rótulo y su valor y, debajo, la estadística que la explica.
  * La grande (la del total) lleva el valor aparte, más grande.
  */
-function TarjetaSaldo({ id, grande, children }: { id: IdSaldo; grande?: boolean; children: ReactNode }) {
+function TarjetaSaldo({ id, grande, llena, children }: { id: IdSaldo; grande?: boolean; children: ReactNode;
+  /** En una fila de la grilla: ocupa todo el alto de la fila, para que queden parejas. */
+  llena?: boolean;
+}) {
   const d = useDatos();
   const { c, estilo } = useTema();
   const forma = saldos(d)[id];
   const valor = neto(forma.valor, d.moneda);
   return (
-    <Tarjeta style={{ padding: 14, paddingHorizontal: 16, gap: 12 }}>
+    <Tarjeta style={{ padding: 14, paddingHorizontal: 16, gap: 12, flex: llena ? 1 : undefined }}>
       {grande ? (
         <View style={{ gap: 2 }}>
           <Texto tam={14} peso="medio" color={c.tenue}>{forma.rotulo}</Texto>
@@ -303,20 +307,28 @@ export function Cuentas() {
   const d = useDatos();
   const abrir = useAbrir();
   const clave = d.hoy.slice(0, 7);
+  // En una pantalla ancha, las formas de saldo van de a dos o tres por fila y las cuentas en más columnas.
+  const { contenido } = useDisposicion();
+  const otras = ORDEN_SALDOS.filter((id): id is Exclude<IdSaldo, 'total'> => id !== 'total');
+  const columnasSaldo = columnasPara(contenido, 320, 8, 1, 3);
 
   return (
     <Marco titulo="Cuentas" derecha={<BotonRedondo icono="mas" etiqueta="Nueva cuenta" onPress={() => abrir({ tipo: 'cuenta' })} />}>
       <View style={{ gap: 8 }}>
         <Rotulo>Tu saldo</Rotulo>
         <TarjetaSaldo id="total" grande><EstadisticaTotal /></TarjetaSaldo>
-        {ORDEN_SALDOS.filter((id): id is Exclude<IdSaldo, 'total'> => id !== 'total').map((id) => (
-          <TarjetaSaldo key={id} id={id}>{ESTADISTICAS[id]()}</TarjetaSaldo>
-        ))}
+        {columnasSaldo === 1
+          ? otras.map((id) => <TarjetaSaldo key={id} id={id}>{ESTADISTICAS[id]()}</TarjetaSaldo>)
+          : (
+            <Grilla columnas={columnasSaldo} gap={8}>
+              {otras.map((id) => <TarjetaSaldo key={id} id={id} llena>{ESTADISTICAS[id]()}</TarjetaSaldo>)}
+            </Grilla>
+          )}
       </View>
 
       <View style={{ gap: 8, marginTop: 6 }}>
         <Rotulo>Tus cuentas</Rotulo>
-        <Grilla columnas={2} gap={8}>
+        <Grilla columnas={columnasPara(contenido, 160, 8, 2, 6)} gap={8}>
           {[...d.cuentas.map((x) => <CuadroCuenta key={x.id} cuenta={x} clave={clave} />), <CuadroNueva key="nueva" />]}
         </Grilla>
       </View>

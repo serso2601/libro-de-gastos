@@ -9,7 +9,8 @@ import { useDatos } from '@/lib/datos';
 import { montoEnCuenta, type FormaSaldo } from '@/lib/calculos';
 import { conSigno, neto } from '@/lib/formato';
 import type { Movimiento, Proximo, TipoMovimiento } from '@/lib/tipos';
-import { COLUMNA_WEB, ESTILO, PALETA, type Peso } from './estilos';
+import { useDisposicion, VENTANA } from './disposicion';
+import { ESTILO, PALETA, type Peso } from './estilos';
 import { Icono, type NombreIcono } from './iconos';
 import { alfa, sobre, useTema, type Colores as ColoresTema } from './tema';
 
@@ -383,34 +384,55 @@ export function FilaMovimiento({ m, onPress, cuentaId, primera, detalle, sinIcon
 
 /**
  * Una hoja que sube desde abajo: la manija, «Cancelar», el título y, abajo y siempre a la vista,
- * el botón principal (`pie`).
+ * el botón principal (`pie`). En una pantalla ancha es una ventana al centro, del alto de lo que lleva.
  */
 export function Hoja({ titulo, alCerrar, children, pie, derecha }: { titulo: string; alCerrar: () => void; children: ReactNode; pie?: ReactNode; derecha?: ReactNode }) {
   const { c, estilo } = useTema();
   const abajo = useSafeAreaInsets().bottom;
+  const { lateral } = useDisposicion();
   // La hoja no empieza arriba de la pantalla: sin este corrimiento el teclado tapa el botón de abajo.
   const caja = useRef<ComponentRef<typeof View>>(null);
   const [arriba, setArriba] = useState(0);
+
+  const cabecera = (
+    <View style={{ height: lateral ? 56 : 44, marginHorizontal: estilo.m.margen, flexDirection: 'row', alignItems: 'center' }}>
+      <View style={{ flex: 1, alignItems: 'flex-start' }}>
+        <Pressable onPress={alCerrar} hitSlop={10}><Texto tam={17} color={c.tenue}>Cancelar</Texto></Pressable>
+      </View>
+      <Texto tam={17} peso="semi" lineas={1} style={{ flexShrink: 1, maxWidth: '60%' }}>{titulo}</Texto>
+      <View style={{ flex: 1, alignItems: 'flex-end' }}>{derecha}</View>
+    </View>
+  );
+  const cuerpo = (
+    <ScrollView style={lateral ? { flexShrink: 1 } : { flex: 1 }} contentContainerStyle={{ paddingHorizontal: estilo.m.margen, paddingTop: 6, paddingBottom: 20, gap: 14 }}
+      keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
+      {children}
+    </ScrollView>
+  );
+
+  if (lateral) {
+    return (
+      <Modal visible transparent animationType="fade" onRequestClose={alCerrar}>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <Pressable onPress={alCerrar} accessibilityLabel="Cerrar" style={[StyleSheet.absoluteFill, { backgroundColor: c.velo }]} />
+          <View style={[VENTANA, { maxHeight: '100%', backgroundColor: c.tarjeta, overflow: 'hidden' }]}>
+            {cabecera}
+            {cuerpo}
+            {pie && <View style={{ paddingHorizontal: estilo.m.margen, paddingTop: 8, paddingBottom: 18, gap: 6 }}>{pie}</View>}
+          </View>
+        </View>
+      </Modal>
+    );
+  }
   return (
     <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={alCerrar}>
-      <View style={{ flex: 1, backgroundColor: COLUMNA_WEB ? c.fondo : c.tarjeta }}>
-      <View ref={caja} style={[{ flex: 1, backgroundColor: c.tarjeta }, COLUMNA_WEB]} onLayout={() => caja.current?.measureInWindow((_x, y) => setArriba(Math.max(0, y)))}>
+      <View ref={caja} style={{ flex: 1, backgroundColor: c.tarjeta }} onLayout={() => caja.current?.measureInWindow((_x, y) => setArriba(Math.max(0, y)))}>
       <KeyboardAvoidingView behavior="padding" keyboardVerticalOffset={arriba} style={{ flex: 1 }}>
         <View style={{ alignSelf: 'center', width: 36, height: 5, borderRadius: 3, backgroundColor: alfa(c.tenue, 0.35), marginTop: 8 }} />
-        <View style={{ height: 44, marginHorizontal: estilo.m.margen, flexDirection: 'row', alignItems: 'center' }}>
-          <View style={{ flex: 1, alignItems: 'flex-start' }}>
-            <Pressable onPress={alCerrar} hitSlop={10}><Texto tam={17} color={c.tenue}>Cancelar</Texto></Pressable>
-          </View>
-          <Texto tam={17} peso="semi" lineas={1} style={{ flexShrink: 1, maxWidth: '60%' }}>{titulo}</Texto>
-          <View style={{ flex: 1, alignItems: 'flex-end' }}>{derecha}</View>
-        </View>
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: estilo.m.margen, paddingTop: 6, paddingBottom: 20, gap: 14 }}
-          keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
-          {children}
-        </ScrollView>
+        {cabecera}
+        {cuerpo}
         {pie && <View style={{ paddingHorizontal: estilo.m.margen, paddingTop: 8, paddingBottom: Math.max(abajo, 16) + 4, gap: 6 }}>{pie}</View>}
       </KeyboardAvoidingView>
-      </View>
       </View>
     </Modal>
   );

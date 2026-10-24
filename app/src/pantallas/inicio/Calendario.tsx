@@ -1,6 +1,6 @@
 // La vista «Calendario» del Inicio: el mes con lo que entró (verde) y salió (rojo) en cada día, tres
 // datos del mes arriba y, abajo, los movimientos del día elegido. El día elegido es el que usa el
-// botón + de la barra para anotar.
+// botón + de la barra para anotar. En una pantalla ancha, el mes va a la izquierda y el día a la derecha.
 
 import * as Haptics from 'expo-haptics';
 import { useEffect, useMemo, useState } from 'react';
@@ -11,6 +11,7 @@ import { useDatos } from '@/lib/datos';
 import { neto, ordenarPorFecha, tituloDia } from '@/lib/formato';
 import { useMes } from '@/lib/mes';
 import { CabeceraDia, Dato, Enlace, FilaMovimiento, Lista, Num, Tarjeta, Texto, Vacio } from '@/ui/componentes';
+import { useDisposicion } from '@/ui/disposicion';
 import { ElegirMes, useDiaElegido } from '@/ui/elegirMes';
 import { Icono } from '@/ui/iconos';
 import { useIr } from '@/ui/pantalla';
@@ -18,6 +19,7 @@ import { useTema } from '@/ui/tema';
 
 const GAP = 4;
 const ALTO_CELDA = 58;
+const ALTO_CELDA_ANCHA = 72;
 
 /** Un monto sin símbolo ni centavos para que quepa en la celda: 45, 1.2k, 12k, 1.5M. */
 function compacto(centavos: number): string {
@@ -34,6 +36,8 @@ export function Calendario() {
   const ir = useIr();
   const mes = useMes();
   const { c } = useTema();
+  const { columnaInicio } = useDisposicion();
+  const altoCelda = columnaInicio && columnaInicio >= 400 ? ALTO_CELDA_ANCHA : ALTO_CELDA;
   const { setFecha } = useDiaElegido();
   const [elegirMes, setElegirMes] = useState(false);
   const [dia, setDia] = useState(d.hoy);
@@ -77,7 +81,7 @@ export function Calendario() {
     </Pressable>
   );
 
-  return (
+  const elMes = (
     <>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         {flecha(-1, true)}
@@ -103,7 +107,7 @@ export function Calendario() {
           <View key={k} style={{ flexDirection: 'row', gap: GAP }}>
             {Array.from({ length: 7 }, (_, i) => {
               const n = k * 7 + i - primero + 1;
-              if (n < 1 || n > dias) return <View key={i} style={{ flex: 1, height: ALTO_CELDA }} />;
+              if (n < 1 || n > dias) return <View key={i} style={{ flex: 1, height: altoCelda }} />;
               const fecha = `${claveMes(mes.anio, mes.mes)}-${String(n).padStart(2, '0')}`;
               const x = porDia[n - 1];
               const futuro = fecha > d.hoy;
@@ -112,7 +116,7 @@ export function Calendario() {
               return (
                 <Pressable key={i} onPress={() => { Haptics.selectionAsync(); setDia(fecha); setFecha(fecha); }}
                   accessibilityLabel={`${tituloDia(fecha, d.hoy)}${futuro ? '' : `: entró ${neto(x.entro, d.moneda)}, salió ${neto(x.salio, d.moneda)}`}`}
-                  style={{ flex: 1, height: ALTO_CELDA, borderRadius: 10, backgroundColor: c.tarjeta, paddingHorizontal: 5, paddingVertical: 4, gap: 1,
+                  style={{ flex: 1, height: altoCelda, borderRadius: 10, backgroundColor: c.tarjeta, paddingHorizontal: 5, paddingVertical: 4, gap: 1,
                     borderWidth: 2, borderColor: esElegido ? c.tinta : esHoy ? c.acento : 'transparent', opacity: futuro ? 0.55 : 1 }}>
                   <Texto num tam={12} peso={esHoy ? 'negrita' : 'medio'} color={futuro ? c.tenue : c.tinta}>{n}</Texto>
                   {!futuro && x.entro > 0 ? <Num tam={11} peso="medio" color={c.ingreso} lineas={1}>{compacto(x.entro)}</Num> : null}
@@ -123,7 +127,11 @@ export function Calendario() {
           </View>
         ))}
       </View>
+    </>
+  );
 
+  const elDia = (
+    <>
       <View style={{ gap: 8 }}>
         <CabeceraDia titulo={tituloDia(elegido, d.hoy)} derecha={delDia.length ? neto(netoDe(delDia), d.moneda, true) : undefined} />
         {delDia.length === 0 ? (
@@ -140,6 +148,22 @@ export function Calendario() {
       <View style={{ alignItems: 'center' }}>
         <Enlace onPress={() => ir('movimientos')}>Ver todo</Enlace>
       </View>
+    </>
+  );
+
+  return (
+    <>
+      {columnaInicio ? (
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 28 }}>
+          <View style={{ width: columnaInicio, gap: 16 }}>{elMes}</View>
+          <View style={{ flex: 1, minWidth: 0, gap: 16 }}>{elDia}</View>
+        </View>
+      ) : (
+        <>
+          {elMes}
+          {elDia}
+        </>
+      )}
 
       <ElegirMes visible={elegirMes} anio={mes.anio} mes={mes.mes} hoy={d.hoy} alElegir={mes.cambiar} alCerrar={() => setElegirMes(false)} />
     </>

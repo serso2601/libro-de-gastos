@@ -77,7 +77,7 @@ class CategoriaIn(BaseModel):
     nombre: str = Field(min_length=1, max_length=60)
     tipo: Literal["gasto", "ingreso"]
     color: str = Color
-    emoji: str = Field(default="💰", min_length=1, max_length=16)
+    emoji: str = Field(default="💰", min_length=1, max_length=32)  # un emoji o «i:<símbolo>» (i:electrodomestico)
     presupuesto: int | None = Field(default=None, ge=0)
     acumula: bool = False  # pasa lo que sobra del periodo al siguiente
     acumula_desde: date | None = None  # inicio del periodo desde el que se acumula; sin acumular, se descarta

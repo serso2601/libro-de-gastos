@@ -28,8 +28,10 @@ hora, borrar con el aviso, las 4 pestañas, la pila, Ajustes, modo claro); **fal
 2. Anotar algo en el iPad (aquí el UUID se arma a mano porque Safari por http no da `randomUUID`) y verlo en el
    teléfono.
 3. Que el teclado de Safari no tape el botón Guardar de las hojas, y que el campo de hora abra la rueda de iOS.
-4. En el iPad la app va en una columna del ancho de un teléfono, al centro. Si el usuario la quiere a lo ancho de
-   la tableta, es un trabajo aparte de diseño.
+4. **La web ya se acomoda al tamaño** (24/oct): en el teléfono igual que la app; en el iPad y la computadora, barra
+   al costado, hojas como ventana y dos columnas (ver `CLAUDE.md`). Probado en Chrome a 390, 820, 1180 y 1440; falta
+   verlo en el iPad de verdad (vertical y horizontal) y que el usuario diga si le gusta la distribución.
+   Ideas si hace falta: que Ajustes y una cuenta abran sin tapar la barra lateral; atajos de teclado en la computadora.
 
 ## Por probar en el iPhone (cuando se pueda volver a firmar)
 

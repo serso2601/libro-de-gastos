@@ -7,6 +7,7 @@ import { useDatos } from '@/lib/datos';
 import { MESES, mayuscula, neto, ordenarPorFecha, tituloDia } from '@/lib/formato';
 import type { Movimiento, Proximo } from '@/lib/tipos';
 import { Buscador, CabeceraDia, Enlace, FilaMovimiento, Lista, Num, Rotulo, Segmentos, Tarjeta, Texto, Vacio } from '@/ui/componentes';
+import { useDisposicion } from '@/ui/disposicion';
 import { Icono } from '@/ui/iconos';
 import { Marco } from '@/ui/pantalla';
 import { alfa, useTema } from '@/ui/tema';
@@ -20,7 +21,8 @@ const FILTROS: [Filtro, string][] = [['todos', 'Todos'], ['gasto', 'Gastos'], ['
 
 /**
  * Movimientos: la lista y los Gráficos. Arriba de la lista va lo que todavía se va a anotar solo en
- * lo que queda del mes; cuando llega su día pasa a la lista como cualquier otro movimiento.
+ * lo que queda del mes; cuando llega su día pasa a la lista como cualquier otro movimiento. En una pantalla
+ * ancha, la lista y los Gráficos van lado a lado.
  */
 export function Movimientos() {
   const d = useDatos();
@@ -28,7 +30,8 @@ export function Movimientos() {
   const [vista, setVista] = useState<Vista>('lista');
   const abrir = useAbrir();
   const anotar = useAnotar();
-  const { c, colorCuenta, estilo } = useTema();
+  const { c, colorCuenta } = useTema();
+  const { dosColumnas, margen } = useDisposicion();
   const [filtro, setFiltro] = useState<Filtro>('todos');
   const [busqueda, setBusqueda] = useState('');
   const [limite, setLimite] = useState(80);
@@ -81,99 +84,108 @@ export function Movimientos() {
   const entro = sumar(delMesActual, 'ingreso');
   const mesNombre = mayuscula(MESES[Number(mesActual.slice(5, 7)) - 1]);
 
-  return (
-    <Marco titulo="Movimientos" subtitulo={`${mesNombre} · ${delMesActual.length} ${delMesActual.length === 1 ? 'anotado' : 'anotados'}`}>
-      <Segmentos opciones={VISTAS} valor={vista} alCambiar={setVista} />
+  const lista = (
+    <>
+      <Tarjeta style={{ flexDirection: 'row', paddingVertical: 12, paddingHorizontal: 16, gap: 16 }}>
+        <View style={{ flex: 1, gap: 2 }}>
+          <Texto tam={13} color={c.tenue}>Salió</Texto>
+          <Num tam={22} color={salio ? c.gasto : undefined} lineas={1}>{neto(salio, d.moneda)}</Num>
+        </View>
+        <View style={{ flex: 1, gap: 2 }}>
+          <Texto tam={13} color={c.tenue}>Entró</Texto>
+          <Num tam={22} color={entro ? c.ingreso : undefined} lineas={1}>{neto(entro, d.moneda)}</Num>
+        </View>
+      </Tarjeta>
 
-      {vista === 'graficos' && <ContenidoGraficos />}
-      {vista === 'lista' && (
-        <>
-          <Tarjeta style={{ flexDirection: 'row', paddingVertical: 12, paddingHorizontal: 16, gap: 16 }}>
-            <View style={{ flex: 1, gap: 2 }}>
-              <Texto tam={13} color={c.tenue}>Salió</Texto>
-              <Num tam={22} color={salio ? c.gasto : undefined} lineas={1}>{neto(salio, d.moneda)}</Num>
-            </View>
-            <View style={{ flex: 1, gap: 2 }}>
-              <Texto tam={13} color={c.tenue}>Entró</Texto>
-              <Num tam={22} color={entro ? c.ingreso : undefined} lineas={1}>{neto(entro, d.moneda)}</Num>
-            </View>
-          </Tarjeta>
+      <Buscador valor={busqueda} alCambiar={setBusqueda} placeholder="Buscar por descripción o categoría" />
 
-          <Buscador valor={busqueda} alCambiar={setBusqueda} placeholder="Buscar por descripción o categoría" />
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginHorizontal: dosColumnas ? 0 : -margen }}
+        contentContainerStyle={{ gap: 6, paddingHorizontal: dosColumnas ? 0 : margen }}>
+        {FILTROS.map(([id, texto]) => {
+          const activo = filtro === id;
+          return (
+            <Pressable key={id} onPress={() => setFiltro(id)} style={{ height: 34, paddingHorizontal: 14, borderRadius: 17, backgroundColor: activo ? c.boton : c.tarjeta, justifyContent: 'center' }}>
+              <Texto tam={13} peso={activo ? 'semi' : 'medio'} color={activo ? c.sobreBoton : c.tenue}>{texto}</Texto>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginHorizontal: -estilo.m.margen }}
-            contentContainerStyle={{ gap: 6, paddingHorizontal: estilo.m.margen }}>
-            {FILTROS.map(([id, texto]) => {
-              const activo = filtro === id;
+      {(porVenir.length > 0 || sugeridos.length > 0) && (
+        <View style={{ gap: 6 }}>
+          <Rotulo derecha={(
+            <Texto tam={13}>
+              {vaASalir > 0 && <Texto num tam={13} peso="medio" color={c.gasto}>−{neto(vaASalir, d.moneda)}</Texto>}
+              {vaASalir > 0 && vaAEntrar > 0 && '  '}
+              {vaAEntrar > 0 && <Texto num tam={13} peso="medio" color={c.ingreso}>+{neto(vaAEntrar, d.moneda)}</Texto>}
+            </Texto>
+          )}>
+            Por venir en {mesNombre.toLowerCase()}
+          </Rotulo>
+          {/* Borde punteado: todavía no pasó; se anota solo cuando llegue su día (el pago de una tarjeta, solo si tú lo confirmas). */}
+          <Lista style={{ borderWidth: 1.5, borderStyle: 'dashed', borderColor: alfa(c.tenue, 0.35) }}>
+            {porVenir.map((p, i) => {
+              const regla = d.recurrencias.find((r) => r.id === p.recurrencia_id);
               return (
-                <Pressable key={id} onPress={() => setFiltro(id)} style={{ height: 34, paddingHorizontal: 14, borderRadius: 17, backgroundColor: activo ? c.boton : c.tarjeta, justifyContent: 'center' }}>
-                  <Texto tam={13} peso={activo ? 'semi' : 'medio'} color={activo ? c.sobreBoton : c.tenue}>{texto}</Texto>
+                <FilaMovimiento key={`${p.recurrencia_id}@${p.fecha}`} m={p} primera={i === 0}
+                  detalle={`Se anota solo ${cuandoViene(p.fecha, d.hoy)} · ${nombreCuenta(p.cuenta_id)}`}
+                  onPress={regla ? () => abrir({ tipo: 'recurrencia', regla }) : undefined} />
+              );
+            })}
+            {sugeridos.map(({ cuenta, pago }, i) => {
+              const delMesPago = pago.fecha && pago.fecha.slice(0, 7) === mesActual ? pago.fecha : null;
+              const cuando = delMesPago ? (delMesPago < d.hoy ? `venció el ${Number(delMesPago.slice(8))}` : `paga ${cuandoViene(delMesPago, d.hoy)}`) : '';
+              return (
+                <Pressable key={`pago@${cuenta.id}`} onPress={() => registrarPago(cuenta.id, pago.total)}
+                  style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 54, paddingVertical: 6,
+                    borderTopWidth: porVenir.length + i === 0 ? 0 : 1, borderTopColor: c.linea, opacity: pressed ? 0.6 : 1 })}>
+                  <View style={{ width: 6, height: 28, borderRadius: 3, backgroundColor: colorCuenta(cuenta.color) }} />
+                  <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                      <Texto tam={15} peso="medio" lineas={1} style={{ flexShrink: 1 }}>Pago de {cuenta.nombre}</Texto>
+                      <Icono nombre="transferir" tam={12} color={c.tenue} />
+                    </View>
+                    <Texto tam={13} color={c.tenue} lineas={2}>
+                      Sugerido · Total {neto(pago.total, d.moneda)}{pago.minimo ? ` · Mínimo ${neto(pago.minimo, d.moneda)}` : ''}{cuando ? ` · ${cuando}` : ''}
+                    </Texto>
+                  </View>
+                  <Texto tam={13} peso="semi" color={c.acento}>Registrar</Texto>
                 </Pressable>
               );
             })}
-          </ScrollView>
+          </Lista>
+        </View>
+      )}
 
-          {(porVenir.length > 0 || sugeridos.length > 0) && (
-            <View style={{ gap: 6 }}>
-              <Rotulo derecha={(
-                <Texto tam={13}>
-                  {vaASalir > 0 && <Texto num tam={13} peso="medio" color={c.gasto}>−{neto(vaASalir, d.moneda)}</Texto>}
-                  {vaASalir > 0 && vaAEntrar > 0 && '  '}
-                  {vaAEntrar > 0 && <Texto num tam={13} peso="medio" color={c.ingreso}>+{neto(vaAEntrar, d.moneda)}</Texto>}
-                </Texto>
-              )}>
-                Por venir en {mesNombre.toLowerCase()}
-              </Rotulo>
-              {/* Borde punteado: todavía no pasó; se anota solo cuando llegue su día (el pago de una tarjeta, solo si tú lo confirmas). */}
-              <Lista style={{ borderWidth: 1.5, borderStyle: 'dashed', borderColor: alfa(c.tenue, 0.35) }}>
-                {porVenir.map((p, i) => {
-                  const regla = d.recurrencias.find((r) => r.id === p.recurrencia_id);
-                  return (
-                    <FilaMovimiento key={`${p.recurrencia_id}@${p.fecha}`} m={p} primera={i === 0}
-                      detalle={`Se anota solo ${cuandoViene(p.fecha, d.hoy)} · ${nombreCuenta(p.cuenta_id)}`}
-                      onPress={regla ? () => abrir({ tipo: 'recurrencia', regla }) : undefined} />
-                  );
-                })}
-                {sugeridos.map(({ cuenta, pago }, i) => {
-                  const delMesPago = pago.fecha && pago.fecha.slice(0, 7) === mesActual ? pago.fecha : null;
-                  const cuando = delMesPago ? (delMesPago < d.hoy ? `venció el ${Number(delMesPago.slice(8))}` : `paga ${cuandoViene(delMesPago, d.hoy)}`) : '';
-                  return (
-                    <Pressable key={`pago@${cuenta.id}`} onPress={() => registrarPago(cuenta.id, pago.total)}
-                      style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 54, paddingVertical: 6,
-                        borderTopWidth: porVenir.length + i === 0 ? 0 : 1, borderTopColor: c.linea, opacity: pressed ? 0.6 : 1 })}>
-                      <View style={{ width: 6, height: 28, borderRadius: 3, backgroundColor: colorCuenta(cuenta.color) }} />
-                      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                          <Texto tam={15} peso="medio" lineas={1} style={{ flexShrink: 1 }}>Pago de {cuenta.nombre}</Texto>
-                          <Icono nombre="transferir" tam={12} color={c.tenue} />
-                        </View>
-                        <Texto tam={13} color={c.tenue} lineas={2}>
-                          Sugerido · Total {neto(pago.total, d.moneda)}{pago.minimo ? ` · Mínimo ${neto(pago.minimo, d.moneda)}` : ''}{cuando ? ` · ${cuando}` : ''}
-                        </Texto>
-                      </View>
-                      <Texto tam={13} peso="semi" color={c.acento}>Registrar</Texto>
-                    </Pressable>
-                  );
-                })}
-              </Lista>
-            </View>
-          )}
+      {grupos.lista.length === 0
+        ? <Vacio>{busqueda || filtro !== 'todos' ? 'No hay nada que coincida.' : 'Todavía no hay movimientos. Toca + para anotar el primero.'}</Vacio>
+        : grupos.lista.map(([fecha, items]) => (
+          <View key={fecha} style={{ gap: 6 }}>
+            <CabeceraDia titulo={tituloDia(fecha, d.hoy)} derecha={neto(netoDe(items), d.moneda, true)} />
+            <Lista>
+              {items.map((m, i) => <FilaMovimiento key={m.id} m={m} primera={i === 0} onPress={() => abrir({ tipo: 'movimiento', inicial: m })} />)}
+            </Lista>
+          </View>
+        ))}
+      {grupos.total > limite && (
+        <View style={{ alignItems: 'center', paddingVertical: 8 }}>
+          <Enlace tam={15} onPress={() => setLimite((l) => l + 200)}>Ver más ({grupos.total - limite})</Enlace>
+        </View>
+      )}
+    </>
+  );
 
-          {grupos.lista.length === 0
-            ? <Vacio>{busqueda || filtro !== 'todos' ? 'No hay nada que coincida.' : 'Todavía no hay movimientos. Toca + para anotar el primero.'}</Vacio>
-            : grupos.lista.map(([fecha, items]) => (
-              <View key={fecha} style={{ gap: 6 }}>
-                <CabeceraDia titulo={tituloDia(fecha, d.hoy)} derecha={neto(netoDe(items), d.moneda, true)} />
-                <Lista>
-                  {items.map((m, i) => <FilaMovimiento key={m.id} m={m} primera={i === 0} onPress={() => abrir({ tipo: 'movimiento', inicial: m })} />)}
-                </Lista>
-              </View>
-            ))}
-          {grupos.total > limite && (
-            <View style={{ alignItems: 'center', paddingVertical: 8 }}>
-              <Enlace tam={15} onPress={() => setLimite((l) => l + 200)}>Ver más ({grupos.total - limite})</Enlace>
-            </View>
-          )}
+  return (
+    <Marco angosto={!dosColumnas} titulo="Movimientos" subtitulo={`${mesNombre} · ${delMesActual.length} ${delMesActual.length === 1 ? 'anotado' : 'anotados'}`}>
+      {dosColumnas ? (
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 36 }}>
+          <View style={{ flex: 6, minWidth: 0, gap: 12 }}>{lista}</View>
+          <View style={{ flex: 5, minWidth: 0, gap: 12 }}><ContenidoGraficos /></View>
+        </View>
+      ) : (
+        <>
+          <Segmentos opciones={VISTAS} valor={vista} alCambiar={setVista} />
+          {vista === 'graficos' ? <ContenidoGraficos /> : lista}
         </>
       )}
     </Marco>
