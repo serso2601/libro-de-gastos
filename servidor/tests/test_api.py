@@ -138,6 +138,7 @@ def test_sirve_la_app_web(config, reloj, tmp_path):
     (web / "_expo").mkdir(parents=True)
     (web / "index.html").write_text("<div id=root>", encoding="utf-8")
     (web / "_expo" / "entry.js").write_text("app()", encoding="utf-8")
+    (web / "_expo" / "grande.js").write_text("x" * 5000, encoding="utf-8")
     (tmp_path / "secreto.txt").write_text("no", encoding="utf-8")
     with TestClient(create_app(config, hoy=reloj, web=web), client=("100.100.20.2", 50000)) as c:
         assert c.get("/app", follow_redirects=False).headers["location"] == "/app/"
@@ -145,6 +146,7 @@ def test_sirve_la_app_web(config, reloj, tmp_path):
         assert c.get("/app/cuenta/abc").text == "<div id=root>"  # las rutas de la app dan la página
         js = c.get("/app/_expo/entry.js")
         assert js.text == "app()" and "immutable" in js.headers["cache-control"]
+        assert c.get("/app/_expo/grande.js").headers["content-encoding"] == "gzip"  # va comprimido
         assert c.get("/app/%2e%2e/secreto.txt").text == "<div id=root>"  # nada fuera de la carpeta
 
 

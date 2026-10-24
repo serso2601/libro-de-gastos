@@ -83,6 +83,9 @@ Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
   avisos de confirmar van por `ui/aviso.avisar` (Alert no hace nada en la web). En el iPad se ve
   con el ancho de un teléfono, al centro (`COLUMNA_WEB`, 520): adaptarla a tableta es otro trabajo.
   Por http (Tailscale) Safari no da `crypto.randomUUID`: `formato.nuevoId` arma el UUID a mano.
+  La web va en **un solo archivo** (`asyncRoutes.web: false`: por pantallas sueltas, la de inicio
+  del iPad se quedaba en negro) y el servidor la manda **comprimida** (gzip). Si la letra no carga,
+  sigue con la del sistema; si algo falla al abrir, `public/index.html` muestra el error y «Recargar».
 - **Montos en centavos (enteros)** en base y API. Fechas ISO. Formato de pantalla $1,234.56.
 - **Recurrencias = reglas**, no copias por adelantado: el servidor anota cada movimiento cuando
   llega su fecha (`recurrencias.materializar`, al pedir datos y cada 30 min) y guarda

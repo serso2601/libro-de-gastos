@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Literal
 
 from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Request
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field, model_validator
 
@@ -215,6 +216,8 @@ def create_app(config: Config | None = None, hoy=date.today, web: Path = WEB) ->
         inicial.close()
 
     app = FastAPI(title="Libro de Gastos", docs_url=None, redoc_url=None)
+    # Comprimido: el código de la app web pesa 1 MB y por Tailscale se nota (queda en ~¼).
+    app.add_middleware(GZipMiddleware, minimum_size=1000)
     app.state.config = config
 
     def conexion() -> Iterator[sqlite3.Connection]:

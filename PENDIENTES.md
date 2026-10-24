@@ -12,8 +12,11 @@ Apple bloqueó Sideloadly, así que la app del iPhone no se puede volver a firma
 misma app, servida por la PC en `http://<ip tailscale>:8766/app`. Se probó en Chrome de la PC (anotar con fecha y
 hora, borrar con el aviso, las 4 pestañas, la pila, Ajustes, modo claro); **falta probarla en el iPad y el iPhone**:
 
-1. Con Tailscale prendido en el iPad, escanear el QR «En el navegador» de la página de estado y ver que entra ya
-   conectada. Luego Compartir → «Agregar a pantalla de inicio» y abrirla desde el ícono (pantalla completa).
+1. **Abrirla desde el ícono de la pantalla de inicio del iPad.** El 23/oct en Safari abrió (lenta), pero desde el
+   ícono se quedó en negro: según el registro bajó el código y pidió los datos, pero nunca la pantalla de Inicio.
+   Se corrigió: un solo archivo en vez de pantallas sueltas, comprimido (de ~1.8 MB a ~0.6 MB), y la app ya no
+   espera para siempre a la letra. Si vuelve a fallar, a los 20 s sale «No terminó de abrir» con el error: pedirle
+   al usuario ese texto. El usuario entra con el link y la clave, sin QR.
 2. Anotar algo en el iPad (aquí el UUID se arma a mano porque Safari por http no da `randomUUID`) y verlo en el
    teléfono.
 3. Que el teclado de Safari no tape el botón Guardar de las hojas, y que el campo de hora abra la rueda de iOS.

@@ -18,9 +18,11 @@ import { ProveedorTema, useTema } from '@/ui/tema';
 SplashScreen.preventAutoHideAsync();
 
 export default function Raiz() {
-  const [listas] = useFonts({
+  // Si la letra no carga (en la web puede tardar o fallar), se sigue con la del sistema: nunca pantalla en negro.
+  const [cargadas, error] = useFonts({
     Onest_400Regular, Onest_500Medium, Onest_600SemiBold, Onest_700Bold,
   });
+  const listas = cargadas || !!error;
 
   useEffect(() => {
     if (listas) SplashScreen.hideAsync();

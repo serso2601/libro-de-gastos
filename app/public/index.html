@@ -23,5 +23,27 @@
   <body>
     <noscript>Hace falta JavaScript para abrir la app.</noscript>
     <div id="root"></div>
+    <!-- Si algo falla al abrir, en vez de quedar en negro se ve el error y un botón para recargar. -->
+    <div id="falla" style="display:none;position:fixed;inset:0;padding:60px 24px;background:#0B0E13;color:#F5F6F7;font:15px/1.4 system-ui,sans-serif;z-index:9">
+      <p style="font-size:20px;font-weight:600;margin:0 0 8px">No terminó de abrir</p>
+      <p id="falla-texto" style="color:rgba(245,246,247,.6);margin:0 0 20px;word-break:break-word"></p>
+      <button onclick="location.reload()" style="font:600 17px system-ui;padding:14px 22px;border:0;border-radius:14px;background:#F5F6F7;color:#0B0E13">Recargar</button>
+    </div>
+    <script>
+      (function () {
+        var errores = [];
+        function mostrar(texto) {
+          document.getElementById('falla-texto').textContent = texto;
+          document.getElementById('falla').style.display = 'block';
+        }
+        window.addEventListener('error', function (e) { errores.push(e.message || String(e)); });
+        window.addEventListener('unhandledrejection', function (e) { errores.push(String(e.reason && e.reason.message || e.reason)); });
+        // A los 20 segundos sin nada dibujado, se muestra qué pasó.
+        setTimeout(function () {
+          var root = document.getElementById('root');
+          if (root && root.innerText.trim() === '') mostrar(errores.length ? errores.join(' · ') : 'Se quedó cargando: revisa que Tailscale esté prendido.');
+        }, 20000);
+      })();
+    </script>
   </body>
 </html>
