@@ -15,6 +15,7 @@ viene de la red de la casa o de cualquier otro lado se rechaza antes de mirar el
 """
 
 import ipaddress
+import mimetypes
 import secrets
 import sqlite3
 from collections.abc import Iterator
@@ -32,6 +33,8 @@ from .config import Config
 
 SIN_ENTRADA = "Falta el token o no es el de este servidor"
 WEB = Path(__file__).resolve().parents[2] / "app" / "dist"  # `npx expo export --platform web` en app/
+# Python en Windows no conoce la letra de la app (.ttf) y la mandaba como application/octet-stream.
+mimetypes.add_type("font/ttf", ".ttf")
 
 # Loopback y los rangos que Tailscale usa para sus equipos (IPv4 100.64.0.0/10, IPv6 fd7a:115c:a1e0::/48).
 RED_PERMITIDA = [ipaddress.ip_network(r) for r in ("127.0.0.0/8", "::1/128", "100.64.0.0/10", "fd7a:115c:a1e0::/48")]
