@@ -17,11 +17,13 @@ import { ProveedorTema, useTema } from '@/ui/tema';
 SplashScreen.preventAutoHideAsync();
 
 export default function Raiz() {
-  // Si la letra no carga (en la web puede tardar o fallar), se sigue con la del sistema: nunca pantalla en negro.
+  // Si la letra no carga, se sigue con la del sistema: nunca pantalla en negro. En la web no se espera: Safari
+  // nunca confirma que la bajó y expo-font se rinde a los 12 s (la web tardaba eso en abrir en el iPhone y el
+  // iPad); la regla de la letra ya está puesta y el navegador la usa en cuanto llega.
   const [cargadas, error] = useFonts({
     Onest_400Regular, Onest_500Medium, Onest_600SemiBold, Onest_700Bold,
   });
-  const listas = cargadas || !!error;
+  const listas = cargadas || !!error || Platform.OS === 'web';
 
   useEffect(() => {
     if (listas) SplashScreen.hideAsync();
