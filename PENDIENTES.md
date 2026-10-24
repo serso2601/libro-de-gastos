@@ -17,6 +17,14 @@ hora, borrar con el aviso, las 4 pestañas, la pila, Ajustes, modo claro); **fal
    Se corrigió: un solo archivo en vez de pantallas sueltas, comprimido (de ~1.8 MB a ~0.6 MB), y la app ya no
    espera para siempre a la letra. Si vuelve a fallar, a los 20 s sale «No terminó de abrir» con el error: pedirle
    al usuario ese texto. El usuario entra con el link y la clave, sin QR.
+1b. **Que llegue hasta abajo en el iPhone** (desde el ícono quedaba una franja negra bajo la barra de pestañas). Se
+   pasó la barra de estado a sólida (`black`): con `black-translucent` iOS calcula mal el alto. Si sigue la franja,
+   borrar el ícono y volver a agregarlo (iOS puede guardar la barra al agregarlo).
+1c. **Lo que tarda en abrir** (4–5 s en el iPhone; en la PC dibuja en 0.14 s y el teléfono ya no vuelve a bajar el
+   código). Cada vez que abre, la web le manda a la PC sus tiempos: buscar «Arranque web» en
+   `datosegistros\servidor.log` (pagina = llegó la página, dibujo = se vio algo, en ms). Si «pagina» es grande, es
+   la conexión al despertar Tailscale; si es «dibujo», es el teléfono procesando. Lo que no aparece ahí (antes de
+   que empiece la página) es lo que tarda iOS en abrir la web desde el ícono.
 2. Anotar algo en el iPad (aquí el UUID se arma a mano porque Safari por http no da `randomUUID`) y verlo en el
    teléfono.
 3. Que el teclado de Safari no tape el botón Guardar de las hojas, y que el campo de hora abra la rueda de iOS.

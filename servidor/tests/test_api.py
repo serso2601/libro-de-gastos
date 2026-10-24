@@ -147,6 +147,7 @@ def test_sirve_la_app_web(config, reloj, tmp_path):
         js = c.get("/app/_expo/entry.js")
         assert js.text == "app()" and "immutable" in js.headers["cache-control"]
         assert c.get("/app/_expo/grande.js").headers["content-encoding"] == "gzip"  # va comprimido
+        assert c.post("/app/arranque", content='{"dibujo": 900}').status_code == 200
         assert c.get("/app/%2e%2e/secreto.txt").text == "<div id=root>"  # nada fuera de la carpeta
 
 

@@ -270,6 +270,12 @@ def create_app(config: Config | None = None, hoy=date.today, web: Path = WEB) ->
             raise HTTPException(404, "Falta compilar la app web: npx expo export --platform web en app/")
         return FileResponse(indice, headers={"Cache-Control": "no-cache"})
 
+    @app.post("/app/arranque", include_in_schema=False)
+    async def arranque(request: Request):
+        """La web avisa cuánto tardó en abrir (ver public/index.html); queda en el registro."""
+        print(f"Arranque web desde {request.client.host if request.client else '?'}: {(await request.body())[:300].decode(errors='replace')}", flush=True)
+        return {"ok": True}
+
     @app.get("/salud")
     def salud():
         return {"ok": True}

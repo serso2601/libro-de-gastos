@@ -7,7 +7,8 @@
     <!-- Agregada a la pantalla de inicio del iPad, se abre a pantalla completa, como una app. -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <!-- Barra de estado sólida: con «black-translucent» iOS calcula mal el alto y deja una franja vacía abajo. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <meta name="apple-mobile-web-app-title" content="Gastos" />
     <link rel="apple-touch-icon" href="/app/icono.png" />
     <link rel="icon" type="image/png" href="/app/icono.png" />
@@ -43,6 +44,20 @@
           var root = document.getElementById('root');
           if (root && root.innerText.trim() === '') mostrar(errores.length ? errores.join(' · ') : 'Se quedó cargando: revisa que Tailscale esté prendido.');
         }, 20000);
+        // Cuánto tardó en abrir (ms desde que el navegador empezó): se le cuenta a la PC, que lo anota en su registro.
+        var observador = new MutationObserver(function () {
+          var root = document.getElementById('root');
+          if (!root || root.innerText.trim() === '') return;
+          observador.disconnect();
+          var n = performance.getEntriesByType('navigation')[0] || {};
+          var js = performance.getEntriesByType('resource').filter(function (r) { return /entry-/.test(r.name); })[0];
+          var tiempos = {
+            pagina: Math.round(n.responseEnd || 0), codigo: js ? Math.round(js.responseEnd) : 'en caché',
+            dibujo: Math.round(performance.now()), desde_icono: !!navigator.standalone,
+          };
+          if (navigator.sendBeacon) navigator.sendBeacon('/app/arranque', JSON.stringify(tiempos));
+        });
+        observador.observe(document.getElementById('root'), { childList: true, subtree: true, characterData: true });
       })();
     </script>
   </body>
