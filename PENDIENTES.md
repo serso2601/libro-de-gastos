@@ -4,7 +4,7 @@ Lo que quedó por probar, revisar o retomar. Claude lo lee al iniciar cada chat 
 seguir con otra cosa (ver «Al iniciar cada chat» en `CLAUDE.md`). Al terminar una sesión se actualiza: lo que ya
 se probó sale; lo que quedó a medias entra.
 
-Última actualización: 23/oct/2026.
+Última actualización: 24/oct/2026.
 
 ## Por probar en la web (iPad), hecha el 23/oct
 
@@ -17,9 +17,15 @@ hora, borrar con el aviso, las 4 pestañas, la pila, Ajustes, modo claro); **fal
    Se corrigió: un solo archivo en vez de pantallas sueltas, comprimido (de ~1.8 MB a ~0.6 MB), y la app ya no
    espera para siempre a la letra. Si vuelve a fallar, a los 20 s sale «No terminó de abrir» con el error: pedirle
    al usuario ese texto. El usuario entra con el link y la clave, sin QR.
-1b. **Que llegue hasta abajo en el iPhone** (desde el ícono quedaba una franja negra bajo la barra de pestañas). Se
-   pasó la barra de estado a sólida (`black`): con `black-translucent` iOS calcula mal el alto. Si sigue la franja,
-   borrar el ícono y volver a agregarlo (iOS puede guardar la barra al agregarlo).
+1b. **La web en el iPhone, a pantalla completa** (24/oct). Con la barra `black`, iOS igual dibujaba la página detrás
+   de la hora pero le daba el alto de la pantalla menos esa barra: todo corrido hacia arriba, franja vacía abajo y
+   «Cancelar» de las hojas escondido. Se corrigió: `index.html` mide el alto real (clase `alto-real`, `--alto`) y
+   estira la app y sus ventanas; las hojas empiezan debajo de la barra; arriba hay 14 px más de aire
+   (`ui/zonaSegura.web.ts`), porque iOS difumina lo que queda pegado a la barra. **Falta verlo en el iPhone**
+   (cerrar la web del todo y abrirla desde el ícono): barra de pestañas hasta abajo, «‹ Volver» y «Cancelar»
+   visibles y tocables. Si no queda, buscar «Arranque web» en `datos\registros\servidor.log`: `alto` dice
+   pantalla/alto que dio iOS+margen de arriba (p. ej. `844/790+54`). Si ahí dice «sin medir», no se detectó como
+   iPhone desde el ícono.
 1c. **Lo que tarda en abrir** (4–5 s en el iPhone; en la PC dibuja en 0.14 s y el teléfono ya no vuelve a bajar el
    código). Cada vez que abre, la web le manda a la PC sus tiempos: buscar «Arranque web» en
    `datos\registros\servidor.log` (pagina = llegó la página, dibujo = se vio algo, en ms). Si «pagina» es grande, es
