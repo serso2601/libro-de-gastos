@@ -2,14 +2,11 @@
 <html lang="es">
   <head>
     <meta charset="utf-8" />
-    <!-- viewport-fit=cover: la app usa las zonas seguras (la barra de arriba y la de abajo del iPad). -->
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
-    <!-- Agregada a la pantalla de inicio del iPad, se abre a pantalla completa, como una app. -->
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <!-- Las versiones nuevas de iOS dibujan la página detrás de la barra de estado igual: el alto lo corrige el
-         script del principio del body y lo de arriba lo salta la app con la zona segura (ui/zonaSegura.web.ts). -->
-    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <!-- Sin «viewport-fit=cover» ni las etiquetas viejas de Apple (apple-mobile-web-app-capable y
+         -status-bar-style): con ellas, iOS 26 dibujaba la página detrás de la hora pero con el alto de la pantalla
+         menos esa barra, y quedaba una franja vacía abajo. Sin ellas, la página va de debajo de la hora hasta el
+         borde de abajo, y desde la pantalla de inicio igual abre como app (iOS 26 lo hace con cualquier página). -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
     <meta name="apple-mobile-web-app-title" content="Gastos" />
     <link rel="apple-touch-icon" href="/app/icono.png" />
     <link rel="icon" type="image/png" href="/app/icono.png" />
@@ -18,9 +15,9 @@
       html, body { height: 100%; background-color: #0B0E13; }
       body { overflow: hidden; overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
       #root { display: flex; height: 100%; flex: 1; }
-      /* En el iPhone, abierta desde el ícono, iOS le da a la página el alto de la pantalla menos la barra de
-         estado, pero la dibuja desde el borde de arriba: toda la app quedaba corrida hacia arriba, con una
-         franja vacía abajo. El script del body mide el alto de verdad (--alto); la app y sus ventanas lo usan. */
+      /* Respaldo: si iOS (por ejemplo, con un ícono agregado antes de este cambio) igual dibuja la página detrás
+         de la hora con el alto corto, el script del body mide el alto de verdad (--alto) y la app y sus ventanas
+         lo usan. */
       html.alto-real #root { position: fixed; top: 0; left: 0; right: 0; height: var(--alto); }
       html.alto-real [aria-modal="true"] { bottom: auto !important; height: var(--alto) !important; }
       /* Es una app de tocar: sin el borde que el navegador le pone a lo que tiene el foco. */
@@ -32,19 +29,23 @@
   <body>
     <script>
       // El alto de verdad en el iPhone abierto desde el ícono (ver el estilo de arriba). Si iOS da la página
-      // más corta que la pantalla y la barra de estado la tapa por arriba, le falta justo ese margen.
+      // más corta que la pantalla y la barra de estado la tapa por arriba, le falta justo ese margen. iOS avisa
+      // el margen un poco después de abrir: por eso se vuelve a medir al cargar y durante los primeros segundos.
       (function () {
-        if (!navigator.standalone || !/iPhone|iPod/.test(navigator.userAgent)) return;
+        var icono = navigator.standalone || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
+        if (!icono || !/iPhone|iPod/.test(navigator.userAgent)) return;
         var sonda = document.createElement('div');
-        sonda.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;padding-top:env(safe-area-inset-top);visibility:hidden;pointer-events:none';
+        sonda.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;padding-top:env(safe-area-inset-top);' +
+          'padding-bottom:env(safe-area-inset-bottom);visibility:hidden;pointer-events:none';
         document.body.appendChild(sonda);
         function medir() {
           var raiz = document.documentElement;
           var vertical = innerHeight >= innerWidth;
           var pantalla = vertical ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height);
-          var arriba = parseFloat(getComputedStyle(sonda).paddingTop) || 0;
+          var margenes = getComputedStyle(sonda);
+          var arriba = parseFloat(margenes.paddingTop) || 0;
           var alto = Math.min(pantalla, innerHeight + arriba);
-          window.altoReal = pantalla + '/' + innerHeight + '+' + arriba;
+          window.altoReal = pantalla + '/' + innerHeight + '+' + arriba + ' abajo ' + (parseFloat(margenes.paddingBottom) || 0);
           if (alto > innerHeight) {
             raiz.style.setProperty('--alto', alto + 'px');
             raiz.classList.add('alto-real');
@@ -53,7 +54,10 @@
           }
         }
         medir();
+        addEventListener('load', medir);
+        [500, 1500, 3000].forEach(function (ms) { setTimeout(medir, ms); });
         addEventListener('resize', medir);
+        if (window.visualViewport) visualViewport.addEventListener('resize', medir);
         addEventListener('orientationchange', function () { setTimeout(medir, 300); });
       })();
     </script>
@@ -88,7 +92,8 @@
           var js = performance.getEntriesByType('resource').filter(function (r) { return /entry-/.test(r.name); })[0];
           var tiempos = {
             pagina: Math.round(n.responseEnd || 0), codigo: js ? Math.round(js.responseEnd) : 'en caché',
-            dibujo: Math.round(performance.now()), desde_icono: !!navigator.standalone,
+            dibujo: Math.round(performance.now()),
+            desde_icono: !!(navigator.standalone || (window.matchMedia && matchMedia('(display-mode: standalone)').matches)),
             alto: window.altoReal || 'sin medir', // pantalla/alto que dio iOS+margen de arriba
           };
           if (navigator.sendBeacon) navigator.sendBeacon('/app/arranque', JSON.stringify(tiempos));

@@ -92,9 +92,12 @@ Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
   columnas que caben (`columnasPara`); listas y Ajustes no pasan de 640 (`angosto` en `Marco`).
   Para probar tamaños: marcos (`iframe`) de 390, 820, 1180 y 1440 en una página del servidor de
   prueba, porque la ventana de Chrome de Claude se abre maximizada y no se deja achicar.
-  En el iPhone desde el ícono, iOS dibuja la página detrás de la barra de estado con un alto corto: `index.html`
-  mide el alto real (`alto-real`/`--alto`) y los márgenes salen de `ui/zonaSegura` (nunca `useSafeAreaInsets`
-  directo; la versión web deja 14 px más arriba). Las hojas en la web empiezan debajo de la barra.
+  En el iPhone desde el ícono (iOS 26), `viewport-fit=cover` y las etiquetas `apple-mobile-web-app-*` hacían que
+  iOS dibujara la página detrás de la hora con el alto de la pantalla menos esa barra (franja vacía abajo): la
+  página **no las lleva** (24/oct), como la web de la app universitaria, que en el mismo iPhone llega hasta abajo.
+  De respaldo, `index.html` mide el alto real (`alto-real`/`--alto`) si iOS informa un margen arriba. Los
+  márgenes salen de `ui/zonaSegura` (nunca `useSafeAreaInsets` directo; la versión web deja 14 px más arriba si
+  hay margen). Las hojas en la web empiezan debajo de ese margen.
   Por http (Tailscale) Safari no da `crypto.randomUUID`: `formato.nuevoId` arma el UUID a mano.
   La web va en **un solo archivo** (`asyncRoutes.web: false`: por pantallas sueltas, la de inicio
   del iPad se quedaba en negro) y el servidor la manda **comprimida** (gzip). Si la letra no carga,
