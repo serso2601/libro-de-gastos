@@ -4,7 +4,6 @@
 import { StatusBar } from 'expo-status-bar';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAbrir, useAnotar } from '@/dialogos/abrir';
 import { configPresupuesto, deudaTarjeta, flujoCuenta, gastadoEnCorte, montoEnCuenta, pagoSugerido, periodoDe, porDia, porVenirDelMes } from '@/lib/calculos';
 import { useDatos } from '@/lib/datos';
@@ -16,6 +15,7 @@ import { Icono } from '@/ui/iconos';
 import { Marco, useApilada, Volver } from '@/ui/pantalla';
 import { SimboloCategoria } from '@/ui/simbolos';
 import { alfa, sobre, useTema } from '@/ui/tema';
+import { useZonaSegura } from '@/ui/zonaSegura';
 import { cuandoViene } from './Proximos';
 
 function useMovsDeCuenta(cuenta: TCuenta | undefined, busqueda: string) {
@@ -146,7 +146,7 @@ function CuentaColor({ cuenta }: { cuenta: TCuenta }) {
   const d = useDatos();
   const abrir = useAbrir();
   const anotar = useAnotar();
-  const insets = useSafeAreaInsets();
+  const insets = useZonaSegura();
   const volver = useApilada() ?? 'Inicio';
   const { c, colorCuenta } = useTema();
   const { lateral, dosColumnas, margen } = useDisposicion();

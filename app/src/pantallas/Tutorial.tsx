@@ -4,11 +4,11 @@
 import { useIsFocused } from 'expo-router';
 import { useState } from 'react';
 import { Modal, Pressable, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BotonPrincipal, Texto } from '@/ui/componentes';
 import { useDisposicion, VENTANA } from '@/ui/disposicion';
 import { Icono, type NombreIcono } from '@/ui/iconos';
 import { usePreferencias, useTema } from '@/ui/tema';
+import { useZonaSegura } from '@/ui/zonaSegura';
 
 interface Paso { icono: NombreIcono; titulo: string; texto: string }
 
@@ -26,7 +26,7 @@ export function Tutorial() {
   const { estilo, c } = useTema();
   const { tutorialVisto, cambiar } = usePreferencias();
   const enFoco = useIsFocused();
-  const abajo = useSafeAreaInsets().bottom;
+  const abajo = useZonaSegura().bottom;
   const { lateral } = useDisposicion();
   const [paso, setPaso] = useState(0);
   const visible = enFoco && !tutorialVisto;

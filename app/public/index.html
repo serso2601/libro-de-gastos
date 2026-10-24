@@ -7,7 +7,8 @@
     <!-- Agregada a la pantalla de inicio del iPad, se abre a pantalla completa, como una app. -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <!-- Barra de estado sólida: con «black-translucent» iOS calcula mal el alto y deja una franja vacía abajo. -->
+    <!-- Las versiones nuevas de iOS dibujan la página detrás de la barra de estado igual: el alto lo corrige el
+         script del principio del body y lo de arriba lo salta la app con la zona segura (ui/zonaSegura.web.ts). -->
     <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <meta name="apple-mobile-web-app-title" content="Gastos" />
     <link rel="apple-touch-icon" href="/app/icono.png" />
@@ -17,6 +18,11 @@
       html, body { height: 100%; background-color: #0B0E13; }
       body { overflow: hidden; overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
       #root { display: flex; height: 100%; flex: 1; }
+      /* En el iPhone, abierta desde el ícono, iOS le da a la página el alto de la pantalla menos la barra de
+         estado, pero la dibuja desde el borde de arriba: toda la app quedaba corrida hacia arriba, con una
+         franja vacía abajo. El script del body mide el alto de verdad (--alto); la app y sus ventanas lo usan. */
+      html.alto-real #root { position: fixed; top: 0; left: 0; right: 0; height: var(--alto); }
+      html.alto-real [aria-modal="true"] { bottom: auto !important; height: var(--alto) !important; }
       /* Es una app de tocar: sin el borde que el navegador le pone a lo que tiene el foco. */
       *:focus, *:focus-visible { outline: none; }
       /* En la computadora, barras de desplazamiento finas y discretas (en el iPhone y el iPad no se ven). */
@@ -24,6 +30,33 @@
     </style>
   </head>
   <body>
+    <script>
+      // El alto de verdad en el iPhone abierto desde el ícono (ver el estilo de arriba). Si iOS da la página
+      // más corta que la pantalla y la barra de estado la tapa por arriba, le falta justo ese margen.
+      (function () {
+        if (!navigator.standalone || !/iPhone|iPod/.test(navigator.userAgent)) return;
+        var sonda = document.createElement('div');
+        sonda.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;padding-top:env(safe-area-inset-top);visibility:hidden;pointer-events:none';
+        document.body.appendChild(sonda);
+        function medir() {
+          var raiz = document.documentElement;
+          var vertical = innerHeight >= innerWidth;
+          var pantalla = vertical ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height);
+          var arriba = parseFloat(getComputedStyle(sonda).paddingTop) || 0;
+          var alto = Math.min(pantalla, innerHeight + arriba);
+          window.altoReal = pantalla + '/' + innerHeight + '+' + arriba;
+          if (alto > innerHeight) {
+            raiz.style.setProperty('--alto', alto + 'px');
+            raiz.classList.add('alto-real');
+          } else {
+            raiz.classList.remove('alto-real');
+          }
+        }
+        medir();
+        addEventListener('resize', medir);
+        addEventListener('orientationchange', function () { setTimeout(medir, 300); });
+      })();
+    </script>
     <noscript>Hace falta JavaScript para abrir la app.</noscript>
     <div id="root"></div>
     <!-- Si algo falla al abrir, en vez de quedar en negro se ve el error y un botón para recargar. -->
@@ -56,6 +89,7 @@
           var tiempos = {
             pagina: Math.round(n.responseEnd || 0), codigo: js ? Math.round(js.responseEnd) : 'en caché',
             dibujo: Math.round(performance.now()), desde_icono: !!navigator.standalone,
+            alto: window.altoReal || 'sin medir', // pantalla/alto que dio iOS+margen de arriba
           };
           if (navigator.sendBeacon) navigator.sendBeacon('/app/arranque', JSON.stringify(tiempos));
         });

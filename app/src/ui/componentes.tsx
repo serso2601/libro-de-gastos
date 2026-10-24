@@ -3,8 +3,7 @@
 
 import * as Haptics from 'expo-haptics';
 import { useRef, useState, type ComponentRef, type ReactNode } from 'react';
-import { KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type StyleProp, type TextInputProps, type TextStyle, type ViewStyle } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type StyleProp, type TextInputProps, type TextStyle, type ViewStyle } from 'react-native';
 import { useDatos } from '@/lib/datos';
 import { montoEnCuenta, type FormaSaldo } from '@/lib/calculos';
 import { conSigno, neto } from '@/lib/formato';
@@ -13,6 +12,7 @@ import { useDisposicion, VENTANA } from './disposicion';
 import { ESTILO, PALETA, type Peso } from './estilos';
 import { Icono, type NombreIcono } from './iconos';
 import { alfa, sobre, useTema, type Colores as ColoresTema } from './tema';
+import { useZonaSegura } from './zonaSegura';
 
 /** La letra de un peso. Los montos van en la misma letra, con cifras de ancho fijo (`tabular-nums`). */
 export function familia(peso: Peso): string {
@@ -388,8 +388,12 @@ export function FilaMovimiento({ m, onPress, cuentaId, primera, detalle, sinIcon
  */
 export function Hoja({ titulo, alCerrar, children, pie, derecha }: { titulo: string; alCerrar: () => void; children: ReactNode; pie?: ReactNode; derecha?: ReactNode }) {
   const { c, estilo } = useTema();
-  const abajo = useSafeAreaInsets().bottom;
+  const zona = useZonaSegura();
+  const abajo = zona.bottom;
   const { lateral } = useDisposicion();
+  // En la web no hay hoja de iOS: se dibuja una que empieza debajo de la barra de estado (si no, «Cancelar»
+  // queda escondido detrás de la hora).
+  const web = Platform.OS === 'web';
   // La hoja no empieza arriba de la pantalla: sin este corrimiento el teclado tapa el botón de abajo.
   const caja = useRef<ComponentRef<typeof View>>(null);
   const [arriba, setArriba] = useState(0);
@@ -425,8 +429,8 @@ export function Hoja({ titulo, alCerrar, children, pie, derecha }: { titulo: str
     );
   }
   return (
-    <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={alCerrar}>
-      <View ref={caja} style={{ flex: 1, backgroundColor: c.tarjeta }} onLayout={() => caja.current?.measureInWindow((_x, y) => setArriba(Math.max(0, y)))}>
+    <Modal visible animationType="slide" presentationStyle="pageSheet" transparent={web} onRequestClose={alCerrar}>
+      <View ref={caja} style={[{ flex: 1, backgroundColor: c.tarjeta }, web && { marginTop: zona.top, borderTopLeftRadius: 14, borderTopRightRadius: 14, overflow: 'hidden' }]} onLayout={() => caja.current?.measureInWindow((_x, y) => setArriba(Math.max(0, y)))}>
       <KeyboardAvoidingView behavior="padding" keyboardVerticalOffset={arriba} style={{ flex: 1 }}>
         <View style={{ alignSelf: 'center', width: 36, height: 5, borderRadius: 3, backgroundColor: alfa(c.tenue, 0.35), marginTop: 8 }} />
         {cabecera}

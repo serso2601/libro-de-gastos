@@ -3,19 +3,19 @@
 import * as Haptics from 'expo-haptics';
 import { createContext, useContext, useState, type ReactNode } from 'react';
 import { Modal, Pressable, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Grilla } from '@/dialogos/piezas';
 import { MESES_CORTOS, mayuscula } from '@/lib/formato';
 import { Texto } from './componentes';
 import { useDisposicion, VENTANA } from './disposicion';
 import { Icono } from './iconos';
 import { useTema } from './tema';
+import { useZonaSegura } from './zonaSegura';
 
 export function ElegirMes({ visible, anio, mes, hoy, alElegir, alCerrar }: {
   visible: boolean; anio: number; mes: number; hoy: string; alElegir: (anio: number, mes: number) => void; alCerrar: () => void;
 }) {
   const { c, estilo } = useTema();
-  const abajo = useSafeAreaInsets().bottom;
+  const abajo = useZonaSegura().bottom;
   const { lateral } = useDisposicion();
   const [viendo, setViendo] = useState(anio);
   const [anioHoy, mesHoy] = hoy.split('-').map(Number);

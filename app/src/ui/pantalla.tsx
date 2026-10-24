@@ -5,12 +5,12 @@
 import { router } from 'expo-router';
 import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
 import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAlmacen } from '@/lib/datos';
 import { BotonRedondo, Texto } from './componentes';
 import { ANCHO_LECTURA, ANCHO_MAXIMO, useDisposicion } from './disposicion';
 import { Icono } from './iconos';
 import { alfa, useTema } from './tema';
+import { useZonaSegura } from './zonaSegura';
 
 export type Seccion = 'inicio' | 'movimientos' | 'presupuesto' | 'cuentas' | 'graficos';
 
@@ -63,7 +63,7 @@ export function Marco({ titulo, subtitulo, derecha, children, pie, cabecera, sin
   /** En una pantalla ancha no pasa del ancho de lectura (listas y formularios). */
   angosto?: boolean;
 }) {
-  const insets = useSafeAreaInsets();
+  const insets = useZonaSegura();
   const { c, estilo } = useTema();
   const { lateral, margen } = useDisposicion();
   // En una pantalla ancha el contenido queda al centro, sin estirarse de lado a lado.

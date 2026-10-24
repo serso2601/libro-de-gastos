@@ -6,12 +6,12 @@ import Constants from 'expo-constants';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAlmacen } from '@/lib/datos';
 import { Volver } from '@/ui/pantalla';
 import { BotonPrincipal, Campo, Etiqueta, Tarjeta, Texto, TextoError } from '@/ui/componentes';
 import { Icono } from '@/ui/iconos';
 import { useTema } from '@/ui/tema';
+import { useZonaSegura } from '@/ui/zonaSegura';
 
 const WEB = Platform.OS === 'web';
 
@@ -30,7 +30,7 @@ function Paso({ n, texto }: { n: number; texto: string }) {
 export default function Conectar() {
   const { conectar, conexion } = useAlmacen();
   const { c, estilo } = useTema();
-  const insets = useSafeAreaInsets();
+  const insets = useZonaSegura();
   const params = useLocalSearchParams<{ d?: string; t?: string }>();
   // En el build de desarrollo el código viene de Metro, que corre en la misma PC que el servidor; la
   // web la sirve el servidor mismo.

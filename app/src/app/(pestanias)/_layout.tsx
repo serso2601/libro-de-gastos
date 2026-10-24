@@ -5,7 +5,6 @@
 import * as Haptics from 'expo-haptics';
 import { Redirect, router, Tabs } from 'expo-router';
 import { ActivityIndicator, Pressable, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAnotar } from '@/dialogos/abrir';
 import { useAlmacen } from '@/lib/datos';
 import { Texto } from '@/ui/componentes';
@@ -13,6 +12,7 @@ import { ANCHO_BARRA, ANCHO_RIEL, useDisposicion } from '@/ui/disposicion';
 import { ProveedorDia, useDiaElegido } from '@/ui/elegirMes';
 import { Icono, type NombreIcono } from '@/ui/iconos';
 import { usePreferencias, useTema } from '@/ui/tema';
+import { useZonaSegura } from '@/ui/zonaSegura';
 
 const RUTAS = ['index', 'movimientos', 'presupuesto', 'cuentas'];
 
@@ -62,7 +62,7 @@ function useBarra({ state, navigateToTab }: PropsBarra) {
 }
 
 function Barra(props: PropsBarra) {
-  const abajo = useSafeAreaInsets().bottom;
+  const abajo = useZonaSegura().bottom;
   const { c } = useTema();
   const { actual, ir, tocarMas } = useBarra(props);
 
@@ -93,7 +93,7 @@ function Barra(props: PropsBarra) {
 /** La barra al costado: arriba el libro y el +, luego las cuatro secciones y al final Ajustes. Angosta es un
  *  riel (ícono con el nombre debajo); ancha lleva el nombre al lado y el + dice «Anotar». */
 function BarraLateral({ ancha, ...props }: PropsBarra & { ancha: boolean }) {
-  const insets = useSafeAreaInsets();
+  const insets = useZonaSegura();
   const { c, estilo } = useTema();
   const { actual, ir, tocarMas } = useBarra(props);
 
