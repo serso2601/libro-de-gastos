@@ -2,7 +2,8 @@
 
 Abierta desde la misma PC muestra además los QR para conectar: el de la web (iPad o cualquier
 navegador de la tailnet) abre `http://<ip de tailscale>:<puerto>/app/conectar?d=...&t=<token>`, y el
-de la app del iPhone abre `librogastos://conectar?d=<ip de tailscale>:<puerto>&t=<token>`. Como llevan
+de la app del iPhone abre `librogastos://conectar?d=<ip de tailscale>:<puerto>&t=<token>` (o, en Expo Go,
+`exp://<ip de tailscale>:8082/--/conectar?d=...&t=<token>`). Como llevan
 el token, a cualquier otro equipo (aunque sea de la tailnet) no se le muestran.
 """
 
@@ -62,25 +63,38 @@ def enlace_para_abrir() -> str | None:
     return f"exp+libro-de-gastos://expo-development-client/?{urlencode({'url': f'http://{ip}:{PUERTO_METRO}'})}" if ip else None
 
 
+def enlace_para_expo_go(token: str, puerto: int) -> str | None:
+    """Abre la app en Expo Go (cargada desde Metro) directo en «conectar», con la dirección y el token."""
+    ip = ip_tailscale()
+    return f"exp://{ip}:{PUERTO_METRO}/--/conectar?{urlencode({'d': f'{ip}:{puerto}', 't': token})}" if ip else None
+
+
 def _qr(enlace: str) -> str:
     return f'<div class="qr">{segno.make(enlace, error="m").svg_inline(scale=5, dark="#0B0E13", light="#ffffff")}</div>'
 
 
 def bloque_qr(token: str, puerto: int) -> str:
     web, conectar, abrir = enlace_para_la_web(token, puerto), enlace_para_conectar(token, puerto), enlace_para_abrir()
-    if not web or not conectar or not abrir:
+    expo_go = enlace_para_expo_go(token, puerto)
+    if not web or not conectar or not abrir or not expo_go:
         return '<div class="tarjeta"><p class="mal">No encontré la IP de Tailscale de esta PC: revisa que Tailscale esté activo y recarga.</p></div>'
     return f"""<div class="tarjeta"><h1>En el navegador (iPad o iPhone)</h1>
 <p>Con Tailscale prendido, apunta la cámara a este código y toca el aviso: se abre la app en Safari, ya
 conectada. Para tenerla como app, en Safari toca Compartir → «Agregar a pantalla de inicio».</p>
 {_qr(web)}
 <p>O abre <b>http://{escape(ip_tailscale() or '')}:{puerto}/app</b> y escribe el token de <b>datos\\token.txt</b>.</p></div>
-<div class="tarjeta"><h1>App del iPhone · 1 · Abrir la app</h1>
+<div class="tarjeta"><h1>App del iPhone (Expo Go)</h1>
+<p>La app de verdad, con sus animaciones y vibraciones. Instala <b>Expo Go</b> de la App Store, prende
+Tailscale, apunta la cámara a este código y toca el aviso: Expo Go carga la app desde esta PC y se conecta sola.</p>
+{_qr(expo_go)}
+<p>O en Expo Go toca «Enter URL manually» y escribe <b>exp://{escape(ip_tailscale() or '')}:{PUERTO_METRO}</b></p></div>
+<div class="tarjeta"><h1>App instalada con Sideloadly · 1 · Abrir la app</h1>
+<p>Solo para el build de desarrollo (gastos-dev-N.ipa), cuando se pueda volver a firmar.</p>
 <p>Con Tailscale prendido en el iPhone, apunta la cámara a este código y toca el aviso. La app carga
 su código desde esta PC (tarda unos segundos la primera vez).</p>
 {_qr(abrir)}
 <p>Si sale la pantalla de Expo, toca «Enter URL manually» y escribe <b>http://{escape(ip_tailscale() or '')}:{PUERTO_METRO}</b></p></div>
-<div class="tarjeta"><h1>App del iPhone · 2 · Conectar con tus datos</h1>
+<div class="tarjeta"><h1>App instalada con Sideloadly · 2 · Conectar con tus datos</h1>
 <p>Cuando la app muestre «Conectar con la PC», vuelve a la cámara y escanea este:</p>
 {_qr(conectar)}
 <p>O a mano: dirección <b>{escape(ip_tailscale() or '')}:{puerto}</b> y el token de <b>datos\\token.txt</b>.</p></div>"""
