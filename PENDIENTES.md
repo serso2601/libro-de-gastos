@@ -4,7 +4,15 @@ Lo que quedó por probar, revisar o retomar. Claude lo lee al iniciar cada chat 
 seguir con otra cosa (ver «Al iniciar cada chat» en `CLAUDE.md`). Al terminar una sesión se actualiza: lo que ya
 se probó sale; lo que quedó a medias entra.
 
-Última actualización: 24/oct/2026.
+Última actualización: 25/oct/2026.
+
+## Por probar: la app nativa en Expo Go (25/oct)
+
+Para ver las animaciones y vibraciones de verdad (la web no las muestra igual) mientras Sideloadly siga bloqueado.
+1. Instalar **Expo Go** de la App Store en el iPhone, con Tailscale prendido.
+2. Abrir http://127.0.0.1:8766 en la PC y escanear el QR «App del iPhone (Expo Go)»: tiene que abrir la app ya
+   conectada, con los datos. Si sale una pantalla roja, pedirle el texto y mirar `datos\registros\metro.log`.
+3. Probar ahí lo de «Por probar en el iPhone» (abajo): la pila de tarjetas, la amortiguación, las vibraciones.
 
 ## Por probar en la web (iPad), hecha el 23/oct
 
@@ -38,7 +46,7 @@ hora, borrar con el aviso, las 4 pestañas, la pila, Ajustes, modo claro); **fal
    verlo en el iPad de verdad (vertical y horizontal) y que el usuario diga si le gusta la distribución.
    Ideas si hace falta: que Ajustes y una cuenta abran sin tapar la barra lateral; atajos de teclado en la computadora.
 
-## Por probar en el iPhone (cuando se pueda volver a firmar)
+## Por probar en el iPhone (en Expo Go, o cuando se pueda volver a firmar)
 
 1. **Tocar muy rápido la pila de tarjetas, con varias cuentas** (PR #11). Antes se cargaba y se ponía lenta hasta que
    el usuario descansaba. Se limitaron las vibraciones (`ui/vibrar.ts`: una cada 120 ms; la de aterrizaje solo si no

@@ -73,7 +73,14 @@ Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
   (`ios-release-N`): lleva el código adentro y abre sola; para cuando la app deje de cambiar tanto.
 - Variable del repo `DEV_SERVER_URL` = `http://<ip tailscale>:8082` (no va en el repo).
 - **23/oct/2026: Apple está bloqueando el acceso de Sideloadly** a las cuentas, así que no se puede
-  volver a firmar. Mientras tanto el usuario usa **la web** (ver «Cómo corre»).
+  volver a firmar. Mientras tanto el usuario usa **la web** (ver «Cómo corre») para el día a día y
+  **Expo Go** para ver la app nativa (animaciones, vibraciones).
+- **Expo Go** (25/oct/2026): gratis en la App Store, sin firmar nada. Carga el mismo código desde
+  Metro (8082; el `--dev-client` de `iniciar.ps1` no estorba: Metro le sirve a los dos). La página de
+  estado tiene su QR: `exp://<ip>:8082/--/conectar?d=<ip>:8766&t=<token>` abre Expo Go ya conectado.
+  Difiere del .ipa en que va dentro de Expo Go (su ícono), `librogastos://` no lo abre, sus datos
+  locales van aparte y en modo desarrollo va algo más lento. Solo corre con el SDK que trae el Expo Go
+  de la App Store (hoy el 58) y con módulos nativos incluidos en Expo Go: antes de agregar uno, verlo.
 
 ## Decisiones tomadas (no repreguntarlas)
 
