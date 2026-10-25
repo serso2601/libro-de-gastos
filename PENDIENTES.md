@@ -9,10 +9,10 @@ se probó sale; lo que quedó a medias entra.
 ## Por probar: la app nativa en Expo Go (25/oct)
 
 Para ver las animaciones y vibraciones de verdad (la web no las muestra igual) mientras Sideloadly siga bloqueado.
-1. Instalar **Expo Go** de la App Store en el iPhone, con Tailscale prendido.
-2. Abrir http://127.0.0.1:8766 en la PC y escanear el QR «App del iPhone (Expo Go)»: tiene que abrir la app ya
-   conectada, con los datos. Si sale una pantalla roja, pedirle el texto y mirar `datos\registros\metro.log`.
-3. Probar ahí lo de «Por probar en el iPhone» (abajo): la pila de tarjetas, la amortiguación, las vibraciones.
+Ya abre y se conectó (25/oct, con el token a mano). Falta:
+1. Que el QR «App del iPhone (Expo Go)» de la página de estado la abra ya conectada (no se probó: entró a mano).
+2. Probar ahí lo de «Por probar en el iPhone» (abajo): la pila de tarjetas, la amortiguación, las vibraciones.
+   Si sale una pantalla roja, pedirle el texto y mirar `datos\registros\metro.log`.
 
 ## Por probar en la web (iPad), hecha el 23/oct
 
