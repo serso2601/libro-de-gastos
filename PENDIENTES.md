@@ -64,9 +64,12 @@ hora, borrar con el aviso, las 4 pestañas, la pila, Ajustes, modo claro); **fal
   investigarlo a fondo e instalar la opción más fácil: reflejar la pantalla por AirPlay en Windows (UxPlay, gratis,
   o AirServer, de pago) o un simulador en la nube (Appetize; pide un build para simulador). La web ya se puede
   abrir en la PC misma: http://127.0.0.1:8766/app.
-- **Animaciones en toda la app.** Se eligió la pila al estilo «Wallet normal». Quedaron por decidir las
-  microinteracciones de la pestaña F de la maqueta (https://claude.ai/artifact/QeqGTGT8HreSfFrN4bKFBX): botones con
-  resorte, saldo que rueda, giro y brillo de la tarjeta, listas que entran, hoja de «Anotar» que se arrastra.
+- **Animaciones en toda la app.** Se eligió la pila al estilo «Wallet normal». El 25/oct se armó una página con
+  cada parte y sus opciones (https://claude.ai/artifact/9yMgBnKboyCCqX6uivV9qn; archivo en
+  `datos\maquetas\animaciones.html`): la fila nueva, el saldo, la hoja de Anotar, botones, vasos, pasarse del tope,
+  cambiar de mes, listas, brillo de la tarjeta y borrar. **Falta que el usuario elija** (la página tiene «Copiar mi
+  elección») y hacerlas en la app, con Reanimated (viene en Expo Go). Ojo: en el iPhone la hoja ya es la de iOS
+  (`pageSheet`), con arrastre para cerrar; cambiarla es solo si elige A o B.
 - **Limpieza:** borrar la rama `worktree-animaciones-tarjetas` de GitHub (ya está mezclada) y su carpeta de trabajo
   en `.claude\worktrees\`.
 
