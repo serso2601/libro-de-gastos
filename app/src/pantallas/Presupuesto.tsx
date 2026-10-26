@@ -78,8 +78,10 @@ function BotonTopes() {
   const abrir = useAbrir();
   const { c } = useTema();
   return (
-    <Tocable onPress={() => abrir({ tipo: 'topes' })} style={{ height: 44, paddingHorizontal: 16, borderRadius: 22, backgroundColor: c.tarjeta, justifyContent: 'center' }}>
-      <Texto tam={14} peso="semi">Editar topes</Texto>
+    <Tocable onPress={() => abrir({ tipo: 'topes' })}
+      style={{ height: 32, paddingLeft: 14, paddingRight: 10, borderRadius: 16, backgroundColor: c.tarjeta, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+      <Texto tam={13} peso="semi">Editar topes</Texto>
+      <Icono nombre="adelante" tam={14} color={c.tenue} grosor={2} />
     </Tocable>
   );
 }
@@ -158,7 +160,11 @@ export function Presupuesto() {
   const periodo = (
     <>
       <NavegadorPeriodo nombre={nombrePeriodo(p)} mover={mover} />
-      <FichaPeriodo config={config} />
+      {/* El periodo y los topes, en fichas chicas bajo el navegador (en la cabecera solo van el título y Ajustes). */}
+      <View style={{ flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap', gap: 8 }}>
+        <FichaPeriodo config={config} />
+        <BotonTopes />
+      </View>
       {t.conTope.length === 0
         ? <SinTopes />
         : <Deslizar clave={p.desde}><Resumen gastado={t.gastado} tope={t.tope} moneda={d.moneda} momento={momento} dias={diasQueQuedanEn(p, d.hoy)} /></Deslizar>}
@@ -184,7 +190,7 @@ export function Presupuesto() {
   );
 
   return (
-    <Marco titulo="Presupuesto" derecha={<BotonTopes />}>
+    <Marco titulo="Presupuesto">
       {dosColumnas ? (
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 36 }}>
           <View style={{ width: ANCHO_COLUMNA, gap: 12 }}>{periodo}</View>

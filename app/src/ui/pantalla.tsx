@@ -12,7 +12,10 @@ import { Icono } from './iconos';
 import { alfa, useTema } from './tema';
 import { useZonaSegura } from './zonaSegura';
 
-export type Seccion = 'inicio' | 'movimientos' | 'presupuesto' | 'cuentas' | 'graficos';
+/** El alto de la primera fila de cada pantalla (la del título o «‹ volver», con los botones redondos de 44). */
+export const ALTO_CABECERA = 44;
+
+export type Seccion ='inicio' | 'movimientos' | 'presupuesto' | 'cuentas' | 'graficos';
 
 const Apilada = createContext<string | null>(null);
 
@@ -83,23 +86,26 @@ export function Marco({ titulo, subtitulo, derecha, children, pie, cabecera, sin
       <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" automaticallyAdjustKeyboardInsets
         contentContainerStyle={[{ paddingTop: insets.top + (lateral ? 20 : 4), paddingHorizontal: margen, paddingBottom: pie ? 16 : volver ? insets.bottom + 24 : 24, gap }, centro]}
         refreshControl={<RefreshControl refreshing={actualizando} onRefresh={actualizar} tintColor={c.tenue} />}>
-        {cabecera ?? (lateral && !volver && titulo ? (
-          // Con la barra al costado no hay botón de Ajustes arriba: el título sube y lo de la derecha va a su lado.
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-            <View style={{ flex: 1, gap: 4 }}>
-              <Texto tam={estilo.m.titulo} peso={estilo.m.pesoTitulo} style={{ letterSpacing: -0.8 }}>{titulo}</Texto>
+        {cabecera ?? (!volver && titulo ? (
+          // Las pestañas: el título y, en la misma fila, lo de la derecha y Ajustes (con la barra al costado, Ajustes
+          // está en la barra). Así todas empiezan a la misma altura que el saldo del Inicio.
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+            <View style={{ flex: 1, gap: 2 }}>
+              <View style={{ minHeight: ALTO_CABECERA, justifyContent: 'center' }}>
+                <Texto tam={estilo.m.titulo} peso={estilo.m.pesoTitulo} style={{ letterSpacing: -0.8 }}>{titulo}</Texto>
+              </View>
               {subtitulo ? <Texto tam={14} color={c.tenue}>{subtitulo}</Texto> : null}
             </View>
-            <View style={{ flexDirection: 'row', gap: 8 }}>{derecha}</View>
+            <View style={{ height: ALTO_CABECERA, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              {derecha}
+              {!sinAjustes && !lateral && <BotonRedondo icono="ajustes" etiqueta="Ajustes" onPress={() => router.push('/ajustes')} />}
+            </View>
           </View>
         ) : (
           <>
-            <View style={{ height: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <View style={{ height: ALTO_CABECERA, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
               {volver ? <Volver texto={volver} /> : <View />}
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                {derecha}
-                {!volver && !sinAjustes && !lateral && <BotonRedondo icono="ajustes" etiqueta="Ajustes" onPress={() => router.push('/ajustes')} />}
-              </View>
+              <View style={{ flexDirection: 'row', gap: 8 }}>{derecha}</View>
             </View>
             {titulo && (
               <View style={{ marginTop: 10, gap: 4 }}>

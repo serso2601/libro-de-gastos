@@ -235,7 +235,7 @@ export function Tarjetas() {
           alto (margen negativo, dentro del aire que ya hay entre bloques) para que la cartera tenga marco. */}
       <View style={{
         zIndex: 1, overflow: 'hidden', padding: MARCO,
-        marginHorizontal: -MARCO, marginVertical: -(MARCO - 2),
+        marginHorizontal: -MARCO, marginVertical: -(MARCO - 4),
       }}>
         {/* El fondo de la cartera: sombra por dentro, para que las tarjetas se vean metidas en algo. */}
         <View pointerEvents="none" style={{

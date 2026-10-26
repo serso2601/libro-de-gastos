@@ -145,6 +145,9 @@ Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
   sombras cambian por pasos, para que tocar rápido varias veces no se trabe. Abajo, **«Recientes» de TODAS las cuentas** y «Ver todo»
   va a Movimientos. Lo de abajo NO se filtra por la tarjeta de arriba: eso duplicaba la pantalla de
   la cuenta. Nada de barras sin rótulo. **Nada de lo que viene en el Inicio**: va arriba en Movimientos.
+- **Todas las pestañas empiezan igual** (25/oct/2026): la primera fila lleva el título (o el saldo, en el
+  Inicio) y, en la misma fila de 44 (`pantalla.ALTO_CABECERA`), los botones redondos y Ajustes; nada de barra
+  vacía arriba. Entre bloques, 12 en todas. «Editar topes» va en ficha junto a la del periodo, no arriba.
 - **Cada pantalla tiene su trabajo, sin repetir**: Inicio = qué está pasando (saldos, lo último,
   atajos); una cuenta = qué pasó en ella (lo que viene en ella, en qué se gastó, su historial con
   buscador); Movimientos = todo el historial con filtros y gráficos; Cuentas = análisis.

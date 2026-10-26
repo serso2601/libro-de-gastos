@@ -12,7 +12,7 @@ import { neto } from '@/lib/formato';
 import { BotonRedondo, colorDeSaldo, Hoja, Num, Segmentos, Texto } from '@/ui/componentes';
 import { useDisposicion } from '@/ui/disposicion';
 import { Icono } from '@/ui/iconos';
-import { Marco } from '@/ui/pantalla';
+import { ALTO_CABECERA, Marco } from '@/ui/pantalla';
 import { EtiquetaCambio, NumeroQueLate, useCambio } from '@/ui/saldoVivo';
 import { usePreferencias, useTema, type VistaInicio } from '@/ui/tema';
 import { Calendario } from './Calendario';
@@ -33,7 +33,7 @@ export function InicioPrincipal() {
   const colorCambio = bueno ? c.ingreso : c.gasto;
 
   const cabecera = (
-    <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
       <Pressable onPress={() => { Haptics.selectionAsync(); setEligiendo(true); }} accessibilityLabel={`${forma.rotulo}. Tocar para ver otro saldo`}
         style={({ pressed }) => ({ flex: 1, gap: 2, opacity: pressed ? 0.6 : 1 })}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
@@ -50,7 +50,7 @@ export function InicioPrincipal() {
         </NumeroQueLate>
       </Pressable>
       {!lateral && (
-        <View style={{ marginBottom: 4 }}>
+        <View style={{ height: ALTO_CABECERA, justifyContent: 'center' }}>
           <BotonRedondo icono="ajustes" etiqueta="Ajustes" onPress={() => router.push('/ajustes')} />
         </View>
       )}
@@ -59,7 +59,7 @@ export function InicioPrincipal() {
 
   return (
     <>
-      <Marco cabecera={cabecera} gap={16} angosto={!columnaInicio}>
+      <Marco cabecera={cabecera} angosto={!columnaInicio}>
         <View style={columnaInicio ? { width: columnaInicio } : undefined}>
           <Segmentos<VistaInicio> opciones={[['tarjetas', 'Tarjetas'], ['calendario', 'Calendario']]} valor={vistaInicio} alCambiar={(v) => cambiar({ vistaInicio: v })} />
         </View>
