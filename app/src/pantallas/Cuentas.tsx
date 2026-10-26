@@ -2,7 +2,7 @@
 // el Inicio se elige allá, no aquí) y un cuadro por cuenta con lo que entró y salió este mes.
 
 import type { ReactNode } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 import { useAbrir } from '@/dialogos/abrir';
 import { Grilla } from '@/dialogos/piezas';
 import {
@@ -17,6 +17,7 @@ import { columnasPara, useDisposicion } from '@/ui/disposicion';
 import { abrirCuenta, Marco } from '@/ui/pantalla';
 import { SimboloCategoria } from '@/ui/simbolos';
 import { mezclar, useTema } from '@/ui/tema';
+import { Tocable } from '@/ui/tocable';
 
 // --- Cuentas de apoyo -----------------------------------------------------------------------------
 
@@ -266,10 +267,10 @@ function CuadroCuenta({ cuenta, clave }: { cuenta: Cuenta; clave: string }) {
   const deuda = credito ? deudaTarjeta(d, cuenta) : 0;
   const f = flujoCuenta(d.movimientos, cuenta.id, clave);
   return (
-    <Pressable onPress={() => abrirCuenta(cuenta.id, 'Cuentas')}
+    <Tocable onPress={() => abrirCuenta(cuenta.id, 'Cuentas')}
       accessibilityLabel={credito ? `${cuenta.nombre}, tarjeta de crédito: ${deuda > 0 ? `debes ${dinero(deuda, d.moneda)}` : 'sin deuda'}` : `${cuenta.nombre}: ${neto(saldo(cuenta, d.movimientos), d.moneda)}`}
-      style={({ pressed }) => ({ flex: 1, minHeight: 136, borderRadius: estilo.m.esquinas, backgroundColor: pastel(cuenta.color), padding: 14, paddingHorizontal: 16,
-        justifyContent: 'space-between', gap: 10, opacity: pressed ? 0.75 : 1 })}>
+      style={{ flex: 1, minHeight: 136, borderRadius: estilo.m.esquinas, backgroundColor: pastel(cuenta.color), padding: 14, paddingHorizontal: 16,
+        justifyContent: 'space-between', gap: 10 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: colorCuenta(cuenta.color) }} />
         <Texto tam={15} peso="semi" lineas={1} style={{ flexShrink: 1 }}>{cuenta.nombre}</Texto>
@@ -287,7 +288,7 @@ function CuadroCuenta({ cuenta, clave }: { cuenta: Cuenta; clave: string }) {
           <Texto num tam={12} peso="medio" color={c.gasto} lineas={1} ajustar>Salió {dinero(f.salio, d.moneda)}</Texto>
         </View>
       )}
-    </Pressable>
+    </Tocable>
   );
 }
 
@@ -295,11 +296,11 @@ function CuadroNueva() {
   const abrir = useAbrir();
   const { c, estilo } = useTema();
   return (
-    <Pressable onPress={() => abrir({ tipo: 'cuenta' })} accessibilityLabel="Nueva cuenta"
-      style={({ pressed }) => ({ flex: 1, minHeight: 136, borderRadius: estilo.m.esquinas, borderWidth: 1.5, borderStyle: 'dashed', borderColor: mezclar(c.fondo, c.tenue, 0.35),
-        alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}>
+    <Tocable onPress={() => abrir({ tipo: 'cuenta' })} accessibilityLabel="Nueva cuenta"
+      style={{ flex: 1, minHeight: 136, borderRadius: estilo.m.esquinas, borderWidth: 1.5, borderStyle: 'dashed', borderColor: mezclar(c.fondo, c.tenue, 0.35),
+        alignItems: 'center', justifyContent: 'center' }}>
       <Texto tam={15} peso="semi" color={c.tenue}>+ Nueva cuenta</Texto>
-    </Pressable>
+    </Tocable>
   );
 }
 

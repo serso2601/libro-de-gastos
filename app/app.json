@@ -32,6 +32,12 @@
       "@react-native-community/datetimepicker",
       "expo-font",
       [
+        "expo-sensors",
+        {
+          "motionPermission": "Para que el brillo de la tarjeta siga la inclinación del teléfono."
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/splash-icon.png",

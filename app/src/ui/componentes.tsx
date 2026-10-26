@@ -2,16 +2,20 @@
 // así que las pantallas no tienen que saber de colores ni de letras.
 
 import * as Haptics from 'expo-haptics';
-import { useRef, useState, type ComponentRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type StyleProp, type TextInputProps, type TextStyle, type ViewStyle } from 'react-native';
+import Animated, { Easing, useAnimatedProps, useAnimatedStyle, useSharedValue, withDelay, withSequence, withSpring, withTiming } from 'react-native-reanimated';
+import Svg, { Path } from 'react-native-svg';
 import { useDatos } from '@/lib/datos';
 import { montoEnCuenta, type FormaSaldo } from '@/lib/calculos';
 import { conSigno, neto } from '@/lib/formato';
 import type { Movimiento, Proximo, TipoMovimiento } from '@/lib/tipos';
+import { resorte } from './animar';
 import { useDisposicion, VENTANA } from './disposicion';
 import { ESTILO, PALETA, type Peso } from './estilos';
 import { Icono, type NombreIcono } from './iconos';
 import { alfa, sobre, useTema, type Colores as ColoresTema } from './tema';
+import { Tocable } from './tocable';
 import { useZonaSegura } from './zonaSegura';
 
 /** La letra de un peso. Los montos van en la misma letra, con cifras de ancho fijo (`tabular-nums`). */
@@ -47,7 +51,7 @@ export function Num({ children, tam = 15, peso, color, style, lineas }: {
 export function Tarjeta({ children, style, color, onPress }: { children: ReactNode; style?: StyleProp<ViewStyle>; color?: string; onPress?: () => void }) {
   const { estilo, c } = useTema();
   const base: ViewStyle = { backgroundColor: color ?? c.tarjeta, borderRadius: estilo.m.esquinas };
-  if (onPress) return <Pressable onPress={onPress} style={({ pressed }) => [base, style, pressed && { opacity: 0.75 }]}>{children}</Pressable>;
+  if (onPress) return <Tocable onPress={onPress} style={[base, style]}>{children}</Tocable>;
   return <View style={[base, style]}>{children}</View>;
 }
 
@@ -66,29 +70,29 @@ export function BotonRedondo({ icono, onPress, etiqueta, fondo, color, tam = 44 
 }) {
   const { c } = useTema();
   return (
-    <Pressable onPress={onPress} accessibilityLabel={etiqueta} hitSlop={4}
-      style={({ pressed }) => ({ width: tam, height: tam, borderRadius: tam / 2, backgroundColor: fondo ?? c.tarjeta, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}>
+    <Tocable onPress={onPress} accessibilityLabel={etiqueta} hitSlop={4}
+      style={{ width: tam, height: tam, borderRadius: tam / 2, backgroundColor: fondo ?? c.tarjeta, alignItems: 'center', justifyContent: 'center' }}>
       <Icono nombre={icono} tam={18} color={color ?? c.tinta} />
-    </Pressable>
+    </Tocable>
   );
 }
 
 export function BotonPrincipal({ children, onPress, style, alto = 56 }: { children: ReactNode; onPress: () => void; style?: StyleProp<ViewStyle>; alto?: number }) {
   const { c } = useTema();
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [{ height: alto, borderRadius: 16, backgroundColor: c.boton, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.8 : 1 }, style]}>
+    <Tocable onPress={onPress} style={[{ height: alto, borderRadius: 16, backgroundColor: c.boton, alignItems: 'center', justifyContent: 'center' }, style]}>
       <Texto tam={17} peso="semi" color={c.sobreBoton}>{children}</Texto>
-    </Pressable>
+    </Tocable>
   );
 }
 
 export function BotonSuave({ children, onPress, icono, color, style }: { children: ReactNode; onPress: () => void; icono?: NombreIcono; color?: string; style?: StyleProp<ViewStyle> }) {
   const { c } = useTema();
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [{ height: 46, borderRadius: 14, backgroundColor: c.suave, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1 }, style]}>
+    <Tocable onPress={onPress} style={[{ height: 46, borderRadius: 14, backgroundColor: c.suave, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center' }, style]}>
       {icono && <Icono nombre={icono} tam={17} color={color ?? c.tinta} />}
       <Texto tam={15} peso="semi" color={color}>{children}</Texto>
-    </Pressable>
+    </Tocable>
   );
 }
 
@@ -120,10 +124,10 @@ export function Segmentos<T extends string>({ opciones, valor, alCambiar }: { op
       {opciones.map(([id, texto]) => {
         const activo = id === valor;
         return (
-          <Pressable key={id} onPress={() => { Haptics.selectionAsync(); alCambiar(id); }}
+          <Tocable key={id} onPress={() => { Haptics.selectionAsync(); alCambiar(id); }}
             style={{ flex: 1, height: 36, borderRadius: r - 3, alignItems: 'center', justifyContent: 'center', backgroundColor: activo ? c.boton : 'transparent' }}>
             <Texto tam={15} peso={activo ? 'semi' : 'normal'} color={activo ? c.sobreBoton : c.tenue} lineas={1} ajustar>{texto}</Texto>
-          </Pressable>
+          </Tocable>
         );
       })}
     </View>
@@ -135,12 +139,12 @@ export function Ficha({ texto, activa, onPress, ancho, alto = 40, children, comp
 }) {
   const { c } = useTema();
   return (
-    <Pressable onPress={() => { Haptics.selectionAsync(); onPress(); }}
-      style={({ pressed }) => ({ height: alto, paddingHorizontal: compacta ? 4 : 14, borderRadius: alto / 2, width: ancho, backgroundColor: activa ? c.boton : c.suave,
-        alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, opacity: pressed ? 0.75 : 1 })}>
+    <Tocable onPress={() => { Haptics.selectionAsync(); onPress(); }}
+      style={{ height: alto, paddingHorizontal: compacta ? 4 : 14, borderRadius: alto / 2, width: ancho, backgroundColor: activa ? c.boton : c.suave,
+        alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 }}>
       {children}
       {texto !== undefined && <Texto tam={14} peso={activa ? 'semi' : 'normal'} color={activa ? c.sobreBoton : c.tinta} lineas={1} ajustar={compacta}>{texto}</Texto>}
-    </Pressable>
+    </Tocable>
   );
 }
 
@@ -280,18 +284,22 @@ export function Barra({ pct, color, alto = 8, fondo }: { pct: number; color: str
   );
 }
 
-/** Un vaso de presupuesto: se llena desde abajo con un solo color, sin raya en el borde. */
-export function Vaso({ nombre, sub, pct, aviso, alerta, relleno, alto, onPress, elegido, fondo, punto }: {
+/** Un vaso de presupuesto: se llena desde abajo con un solo color, sin raya en el borde. Cada vez que cambia `vez`
+ *  (al abrir Presupuesto o cambiar de periodo) se llena desde cero y el líquido se mece hasta quedarse quieto; si
+ *  cambia lo gastado, sube o baja desde donde estaba. Con `latir` (te pasaste del tope), un borde rojo late dos veces. */
+export function Vaso({ nombre, sub, pct, aviso, alerta, relleno, alto, onPress, elegido, fondo, punto, vez, latir }: {
   nombre: string; sub: string; pct: number; aviso: string; alerta: boolean; relleno: string; alto: number;
-  onPress: () => void; elegido?: boolean; fondo?: string; punto?: boolean;
+  onPress: () => void; elegido?: boolean; fondo?: string; punto?: boolean; vez?: number | string; latir?: boolean;
 }) {
   const { c, estilo } = useTema();
   const grande = alto >= 140;
+  const radio = estilo.m.esquinas - (grande ? 0 : 2);
   return (
-    <Pressable onPress={onPress} accessibilityLabel={`${nombre}: ${pct}%. ${aviso}`}
-      style={({ pressed }) => ({ flex: 1, height: alto, borderRadius: estilo.m.esquinas - (grande ? 0 : 2), backgroundColor: fondo ?? c.tarjeta, overflow: 'hidden',
-        borderWidth: elegido ? 2 : 0, borderColor: c.tinta, opacity: pressed ? 0.8 : 1 })}>
-      <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `${Math.min(pct, 100)}%`, backgroundColor: relleno }} />
+    <Tocable onPress={onPress} accessibilityLabel={`${nombre}: ${pct}%. ${aviso}`}
+      style={{ flex: 1, height: alto, borderRadius: radio, backgroundColor: fondo ?? c.tarjeta, overflow: 'hidden',
+        borderWidth: elegido ? 2 : 0, borderColor: c.tinta }}>
+      <Liquido pct={pct} color={relleno} alto={alto} vez={vez} />
+      {latir && <Latido radio={radio} vez={vez} />}
       <View style={{ flex: 1, padding: grande ? 14 : 12, paddingHorizontal: grande ? 16 : 14, justifyContent: 'space-between' }}>
         <View style={{ gap: 2 }}>
           <Texto tam={15} peso="semi" lineas={1}>{nombre}</Texto>
@@ -305,8 +313,59 @@ export function Vaso({ nombre, sub, pct, aviso, alerta, relleno, alto, onPress, 
           <Num tam={grande ? 24 : 20} peso={estilo.m.pesoCifraGrande}>{pct}%</Num>
         </View>
       </View>
-    </Pressable>
+    </Tocable>
   );
+}
+
+const CaminoAnimado = Animated.createAnimatedComponent(Path);
+
+/** El líquido del vaso. En la web, quieto (Reanimated no anima el dibujo ahí); en el teléfono, con ola. */
+function Liquido(props: { pct: number; color: string; alto: number; vez?: number | string }) {
+  if (Platform.OS !== 'web') return <LiquidoConOla {...props} />;
+  return <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `${Math.min(props.pct, 100)}%`, backgroundColor: props.color }} />;
+}
+
+/** Una superficie de 12 tramos que ondula con `amp` (en px) y `fase`, en un dibujo de 100×100. */
+function LiquidoConOla({ pct, color, alto, vez }: { pct: number; color: string; alto: number; vez?: number | string }) {
+  const nivel = useSharedValue(0);
+  const amp = useSharedValue(0);
+  const fase = useSharedValue(0);
+  const ultimaVez = useRef<number | string | undefined>(undefined);
+  useEffect(() => {
+    const meta = Math.min(Math.max(pct, 0), 100) / 100;
+    if (ultimaVez.current !== vez) {
+      ultimaVez.current = vez;
+      nivel.value = 0;
+    }
+    nivel.value = withSpring(meta, resorte(0.85, 1));
+    amp.value = withSequence(withTiming(4.5, { duration: 250 }), withTiming(0, { duration: 2600, easing: Easing.out(Easing.quad) }));
+    fase.value = 0;
+    fase.value = withTiming(16, { duration: 2850, easing: Easing.linear });
+  }, [pct, vez, nivel, amp, fase]);
+  const props = useAnimatedProps(() => {
+    const y0 = 100 * (1 - nivel.value);
+    const a = (amp.value * 100) / alto;
+    let d = 'M0 100';
+    for (let i = 0; i <= 12; i++) d += ` L${(i * 100) / 12} ${y0 + a * Math.sin((i / 12) * Math.PI * 2 + fase.value)}`;
+    return { d: `${d} L100 100 Z` };
+  });
+  return (
+    <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" pointerEvents="none">
+      <CaminoAnimado animatedProps={props} fill={color} />
+    </Svg>
+  );
+}
+
+/** Un borde rojo por dentro del vaso que late dos veces cuando termina de llenarse. */
+function Latido({ radio, vez }: { radio: number; vez?: number | string }) {
+  const { c } = useTema();
+  const op = useSharedValue(0);
+  useEffect(() => {
+    const golpe = () => withSequence(withTiming(1, { duration: 350 }), withTiming(0, { duration: 350 }));
+    op.value = withDelay(650, withSequence(golpe(), golpe()));
+  }, [vez, op]);
+  const estilo = useAnimatedStyle(() => ({ opacity: op.value }));
+  return <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: radio, borderWidth: 3, borderColor: c.alerta }, estilo]} />;
 }
 
 /** El navegador de meses en cápsula: ‹ Octubre 2026 › */

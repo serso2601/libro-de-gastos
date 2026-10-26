@@ -13,9 +13,11 @@ import { BotonRedondo, colorDeSaldo, Hoja, Num, Segmentos, Texto } from '@/ui/co
 import { useDisposicion } from '@/ui/disposicion';
 import { Icono } from '@/ui/iconos';
 import { Marco } from '@/ui/pantalla';
+import { EtiquetaCambio, NumeroQueLate, useCambio } from '@/ui/saldoVivo';
 import { usePreferencias, useTema, type VistaInicio } from '@/ui/tema';
 import { Calendario } from './Calendario';
 import { Tarjetas } from './Tarjetas';
+import { Tocable } from '@/ui/tocable';
 
 export function InicioPrincipal() {
   const d = useDatos();
@@ -25,6 +27,10 @@ export function InicioPrincipal() {
   const [eligiendo, setEligiendo] = useState(false);
   const formas = saldos(d);
   const forma = formas[saldo];
+  // Cuando el saldo cambia, late y sale la diferencia: verde si es para bien (en «gastado», que baje).
+  const cambio = useCambio(saldo, forma.valor);
+  const bueno = cambio ? (forma.tono === 'gasto' ? cambio.delta < 0 : cambio.delta > 0) : true;
+  const colorCambio = bueno ? c.ingreso : c.gasto;
 
   const cabecera = (
     <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 }}>
@@ -33,8 +39,15 @@ export function InicioPrincipal() {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
           <Texto tam={14} color={c.tenue} lineas={1} style={{ flexShrink: 1 }}>{forma.rotulo}</Texto>
           <Icono nombre="abajo" tam={14} color={c.tenue} grosor={2} />
+          {cambio && (
+            <View style={{ marginLeft: 6 }}>
+              <EtiquetaCambio key={cambio.vez} vez={cambio.vez} color={colorCambio} texto={neto(cambio.delta, d.moneda, true)} />
+            </View>
+          )}
         </View>
-        <Num tam={estilo.m.cifra} color={colorDeSaldo(forma, c)} lineas={1}>{neto(forma.valor, d.moneda)}</Num>
+        <NumeroQueLate tam={estilo.m.cifra} color={colorDeSaldo(forma, c)} tinte={colorCambio} vez={cambio?.vez ?? 0}>
+          {neto(forma.valor, d.moneda)}
+        </NumeroQueLate>
       </Pressable>
       {!lateral && (
         <View style={{ marginBottom: 4 }}>
@@ -59,17 +72,17 @@ export function InicioPrincipal() {
             const f = formas[id];
             const elegida = id === saldo;
             return (
-              <Pressable key={id} onPress={() => { Haptics.selectionAsync(); cambiar({ saldo: id }); setEligiendo(false); }}
+              <Tocable key={id} onPress={() => { Haptics.selectionAsync(); cambiar({ saldo: id }); setEligiendo(false); }}
                 accessibilityLabel={f.rotulo} accessibilityState={{ selected: elegida }}
-                style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: estilo.m.esquinas, backgroundColor: c.suave,
-                  borderWidth: 2, borderColor: elegida ? c.tinta : 'transparent', opacity: pressed ? 0.7 : 1 })}>
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: estilo.m.esquinas, backgroundColor: c.suave,
+                  borderWidth: 2, borderColor: elegida ? c.tinta : 'transparent' }}>
                 <View style={{ flex: 1, gap: 2 }}>
                   <Texto tam={15} peso="semi">{f.rotulo}</Texto>
                   <Texto tam={13} color={c.tenue}>{f.detalle}</Texto>
                 </View>
                 <Num tam={17} color={colorDeSaldo(f, c)}>{neto(f.valor, d.moneda)}</Num>
                 {elegida && <Icono nombre="check" tam={18} color={c.tinta} grosor={2} />}
-              </Pressable>
+              </Tocable>
             );
           })}
         </Hoja>

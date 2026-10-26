@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useAcciones } from '@/lib/acciones';
 import { useDatos } from '@/lib/datos';
@@ -8,7 +8,9 @@ import { FRECUENCIAS, type Frecuencia, type Movimiento, type Recurrencia, type T
 import { avisar } from '@/ui/aviso';
 import { BotonPrincipal, Campo, Ficha, Hoja, MontoGrande, Segmentos, Texto, TextoError } from '@/ui/componentes';
 import { Icono } from '@/ui/iconos';
+import { Tocable } from '@/ui/tocable';
 import { useTema } from '@/ui/tema';
+import { abrirHoja, anunciarBorrado, anunciarNuevo, BAJA_LA_HOJA } from '@/ui/vivo';
 import { Desplegable, ElegirCategoria, ElegirCuenta, ElegirFecha } from './piezas';
 
 const TIPOS: [TipoMovimiento, string][] = [['gasto', 'Gasto'], ['ingreso', 'Ingreso'], ['transferencia', 'Transferencia']];
@@ -39,6 +41,8 @@ export function DialogoMovimiento({ inicial, tipoInicial = 'gasto', fechaInicial
   const [verRepetir, setVerRepetir] = useState(false);
   const [error, setError] = useState('');
   const regla = inicial?.recurrencia_id ? recurrencias.find((r) => r.id === inicial.recurrencia_id) : undefined;
+  // Mientras la hoja está abierta (y un rato después), las listas de atrás acomodan sus filas con resorte.
+  useEffect(() => abrirHoja(), []);
 
   function cambiarTipo(t: TipoMovimiento) {
     setTipo(t);
@@ -61,10 +65,17 @@ export function DialogoMovimiento({ inicial, tipoInicial = 'gasto', fechaInicial
       const id = nuevoId();
       acciones.guardarRecurrencia({ ...comun, id, frecuencia: repetir, fecha_inicio: fecha, fecha_fin: null, generada_hasta: null });
       // La PC anota la primera vez si la fecha ya llegó; se muestra ya, con el mismo id que le va a dar.
-      if (fecha <= hoy) acciones.guardarMovimiento({ ...comun, id: `${id}@${fecha}`, fecha, hora: null, recurrencia_id: id, origen: 'recurrencia' });
+      if (fecha <= hoy) {
+        const m: Movimiento = { ...comun, id: `${id}@${fecha}`, fecha, hora: null, recurrencia_id: id, origen: 'recurrencia' };
+        anunciarNuevo(m);
+        acciones.guardarMovimiento(m);
+      }
     } else {
-      acciones.guardarMovimiento({ ...comun, id: inicial?.id ?? nuevoId(), fecha, hora: hora || null,
-        recurrencia_id: inicial?.recurrencia_id ?? null, origen: inicial?.origen ?? 'manual' });
+      const m: Movimiento = { ...comun, id: inicial?.id ?? nuevoId(), fecha, hora: hora || null,
+        recurrencia_id: inicial?.recurrencia_id ?? null, origen: inicial?.origen ?? 'manual' };
+      // Lo nuevo vuela desde el + hasta su fila; lo editado se queda donde está.
+      if (!editando) anunciarNuevo(m);
+      acciones.guardarMovimiento(m);
     }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     alCerrar();
@@ -73,9 +84,11 @@ export function DialogoMovimiento({ inicial, tipoInicial = 'gasto', fechaInicial
   function borrar() {
     if (!inicial) return;
     const hacer = (ySiguientes: boolean) => {
-      acciones.borrarMovimiento(inicial, ySiguientes);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      // Se borra cuando la hoja ya bajó, para que se vea la fila desvanecerse y cerrarse el hueco.
+      anunciarBorrado(inicial.id);
       alCerrar();
+      setTimeout(() => acciones.borrarMovimiento(inicial, ySiguientes), BAJA_LA_HOJA);
     };
     if (inicial.recurrencia_id) {
       avisar('¿Borrar este movimiento?', 'Viene de algo que se repite.', [
@@ -132,13 +145,13 @@ export function DialogoMovimiento({ inicial, tipoInicial = 'gasto', fechaInicial
       )}
 
       {regla && (
-        <Pressable onPress={() => alEditarRegla(regla)}
-          style={({ pressed }) => ({ height: 50, borderRadius: 14, backgroundColor: c.suave, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, opacity: pressed ? 0.7 : 1 })}>
+        <Tocable onPress={() => alEditarRegla(regla)}
+          style={{ height: 50, borderRadius: 14, backgroundColor: c.suave, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14 }}>
           <Icono nombre="repetir" tam={18} color={c.tinta} />
           <Texto tam={15} style={{ flex: 1 }}>Se repite</Texto>
           <Texto tam={15} color={c.tenue}>{FRECUENCIAS.find(([f]) => f === regla.frecuencia)?.[1]}</Texto>
           <Icono nombre="adelante" tam={16} color={c.tenue} grosor={2} />
-        </Pressable>
+        </Tocable>
       )}
     </Hoja>
   );

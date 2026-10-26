@@ -10,13 +10,16 @@ import { useDatos } from '@/lib/datos';
 import { conSigno, MESES, neto, ordenarPorFecha, saldo, tituloDia } from '@/lib/formato';
 import type { Cuenta as TCuenta } from '@/lib/tipos';
 import { BotonRedondo, Buscador, CabeceraDia, FilaMovimiento, Lista, Num, Rotulo, Tarjeta, Texto, Vacio } from '@/ui/componentes';
+import { useVez } from '@/ui/animar';
 import { ANCHO_COLUMNA, ANCHO_LECTURA, useDisposicion } from '@/ui/disposicion';
+import { FilaViva, GrupoVivo, ListaViva } from '@/ui/filaViva';
 import { Icono } from '@/ui/iconos';
 import { Marco, useApilada, Volver } from '@/ui/pantalla';
 import { SimboloCategoria } from '@/ui/simbolos';
 import { alfa, sobre, useTema } from '@/ui/tema';
 import { useZonaSegura } from '@/ui/zonaSegura';
 import { cuandoViene } from './Proximos';
+import { Tocable } from '@/ui/tocable';
 
 function useMovsDeCuenta(cuenta: TCuenta | undefined, busqueda: string) {
   const d = useDatos();
@@ -43,19 +46,23 @@ export function Cuenta({ id }: { id: string }) {
 function Grupos({ cuenta, grupos, separadas }: { cuenta: TCuenta; grupos: ReturnType<typeof useMovsDeCuenta>; separadas: boolean }) {
   const d = useDatos();
   const abrir = useAbrir();
+  const vez = useVez();
   if (grupos.length === 0) return <Vacio>Sin movimientos todavía.</Vacio>;
+  let orden = 0;
   return (
     <>
       {grupos.map(([fecha, items]) => {
         const total = items.reduce((s, m) => s + montoEnCuenta(m, cuenta.id), 0);
         const filas = items.map((m, i) => (
-          <FilaMovimiento key={m.id} m={m} cuentaId={cuenta.id} primera={i === 0 || !separadas} sinIcono={!separadas} onPress={() => abrir({ tipo: 'movimiento', inicial: m })} />
+          <FilaViva key={m.id} id={m.id} orden={orden++} vez={vez}>
+            <FilaMovimiento m={m} cuentaId={cuenta.id} primera={i === 0 || !separadas} sinIcono={!separadas} onPress={() => abrir({ tipo: 'movimiento', inicial: m })} />
+          </FilaViva>
         ));
         return (
-          <View key={fecha} style={{ gap: 6 }}>
+          <GrupoVivo key={fecha} style={{ gap: 6 }}>
             <CabeceraDia titulo={tituloDia(fecha, d.hoy)} derecha={neto(total, d.moneda, true)} />
-            {separadas ? <Lista>{filas}</Lista> : <View>{filas}</View>}
-          </View>
+            {separadas ? <ListaViva>{filas}</ListaViva> : <GrupoVivo>{filas}</GrupoVivo>}
+          </GrupoVivo>
         );
       })}
     </>
@@ -195,22 +202,22 @@ function CuentaColor({ cuenta }: { cuenta: TCuenta }) {
       )}
     </View>
     <View style={{ flexDirection: 'row', gap: 10 }}>
-      <Pressable onPress={() => anotar({ cuentaInicial: cuenta.id })}
-        style={({ pressed }) => ({ flex: 1, height: 46, borderRadius: 23, backgroundColor: tinta, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.85 : 1 })}>
+      <Tocable onPress={() => anotar({ cuentaInicial: cuenta.id })}
+        style={{ flex: 1, height: 46, borderRadius: 23, backgroundColor: tinta, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center' }}>
         <Icono nombre="mas" tam={18} color={fondo} grosor={2.2} />
         <Texto tam={15} peso="semi" color={fondo}>Anotar aquí</Texto>
-      </Pressable>
-      <Pressable onPress={() => abrir({ tipo: 'cuenta', inicial: cuenta })}
-        style={({ pressed }) => ({ flex: 1, height: 46, borderRadius: 23, backgroundColor: alfa(tinta, 0.16), alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1 })}>
+      </Tocable>
+      <Tocable onPress={() => abrir({ tipo: 'cuenta', inicial: cuenta })}
+        style={{ flex: 1, height: 46, borderRadius: 23, backgroundColor: alfa(tinta, 0.16), alignItems: 'center', justifyContent: 'center' }}>
         <Texto tam={15} peso="medio" color={tinta}>Editar cuenta</Texto>
-      </Pressable>
+      </Tocable>
     </View>
     {pago && (
-      <Pressable onPress={registrarPago} accessibilityLabel="Registrar el pago de la tarjeta"
-        style={({ pressed }) => ({ height: 46, borderRadius: 23, borderWidth: 1.5, borderColor: tinta, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1 })}>
+      <Tocable onPress={registrarPago} accessibilityLabel="Registrar el pago de la tarjeta"
+        style={{ height: 46, borderRadius: 23, borderWidth: 1.5, borderColor: tinta, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center' }}>
         <Icono nombre="transferir" tam={18} color={tinta} />
         <Texto tam={15} peso="semi" color={tinta}>Registrar pago · {neto(pago.total, d.moneda)}</Texto>
-      </Pressable>
+      </Tocable>
     )}
     </>
   );

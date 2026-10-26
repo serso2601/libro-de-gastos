@@ -17,6 +17,7 @@ import { Icono } from '@/ui/iconos';
 import { Marco, ProveedorApilada } from '@/ui/pantalla';
 import { SimboloCategoria } from '@/ui/simbolos';
 import { usePreferencias, useTema, type Modo } from '@/ui/tema';
+import { Tocable } from '@/ui/tocable';
 
 const ESTE = Platform.OS === 'web' ? 'este navegador' : 'este teléfono';
 
@@ -172,10 +173,10 @@ function ContenidoAjustes() {
       <TituloSeccion>Moneda</TituloSeccion>
       <Tarjeta style={{ padding: 14, flexDirection: 'row', gap: 8 }}>
         <Campo value={moneda} onChangeText={setMoneda} maxLength={4} style={{ flex: 1, height: 44 }} accessibilityLabel="Símbolo de la moneda" />
-        <Pressable onPress={() => { acciones.guardarMoneda(moneda.trim() || '$'); Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); }}
-          style={({ pressed }) => ({ height: 44, paddingHorizontal: 20, borderRadius: 14, backgroundColor: c.boton, justifyContent: 'center', opacity: pressed ? 0.8 : 1 })}>
+        <Tocable onPress={() => { acciones.guardarMoneda(moneda.trim() || '$'); Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); }}
+          style={{ height: 44, paddingHorizontal: 20, borderRadius: 14, backgroundColor: c.boton, justifyContent: 'center' }}>
           <Texto tam={15} peso="semi" color={c.sobreBoton}>Guardar</Texto>
-        </Pressable>
+        </Tocable>
       </Tarjeta>
 
       <TituloSeccion>Respaldo</TituloSeccion>

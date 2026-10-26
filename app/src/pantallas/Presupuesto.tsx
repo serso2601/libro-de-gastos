@@ -15,11 +15,14 @@ import { useDatos } from '@/lib/datos';
 import { DIAS, dinero, dineroCorto } from '@/lib/formato';
 import type { Categoria, ConfigPresupuesto } from '@/lib/tipos';
 import { Barra, BotonPrincipal, Num, Tarjeta, Texto, Vaso } from '@/ui/componentes';
+import { useVez } from '@/ui/animar';
 import { ANCHO_COLUMNA, columnasPara, useDisposicion } from '@/ui/disposicion';
 import { Icono, type NombreIcono } from '@/ui/iconos';
 import { Marco } from '@/ui/pantalla';
 import { SimboloCategoria } from '@/ui/simbolos';
 import { mezclar, useTema } from '@/ui/tema';
+import { Tocable } from '@/ui/tocable';
+import { Deslizar } from '@/ui/deslizar';
 
 /**
  * Corto a propósito: en un vaso de media pantalla tiene que caber junto al porcentaje. Los montos ya
@@ -63,11 +66,11 @@ function FichaPeriodo({ config }: { config: ConfigPresupuesto }) {
   const abrir = useAbrir();
   const { c } = useTema();
   return (
-    <Pressable onPress={() => abrir({ tipo: 'periodo' })} accessibilityLabel={`${descripcionPeriodo(config)}. Cambiar el periodo`}
-      style={({ pressed }) => ({ alignSelf: 'center', height: 32, paddingLeft: 14, paddingRight: 10, borderRadius: 16, backgroundColor: c.tarjeta, flexDirection: 'row', alignItems: 'center', gap: 4, opacity: pressed ? 0.7 : 1 })}>
+    <Tocable onPress={() => abrir({ tipo: 'periodo' })} accessibilityLabel={`${descripcionPeriodo(config)}. Cambiar el periodo`}
+      style={{ alignSelf: 'center', height: 32, paddingLeft: 14, paddingRight: 10, borderRadius: 16, backgroundColor: c.tarjeta, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
       <Texto tam={13} color={c.tenue}>{descripcionPeriodo(config)}</Texto>
       <Icono nombre="adelante" tam={14} color={c.tenue} grosor={2} />
-    </Pressable>
+    </Tocable>
   );
 }
 
@@ -75,9 +78,9 @@ function BotonTopes() {
   const abrir = useAbrir();
   const { c } = useTema();
   return (
-    <Pressable onPress={() => abrir({ tipo: 'topes' })} style={({ pressed }) => ({ height: 44, paddingHorizontal: 16, borderRadius: 22, backgroundColor: c.tarjeta, justifyContent: 'center', opacity: pressed ? 0.7 : 1 })}>
+    <Tocable onPress={() => abrir({ tipo: 'topes' })} style={{ height: 44, paddingHorizontal: 16, borderRadius: 22, backgroundColor: c.tarjeta, justifyContent: 'center' }}>
       <Texto tam={14} peso="semi">Editar topes</Texto>
-    </Pressable>
+    </Tocable>
   );
 }
 
@@ -140,6 +143,9 @@ export function Presupuesto() {
   const momento: Momento = d.hoy < p.desde ? 'futuro' : d.hoy > p.hasta ? 'pasado' : 'actual';
 
   const t = topes(d, p);
+  // Los vasos se llenan desde cero al abrir la pestaña y al cambiar de periodo.
+  const abierta = useVez();
+  const llenar = `${abierta}|${p.desde}`;
   const alto = 150;
   const ver = (categoria: Categoria) => abrir({ tipo: 'detalleCategoria', categoria, periodo: p });
   // Las categorías sin tope van aparte, en cuadros bajitos: no tienen nada que llenar.
@@ -155,21 +161,23 @@ export function Presupuesto() {
       <FichaPeriodo config={config} />
       {t.conTope.length === 0
         ? <SinTopes />
-        : <Resumen gastado={t.gastado} tope={t.tope} moneda={d.moneda} momento={momento} dias={diasQueQuedanEn(p, d.hoy)} />}
+        : <Deslizar clave={p.desde}><Resumen gastado={t.gastado} tope={t.tope} moneda={d.moneda} momento={momento} dias={diasQueQuedanEn(p, d.hoy)} /></Deslizar>}
     </>
   );
   const vasos = t.conTope.length === 0 ? sinTope : (
     <>
+      <Deslizar clave={p.desde}>
       <Grilla columnas={columnas} gap={12}>
         {t.conTope.map((x) => {
           const malo = x.pasado || x.casiAlTope;
           return (
             <Vaso key={x.categoria.id} nombre={x.categoria.nombre} sub={`${dineroCorto(x.gastado, d.moneda)} de ${dineroCorto(x.tope, d.moneda)}`}
               pct={x.pct} aviso={avisoDe(x, d.moneda)} alerta={malo} relleno={malo ? relleno(c.alerta) : relleno(x.categoria.color)}
-              alto={alto} onPress={() => ver(x.categoria)} />
+              alto={alto} onPress={() => ver(x.categoria)} vez={llenar} latir={x.pasado} />
           );
         })}
       </Grilla>
+      </Deslizar>
       {sinTope}
       <Texto tam={13} color={c.tenue} centro style={{ marginTop: 6 }}>Toca una categoría para ver sus compras de este periodo.</Texto>
     </>
@@ -196,9 +204,9 @@ export function Presupuesto() {
 function CuadroSinTope({ categoria, gastado, moneda, onPress }: { categoria: Categoria; gastado: number; moneda: string; onPress: () => void }) {
   const { c, estilo } = useTema();
   return (
-    <Pressable onPress={onPress} accessibilityLabel={`${categoria.nombre}, sin tope${gastado > 0 ? `, ${dinero(gastado, moneda)} en este periodo` : ''}`}
-      style={({ pressed }) => ({ height: 84, borderRadius: estilo.m.esquinas, borderWidth: 1.5, borderStyle: 'dashed', borderColor: mezclar(c.fondo, c.tenue, 0.35),
-        paddingVertical: 12, paddingHorizontal: 14, justifyContent: 'space-between', opacity: pressed ? 0.6 : 1 })}>
+    <Tocable onPress={onPress} accessibilityLabel={`${categoria.nombre}, sin tope${gastado > 0 ? `, ${dinero(gastado, moneda)} en este periodo` : ''}`}
+      style={{ height: 84, borderRadius: estilo.m.esquinas, borderWidth: 1.5, borderStyle: 'dashed', borderColor: mezclar(c.fondo, c.tenue, 0.35),
+        paddingVertical: 12, paddingHorizontal: 14, justifyContent: 'space-between' }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <SimboloCategoria categoria={categoria} tam={24} />
         <Texto tam={15} peso="semi" lineas={1} style={{ flex: 1 }}>{categoria.nombre}</Texto>
@@ -207,6 +215,6 @@ function CuadroSinTope({ categoria, gastado, moneda, onPress }: { categoria: Cat
         <Texto tam={12} color={c.tenue} lineas={1}>Sin tope</Texto>
         {gastado > 0 && <Num tam={13} peso="medio" color={c.gasto} lineas={1} style={{ flexShrink: 1 }}>{dineroCorto(gastado, moneda)}</Num>}
       </View>
-    </Pressable>
+    </Tocable>
   );
 }

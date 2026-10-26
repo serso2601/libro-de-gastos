@@ -7,7 +7,9 @@ import { useDatos } from '@/lib/datos';
 import { MESES, mayuscula, neto, ordenarPorFecha, tituloDia } from '@/lib/formato';
 import type { Movimiento, Proximo } from '@/lib/tipos';
 import { Buscador, CabeceraDia, Enlace, FilaMovimiento, Lista, Num, Rotulo, Segmentos, Tarjeta, Texto, Vacio } from '@/ui/componentes';
+import { useVez } from '@/ui/animar';
 import { useDisposicion } from '@/ui/disposicion';
+import { FilaViva, GrupoVivo, ListaViva } from '@/ui/filaViva';
 import { Icono } from '@/ui/iconos';
 import { Marco } from '@/ui/pantalla';
 import { alfa, useTema } from '@/ui/tema';
@@ -60,6 +62,10 @@ export function Movimientos() {
     const filtrados = d.movimientos.filter(coincide).sort(ordenarPorFecha);
     return { lista: porDia(filtrados.slice(0, limite)), total: filtrados.length };
   }, [d.movimientos, coincide, limite]);
+  // Cada vez que se abre la pestaña, las filas entran en cascada (cada una en su lugar de la pantalla).
+  const vez = useVez();
+  const antes: number[] = [];
+  grupos.lista.reduce((n, [, items]) => { antes.push(n); return n + items.length; }, 0);
 
   const porVenir = porVenirDelMes(d).filter(coincide);
   const vaASalir = porVenir.reduce((s, p) => s + (p.tipo === 'gasto' ? p.monto : 0), 0);
@@ -159,18 +165,22 @@ export function Movimientos() {
 
       {grupos.lista.length === 0
         ? <Vacio>{busqueda || filtro !== 'todos' ? 'No hay nada que coincida.' : 'Todavía no hay movimientos. Toca + para anotar el primero.'}</Vacio>
-        : grupos.lista.map(([fecha, items]) => (
-          <View key={fecha} style={{ gap: 6 }}>
+        : grupos.lista.map(([fecha, items], g) => (
+          <GrupoVivo key={fecha} style={{ gap: 6 }}>
             <CabeceraDia titulo={tituloDia(fecha, d.hoy)} derecha={neto(netoDe(items), d.moneda, true)} />
-            <Lista>
-              {items.map((m, i) => <FilaMovimiento key={m.id} m={m} primera={i === 0} onPress={() => abrir({ tipo: 'movimiento', inicial: m })} />)}
-            </Lista>
-          </View>
+            <ListaViva>
+              {items.map((m, i) => (
+                <FilaViva key={m.id} id={m.id} orden={antes[g] + i} vez={vez}>
+                  <FilaMovimiento m={m} primera={i === 0} onPress={() => abrir({ tipo: 'movimiento', inicial: m })} />
+                </FilaViva>
+              ))}
+            </ListaViva>
+          </GrupoVivo>
         ))}
       {grupos.total > limite && (
-        <View style={{ alignItems: 'center', paddingVertical: 8 }}>
+        <GrupoVivo style={{ alignItems: 'center', paddingVertical: 8 }}>
           <Enlace tam={15} onPress={() => setLimite((l) => l + 200)}>Ver más ({grupos.total - limite})</Enlace>
-        </View>
+        </GrupoVivo>
       )}
     </>
   );

@@ -13,6 +13,7 @@ import { AnfitrionDialogos } from '@/dialogos/abrir';
 import { ProveedorDatos } from '@/lib/datos';
 import { AnfitrionAvisos } from '@/ui/aviso';
 import { ProveedorTema, useTema } from '@/ui/tema';
+import { Vuelo } from '@/ui/vuelo';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -37,6 +38,7 @@ export default function Raiz() {
           <AnfitrionDialogos>
             <Pantallas />
           </AnfitrionDialogos>
+          <Vuelo />
           <AnfitrionAvisos />
         </ProveedorDatos>
       </ProveedorTema>

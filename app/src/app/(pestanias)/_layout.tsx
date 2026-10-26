@@ -4,7 +4,8 @@
 
 import * as Haptics from 'expo-haptics';
 import { Redirect, router, Tabs } from 'expo-router';
-import { ActivityIndicator, Pressable, View } from 'react-native';
+import { useRef, type ComponentRef, type ReactNode } from 'react';
+import { ActivityIndicator, Pressable, View, type ViewStyle } from 'react-native';
 import { useAnotar } from '@/dialogos/abrir';
 import { useAlmacen } from '@/lib/datos';
 import { Texto } from '@/ui/componentes';
@@ -12,6 +13,8 @@ import { ANCHO_BARRA, ANCHO_RIEL, useDisposicion } from '@/ui/disposicion';
 import { ProveedorDia, useDiaElegido } from '@/ui/elegirMes';
 import { Icono, type NombreIcono } from '@/ui/iconos';
 import { usePreferencias, useTema } from '@/ui/tema';
+import { Tocable } from '@/ui/tocable';
+import { registrarOrigen } from '@/ui/vivo';
 import { useZonaSegura } from '@/ui/zonaSegura';
 
 const RUTAS = ['index', 'movimientos', 'presupuesto', 'cuentas'];
@@ -61,6 +64,20 @@ function useBarra({ state, navigateToTab }: PropsBarra) {
   return { actual, ir, tocarMas };
 }
 
+/** El + (o «Anotar»): rebota al tocarlo y avisa dónde está, porque de ahí sale volando lo que se anota. */
+function BotonMas({ onPress, style, afuera, children }: { onPress: () => void; style: ViewStyle; afuera?: ViewStyle; children: ReactNode }) {
+  const { c } = useTema();
+  const caja = useRef<ComponentRef<typeof View>>(null);
+  return (
+    <View ref={caja} collapsable={false} style={afuera}
+      onLayout={() => caja.current?.measureInWindow((x, y, ancho, alto) => registrarOrigen({ x, y, ancho, alto }))}>
+      <Tocable onPress={onPress} accessibilityLabel="Anotar" style={[{ backgroundColor: c.boton, alignItems: 'center', justifyContent: 'center' }, style]}>
+        {children}
+      </Tocable>
+    </View>
+  );
+}
+
 function Barra(props: PropsBarra) {
   const abajo = useZonaSegura().bottom;
   const { c } = useTema();
@@ -81,10 +98,9 @@ function Barra(props: PropsBarra) {
     <View style={{ height: 58 + Math.max(abajo - 8, 12), paddingTop: 6, paddingHorizontal: 6, paddingBottom: Math.max(abajo - 8, 12), backgroundColor: c.tarjeta,
       flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around' }}>
       {IZQUIERDA.map(boton)}
-      <Pressable onPress={tocarMas} accessibilityLabel="Anotar"
-        style={({ pressed }) => ({ width: 52, height: 52, borderRadius: 26, backgroundColor: c.boton, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.85 : 1 })}>
+      <BotonMas onPress={tocarMas} style={{ width: 52, height: 52, borderRadius: 26 }}>
         <Icono nombre="mas" tam={24} color={c.sobreBoton} grosor={2.4} />
-      </Pressable>
+      </BotonMas>
       {DERECHA.map(boton)}
     </View>
   );
@@ -118,12 +134,11 @@ function BarraLateral({ ancha, ...props }: PropsBarra & { ancha: boolean }) {
         </View>
         {ancha && <Texto tam={20} peso={estilo.m.pesoTitulo} style={{ letterSpacing: -0.4 }}>Gastos</Texto>}
       </View>
-      <Pressable onPress={tocarMas} accessibilityLabel="Anotar"
-        style={({ pressed }) => ({ height: 52, borderRadius: 26, backgroundColor: c.boton, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center',
-          width: ancha ? undefined : 52, alignSelf: ancha ? 'stretch' : 'center', marginBottom: 14, opacity: pressed ? 0.85 : 1 })}>
+      <BotonMas onPress={tocarMas} style={{ height: 52, borderRadius: 26, flexDirection: 'row', gap: 8, width: ancha ? undefined : 52 }}
+        afuera={{ alignSelf: ancha ? 'stretch' : 'center', marginBottom: 14 }}>
         <Icono nombre="mas" tam={22} color={c.sobreBoton} grosor={2.4} />
         {ancha && <Texto tam={16} peso="semi" color={c.sobreBoton}>Anotar</Texto>}
-      </Pressable>
+      </BotonMas>
       {[...IZQUIERDA, ...DERECHA].map(([nombre, texto, icono]) => item(nombre, texto, icono, actual === nombre, () => ir(nombre)))}
       <View style={{ flex: 1 }} />
       {item('ajustes', 'Ajustes', 'ajustes', false, () => router.push('/ajustes'))}

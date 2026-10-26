@@ -7,6 +7,7 @@ import { useMes } from '@/lib/mes';
 import { NavegadorMes, Num, Tarjeta, Texto, Vacio } from '@/ui/componentes';
 import { Barras, Dona, Leyenda } from '@/ui/graficos';
 import { useTema } from '@/ui/tema';
+import { Deslizar } from '@/ui/deslizar';
 
 /** Los gráficos del mes: dona por categoría, barras de 6 meses y este mes contra el anterior. Sin marco: vive dentro de Movimientos. */
 export function ContenidoGraficos() {
@@ -59,6 +60,9 @@ export function ContenidoGraficos() {
     <>
       <NavegadorMes nombre={mes.nombre} anio={mes.anio} mover={mes.mover} />
 
+      <Deslizar clave={mes.clave}>
+      <View style={{ gap: 12 }}>
+
       <Tarjeta style={{ padding: 16, gap: 8 }}>
         <Texto tam={15} peso="semi">Gastos por categoría</Texto>
         {porCategoria.length === 0 ? <Vacio>Sin gastos en {mes.nombre.toLowerCase()}.</Vacio> : (
@@ -105,6 +109,8 @@ export function ContenidoGraficos() {
         </View>
         <Texto tam={13} color={c.tenue}>{fraseComparacion}</Texto>
       </Tarjeta>
+      </View>
+      </Deslizar>
     </>
   );
 }

@@ -10,12 +10,14 @@ import { claveMes, diasDelMes, netoDe } from '@/lib/calculos';
 import { useDatos } from '@/lib/datos';
 import { neto, ordenarPorFecha, tituloDia } from '@/lib/formato';
 import { useMes } from '@/lib/mes';
-import { CabeceraDia, Dato, Enlace, FilaMovimiento, Lista, Num, Tarjeta, Texto, Vacio } from '@/ui/componentes';
+import { CabeceraDia, Dato, Enlace, FilaMovimiento, Num, Tarjeta, Texto, Vacio } from '@/ui/componentes';
 import { useDisposicion } from '@/ui/disposicion';
 import { ElegirMes, useDiaElegido } from '@/ui/elegirMes';
 import { Icono } from '@/ui/iconos';
+import { FilaViva, ListaViva } from '@/ui/filaViva';
 import { useIr } from '@/ui/pantalla';
 import { useTema } from '@/ui/tema';
+import { Deslizar } from '@/ui/deslizar';
 
 const GAP = 4;
 const ALTO_CELDA = 58;
@@ -93,6 +95,8 @@ export function Calendario() {
         {flecha(1, hayAdelante)}
       </View>
 
+      <Deslizar clave={mes.clave}>
+      <View style={{ gap: 16 }}>
       <Tarjeta style={{ padding: 14, flexDirection: 'row', gap: 12 }}>
         <Dato rotulo="Entró" valor={neto(entro, d.moneda)} color={c.ingreso} />
         <Dato rotulo="Salió" valor={neto(salio, d.moneda)} color={c.gasto} />
@@ -127,6 +131,8 @@ export function Calendario() {
           </View>
         ))}
       </View>
+      </View>
+      </Deslizar>
     </>
   );
 
@@ -137,11 +143,13 @@ export function Calendario() {
         {delDia.length === 0 ? (
           <Tarjeta><Vacio>Nada anotado este día.</Vacio></Tarjeta>
         ) : (
-          <Lista>
+          <ListaViva>
             {delDia.map((m, i) => (
-              <FilaMovimiento key={m.id} m={m} primera={i === 0} onPress={() => abrir({ tipo: 'movimiento', inicial: m })} />
+              <FilaViva key={m.id} id={m.id} orden={i} vez={0}>
+                <FilaMovimiento m={m} primera={i === 0} onPress={() => abrir({ tipo: 'movimiento', inicial: m })} />
+              </FilaViva>
             ))}
-          </Lista>
+          </ListaViva>
         )}
       </View>
 

@@ -18,13 +18,17 @@ import { cicloTarjeta, deudaTarjeta, flujoCuenta, gastadoEnCorte, pagoSugerido }
 import { useDatos } from '@/lib/datos';
 import { dinero, MESES, mayuscula, neto, ordenarPorFecha, saldo } from '@/lib/formato';
 import type { Cuenta } from '@/lib/tipos';
-import { BotonPrincipal, Enlace, FilaMovimiento, Lista, Num, Rotulo, Tarjeta, Texto, Vacio } from '@/ui/componentes';
+import { useVez } from '@/ui/animar';
+import { BotonPrincipal, Enlace, FilaMovimiento, Num, Rotulo, Tarjeta, Texto, Vacio } from '@/ui/componentes';
+import { FilaViva, ListaViva } from '@/ui/filaViva';
 import { useDisposicion } from '@/ui/disposicion';
 import { Icono, type NombreIcono } from '@/ui/iconos';
+import { CapaInclinada, useInclinacion } from '@/ui/inclinacion';
 import { abrirCuenta, useIr } from '@/ui/pantalla';
 import { Resorte, useMotor } from '@/ui/resorte';
 import { vibrar } from '@/ui/vibrar';
 import { alfa, mezclar, sobre, useTema } from '@/ui/tema';
+import { Tocable } from '@/ui/tocable';
 
 /** Cuántos movimientos salen en «Recientes» (al lado de la pila, en una pantalla ancha, caben más). */
 const RECIENTES = 6;
@@ -91,6 +95,9 @@ export function Tarjetas() {
   const salto = useRef<{ id: string; top: number; ang: number } | null>(null);
   /** Dónde está dibujada cada tarjeta (para arrancar el brinco justo desde ahí). */
   const pos = useRef<Record<string, { top: number; ang: number }>>({});
+
+  // Con la pila cerrada y quieta, la tarjeta de arriba sigue la inclinación del teléfono.
+  const { rx, ry } = useInclinacion(P.x < 0.02 && !salto.current);
 
   const frente = d.cuentas.find((x) => x.id === elegida) ?? d.cuentas[0];
   const N = d.cuentas.length;
@@ -209,7 +216,9 @@ export function Tarjetas() {
         <Pressable onPress={() => tocar(x.id)} accessibilityLabel={esta ? (p > 0.5 ? 'Cerrar las tarjetas' : `Abrir ${x.nombre}`) : (p > 0.5 ? `Pasar ${x.nombre} arriba` : 'Ver todas las tarjetas')}
           style={{ flex: 1, borderRadius: 22, overflow: 'hidden' }}>
           <View pointerEvents={activa ? 'auto' : 'none'} style={StyleSheet.absoluteFill}>
-            <Contenido cuenta={x} tinta={tinta} />
+            {esta
+              ? <CapaInclinada rx={rx} ry={ry} fondo={fondo}><Contenido cuenta={x} tinta={tinta} /></CapaInclinada>
+              : <Contenido cuenta={x} tinta={tinta} />}
           </View>
           {/* Las del fondo se oscurecen: están más adentro de la cartera. */}
           <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: '#000000', opacity: velo }]} />
@@ -347,12 +356,12 @@ function Accion({ icono, texto, tinta, onPress, etiqueta, soloIcono }: {
 }) {
   const circulo = !!soloIcono && !!icono;
   return (
-    <Pressable onPress={() => { Haptics.selectionAsync(); onPress(); }} accessibilityLabel={etiqueta ?? texto} hitSlop={4}
-      style={({ pressed }) => ({ flexShrink: circulo ? 0 : 1, height: 36, minWidth: 36, borderRadius: 18, paddingHorizontal: circulo ? 0 : 14,
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: alfa(tinta, pressed ? 0.28 : 0.16) })}>
+    <Tocable onPress={() => { Haptics.selectionAsync(); onPress(); }} accessibilityLabel={etiqueta ?? texto} hitSlop={4}
+      style={{ flexShrink: circulo ? 0 : 1, height: 36, minWidth: 36, borderRadius: 18, paddingHorizontal: circulo ? 0 : 14,
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: alfa(tinta, 0.16) }}>
       {icono && <Icono nombre={icono} tam={15} color={tinta} grosor={2.2} />}
       {!circulo && <Texto tam={14} peso="semi" color={tinta} lineas={1} ajustar>{texto}</Texto>}
-    </Pressable>
+    </Tocable>
   );
 }
 
@@ -362,6 +371,7 @@ const Recientes = memo(function Recientes({ cuantos }: { cuantos: number }) {
   const d = useDatos();
   const abrir = useAbrir();
   const ir = useIr();
+  const vez = useVez();
   const ultimos = d.movimientos.filter((m) => m.fecha <= d.hoy).sort(ordenarPorFecha).slice(0, cuantos);
   return (
     <View style={{ gap: 8 }}>
@@ -369,11 +379,13 @@ const Recientes = memo(function Recientes({ cuantos }: { cuantos: number }) {
       {ultimos.length === 0 ? (
         <Tarjeta><Vacio>Todavía no hay movimientos.</Vacio></Tarjeta>
       ) : (
-        <Lista>
+        <ListaViva>
           {ultimos.map((m, i) => (
-            <FilaMovimiento key={m.id} m={m} primera={i === 0} onPress={() => abrir({ tipo: 'movimiento', inicial: m })} />
+            <FilaViva key={m.id} id={m.id} orden={i} vez={vez}>
+              <FilaMovimiento m={m} primera={i === 0} onPress={() => abrir({ tipo: 'movimiento', inicial: m })} />
+            </FilaViva>
           ))}
-        </Lista>
+        </ListaViva>
       )}
     </View>
   );
