@@ -177,6 +177,18 @@ Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
   funciona». Si el manejo cambia, el tutorial se actualiza.
 - **Recurrencias**: semanal, cada 2 semanas (`catorcenal`, 26 al año), cada quincena (`quincenal`,
   dos veces al mes: el día de inicio y 15 días después), mensual, anual.
+- **Animaciones** (elegidas el 25/oct/2026 en la página de muestras, `datos\maquetas\animaciones.html`):
+  van con **Reanimated** y el mismo resorte de la pila (`ui/animar.resorte(resp, amort)`). Lo anotado
+  **vuela desde el +** hasta su fila (`ui/vuelo.tsx`, `ui/vivo.ts`); el **saldo del Inicio late** y
+  muestra la diferencia junto al rótulo (`ui/saldoVivo.tsx`); los **botones se achican y rebotan**
+  (`ui/tocable.Tocable`, nunca más de 8 px por lado); los **vasos se llenan con ola** al abrir
+  Presupuesto o cambiar de periodo y, si te pasaste, **late un borde rojo**; **cambiar de mes desliza
+  entero** (`ui/deslizar`, Calendario, Gráficos y periodo del Presupuesto); las **listas entran en
+  cascada marcada** al abrir la pantalla; al **borrar**, la fila se desvanece y el hueco se cierra
+  (`ui/filaViva.tsx`); la **tarjeta de arriba se ladea con el giroscopio** y un brillo la sigue
+  (`ui/inclinacion.tsx`, `expo-sensors`). La hoja de Anotar se queda como la de iOS. Lo que espera a
+  que baje la hoja usa `vivo.BAJA_LA_HOJA`. En la web no hay ola, ni deslizar, ni giroscopio (Reanimated
+  web no los corre); lo demás sí.
 
 ## Estado (20/oct/2026)
 

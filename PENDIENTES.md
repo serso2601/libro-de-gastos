@@ -13,6 +13,15 @@ Ya abre y se conectó (25/oct, con el token a mano). Falta:
 1. Que el QR «App del iPhone (Expo Go)» de la página de estado la abra ya conectada (no se probó: entró a mano).
 2. Probar ahí lo de «Por probar en el iPhone» (abajo): la pila de tarjetas, la amortiguación, las vibraciones.
    Si sale una pantalla roja, pedirle el texto y mirar `datos\registros\metro.log`.
+3. **Las animaciones elegidas (hechas el 25/oct, sin probar en el teléfono)**: ver «Animaciones» en `CLAUDE.md`.
+   Compilan (tsc, export de iOS y de web) y Metro se reinició con `--clear`; en la web solo se vio que abre. Probar:
+   anotar desde el + en el Inicio y en Movimientos (la pastilla vuela a su fila y el saldo late con la diferencia),
+   borrar uno (se desvanece y el hueco se cierra), apretar botones (se achican y rebotan), abrir Presupuesto y
+   cambiar de periodo (vasos con ola; borde rojo si te pasaste), flechas del Calendario y de Gráficos (desliza),
+   volver a Movimientos (cascada) e inclinar el teléfono con la pila cerrada (la tarjeta se ladea con brillo).
+   Ajustes probables: tiempos (`BAJA_LA_HOJA` en `ui/vivo.ts`), cuánto se ladea (`MAXIMO` en `ui/inclinacion.tsx`)
+   y si la cascada al volver a cada pestaña cansa. Un `.ipa` nuevo necesita compilar (Reanimated y los sensores son
+   nativos): etiqueta `ios-dev-4` cuando se pueda volver a firmar.
 
 ## Por probar en la web (iPad), hecha el 23/oct
 
@@ -64,12 +73,8 @@ hora, borrar con el aviso, las 4 pestañas, la pila, Ajustes, modo claro); **fal
   investigarlo a fondo e instalar la opción más fácil: reflejar la pantalla por AirPlay en Windows (UxPlay, gratis,
   o AirServer, de pago) o un simulador en la nube (Appetize; pide un build para simulador). La web ya se puede
   abrir en la PC misma: http://127.0.0.1:8766/app.
-- **Animaciones en toda la app.** Se eligió la pila al estilo «Wallet normal». El 25/oct se armó una página con
-  cada parte y sus opciones (https://claude.ai/artifact/9yMgBnKboyCCqX6uivV9qn; archivo en
-  `datos\maquetas\animaciones.html`): la fila nueva, el saldo, la hoja de Anotar, botones, vasos, pasarse del tope,
-  cambiar de mes, listas, brillo de la tarjeta y borrar. **Falta que el usuario elija** (la página tiene «Copiar mi
-  elección») y hacerlas en la app, con Reanimated (viene en Expo Go). Ojo: en el iPhone la hoja ya es la de iOS
-  (`pageSheet`), con arrastre para cerrar; cambiarla es solo si elige A o B.
+- **Animaciones:** elegidas y hechas el 25/oct (ver «Por probar: la app nativa en Expo Go», punto 3). Página de
+  muestras: https://claude.ai/artifact/9yMgBnKboyCCqX6uivV9qn (`datos\maquetas\animaciones.html`).
 - **Limpieza:** borrar la rama `worktree-animaciones-tarjetas` de GitHub (ya está mezclada) y su carpeta de trabajo
   en `.claude\worktrees\`.
 
