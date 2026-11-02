@@ -43,14 +43,39 @@ function Copiable({ rotulo, valor }: { rotulo: string; valor: string }) {
   );
 }
 
-function Paso({ n, children }: { n: number; children: React.ReactNode }) {
+/** Un paso: número, título y lo que hay que hacer (en una tarjeta). */
+function Paso({ n, titulo, children }: { n: number; titulo: string; children: React.ReactNode }) {
+  const { c } = useTema();
+  return (
+    <View style={{ gap: 8 }}>
+      <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+        <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: c.boton, alignItems: 'center', justifyContent: 'center' }}>
+          <Texto num tam={13} peso="semi" color={c.sobreBoton}>{n}</Texto>
+        </View>
+        <Texto tam={15} peso="semi" style={{ flex: 1 }}>{titulo}</Texto>
+      </View>
+      <Tarjeta color={c.suave} style={{ padding: 14, gap: 10 }}>{children}</Tarjeta>
+    </View>
+  );
+}
+
+/** Una línea de instrucción. */
+function Linea({ children }: { children: React.ReactNode }) {
+  return <Texto tam={14} style={{ lineHeight: 20 }}>{children}</Texto>;
+}
+
+/** Un campo del cuerpo del Atajo: la clave que se escribe a la izquierda y qué va en «Texto». */
+function Campo({ clave, valor, detalle }: { clave: string; valor: string; detalle?: string }) {
   const { c } = useTema();
   return (
     <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
-      <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: c.suave, alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>
-        <Texto num tam={12} peso="semi">{n}</Texto>
+      <View style={{ width: 96, backgroundColor: c.tarjeta, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 6 }}>
+        <Texto tam={13} peso="semi" selectable>{clave}</Texto>
       </View>
-      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>{children}</View>
+      <View style={{ flex: 1, minWidth: 0, paddingTop: 5, gap: 2 }}>
+        <Texto tam={14} peso="medio">{valor}</Texto>
+        {detalle ? <Texto tam={12} color={c.tenue} style={{ lineHeight: 17 }}>{detalle}</Texto> : null}
+      </View>
     </View>
   );
 }
@@ -74,40 +99,49 @@ export function DialogoApplePay({ alCerrar }: { alCerrar: () => void }) {
         <Texto tam={13} color={c.tenue}>Ponle los 4 dígitos de la tarjeta a esta cuenta (al editarla): así la PC sabe de cuál es cada pago.</Texto>
       )}
 
-      <View style={{ gap: 8 }}>
-        <Etiqueta>Pasos en el iPhone</Etiqueta>
-        <Tarjeta color={c.suave} style={{ padding: 14, gap: 12 }}>
-          <Paso n={1}>
-            <Texto tam={14}>Abre Atajos → Automatización → + → «Transacción». Elige tu tarjeta y «Ejecutar inmediatamente».</Texto>
-          </Paso>
-          <Paso n={2}>
-            <Texto tam={14}>Agrega la acción «Obtener contenido de URL».</Texto>
-          </Paso>
-          <Paso n={3}>
-            <Texto tam={14}>Pega la dirección de abajo. Método: POST. Encabezado «Authorization» con el valor de abajo. Cuerpo: JSON con estos campos:</Texto>
-            <Texto tam={13} color={c.tenue}>origen = wallet</Texto>
-            <Texto tam={13} color={c.tenue}>monto = la variable «Importe»</Texto>
-            <Texto tam={13} color={c.tenue}>comercio = la variable «Comerciante»</Texto>
-            <Texto tam={13} color={c.tenue}>terminacion = los 4 dígitos de abajo</Texto>
-          </Paso>
-          <Paso n={4}>
-            <Texto tam={14}>Deja Tailscale prendido en el iPhone. En Tailscale, activa «VPN a pedido» para que no se apague.</Texto>
-          </Paso>
-        </Tarjeta>
-      </View>
+      <Etiqueta>Se arma una sola vez, en la app Atajos del iPhone</Etiqueta>
 
-      <View style={{ gap: 12 }}>
-        <Etiqueta>Lo que se pega</Etiqueta>
-        {conexion ? (
-          <>
-            <Copiable rotulo="Dirección" valor={direccion} />
-            <Copiable rotulo="Encabezado Authorization (valor)" valor={`Bearer ${conexion.token}`} />
-          </>
-        ) : (
+      <Paso n={1} titulo="Crear la automatización">
+        <Linea>Abre Atajos → pestaña «Automatización» → «+» → «Transacción».</Linea>
+        <Linea>Elige la tarjeta con la que pagas{cuenta ? ` (la de ${cuenta.nombre})` : ''}. Categorías y comercios: déjalos en «Cualquiera».</Linea>
+        <Linea>Deja prendido «Automatización»: así corre sola, sin preguntarte. «Notificar» es opcional: te avisa cada vez que se anota un pago.</Linea>
+      </Paso>
+
+      <Paso n={2} titulo="Encender Tailscale por si está apagado">
+        <Linea>En la barra «Buscar» de abajo escribe «VPN» y agrega «Configurar VPN» (o la de Tailscale «Conectar»). Ponla en «Conectar» · «Tailscale».</Linea>
+        <Linea>Busca «Esperar» y agrégala con 2 segundos: la VPN tarda un momento en conectarse.</Linea>
+      </Paso>
+
+      <Paso n={3} titulo="Mandar el pago a la PC">
+        <Linea>Busca y agrega «Obtener contenido de URL». Toca «URL» y pega esta dirección:</Linea>
+        {conexion ? <Copiable rotulo="Dirección" valor={direccion} /> : (
           <Texto tam={13} color={c.tenue}>Conecta la app a la PC para ver la dirección y la clave.</Texto>
         )}
-        {cuenta?.terminacion ? <Copiable rotulo={`Últimos 4 dígitos de ${cuenta.nombre}`} valor={cuenta.terminacion} /> : null}
-      </View>
+        <Linea>Toca la flechita junto a la dirección para ver las opciones. Método: «POST».</Linea>
+        <Linea>En «Encabezados» → «Agregar nuevo encabezado». En «Clave» escribe Authorization y en «Texto» pega esto:</Linea>
+        {conexion ? <Copiable rotulo="Texto del encabezado (es tu llave: no la compartas)" valor={`Bearer ${conexion.token}`} /> : null}
+        <Linea>En «Solicitar cuerpo» deja «JSON» y toca 4 veces «Agregar nuevo campo», eligiendo «Texto» cada vez. Llénalos así:</Linea>
+        <View style={{ gap: 8 }}>
+          <Campo clave="origen" valor="escribe: wallet" />
+          <Campo clave="monto" valor="la variable «Cantidad»"
+            detalle="Toca «Texto» → «Seleccionar variable» (arriba del teclado) → toca el bloque «Cuando se use…» → toca la burbuja azul que aparece → «Cantidad»." />
+          <Campo clave="comercio" valor="la variable «Comercio»" detalle="Igual que monto, pero en la burbuja eliges «Comercio»." />
+          <Campo clave="terminacion" valor={cuenta?.terminacion ? `escribe: ${cuenta.terminacion}` : 'los 4 dígitos de la tarjeta'} />
+        </View>
+        {cuenta && !cuenta.terminacion && (
+          <Texto tam={13} color={c.tenue}>Ponle los 4 dígitos de la tarjeta a {cuenta.nombre} (al editar la cuenta): así la PC sabe de qué cuenta es cada pago.</Texto>
+        )}
+      </Paso>
+
+      <Paso n={4} titulo="Revisar el orden y probar">
+        <Linea>De arriba abajo debe quedar: «Cuando se use tu tarjeta» → «Configurar VPN: Conectar Tailscale» → «Esperar 2 s» → «Obtener contenido de URL». Si no, arrástralas.</Linea>
+        <Linea>Para probar, paga algo pequeño con el iPhone y abre la app: aparece el gasto con el nombre del comercio. El botón ▶ del Atajo no sirve para probar: sin un pago de verdad no hay monto.</Linea>
+      </Paso>
+
+      <Paso n={5} titulo="Mejor aún: Tailscale siempre conectado">
+        <Linea>En la app Tailscale, activa «VPN On Demand» (VPN a pedido): se conecta solo, también después de reiniciar o cambiar de red.</Linea>
+        <Texto tam={13} color={c.tenue} style={{ lineHeight: 18 }}>Si la PC está apagada cuando pagas, ese gasto no llega: anótalo a mano.</Texto>
+      </Paso>
     </Hoja>
   );
 }

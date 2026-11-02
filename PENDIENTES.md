@@ -18,8 +18,10 @@ compilación de la app pasan; **nada se vio todavía en pantalla**.
    política = `PRIVACIDAD.md`, dominio `github.com`) y permiso de Gmail renovado ya en producción: no vence a
    los 7 días. Si algún día Google lo retira, la página de estado lo dice; se arregla con
    `uv run python -m gastos.correo --autorizar` en `servidor\`.
-3. **Atajo de Apple Pay**: armarlo con Ajustes → «Anotar solo con Apple Pay» y probar un pago. Tailscale con
-   «VPN a pedido». Revisar que «Copiar» funcione en la web por http y en el iPhone.
+3. **Atajo de Apple Pay armado por el usuario el 2/nov** (tarjeta «Debito Platinum», monto = variable «Cantidad»,
+   comercio = «Comercio», con «Configurar VPN: Tailscale» + «Esperar 2 s» antes). **Falta el primer pago real**: ver
+   que llegue (`pendiente` con origen `wallet`). Las instrucciones de la app se rehicieron con los nombres reales de
+   iOS 26. Tailscale con «VPN On Demand».
 4. **Cargos del banco**: reglas de membresía ($2.68) y seguro ($1.05) el día 3 en la cuenta de BG. Ver que el
    3/nov se anoten solos en «Cargos del banco».
 5. **Revisar a ojo**: el «Resumen de <mes>» en la pantalla de cada cuenta (flechas de mes, entró/salió, interés
