@@ -107,6 +107,8 @@ CREATE TABLE IF NOT EXISTS pendiente (
     categoria_id  TEXT,
     cuenta_id     TEXT,
     terminacion   TEXT,
+    contraparte   TEXT,                          -- Yappy: la persona o comercio solo
+    referencia    TEXT,                          -- Yappy: código de confirmación (no entra dos veces)
     estado        TEXT NOT NULL DEFAULT 'nuevo'
                   CHECK (estado IN ('nuevo', 'agregado', 'aceptado', 'descartado', 'duplicado', 'ignorado')),
     movimiento_id TEXT,
@@ -114,3 +116,4 @@ CREATE TABLE IF NOT EXISTS pendiente (
     creado        TEXT NOT NULL,
     actualizado   TEXT NOT NULL
 );
+CREATE UNIQUE INDEX IF NOT EXISTS pendiente_referencia ON pendiente (origen, referencia) WHERE referencia IS NOT NULL;

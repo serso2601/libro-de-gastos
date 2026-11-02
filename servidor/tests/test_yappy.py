@@ -101,25 +101,25 @@ def poner_cuenta_yappy(con, cuenta="efectivo"):
 # --- El lector --------------------------------------------------------------------------------------
 def test_te_enviaron_es_un_ingreso():
     y = correo.leer_yappy(ASUNTOS["ingreso"], TE_ENVIARON)
-    assert (y["tipo"], y["monto"], y["contraparte"], y["comercio"], y["mensaje"]) == ("ingreso", 3000, "Ana R.", "Ana R.", "")
+    assert (y["tipo"], y["monto"], y["contraparte"], y["comercio"], y["mensaje"]) == ("ingreso", 3000, "Ana R.", "Yappy de Ana R.", "")
     assert (y["fecha"], y["hora"], y["confirmacion"]) == ("2026-10-30", "19:00", "ABCDE-00000001")
 
 
 def test_enviaste_es_un_gasto_y_la_madrugada_va_en_24_horas():
     y = correo.leer_yappy(ASUNTOS["enviaste"], ENVIASTE)
-    assert (y["tipo"], y["monto"], y["contraparte"]) == ("gasto", 800, "Luis Pérez")
+    assert (y["tipo"], y["monto"], y["contraparte"], y["comercio"]) == ("gasto", 800, "Luis Pérez", "Yappy a Luis Pérez")
     assert (y["fecha"], y["hora"], y["confirmacion"]) == ("2026-11-01", "03:02", "FGHIJ-00000002")
 
 
 def test_pagaste_trae_el_mensaje_en_la_nota():
     y = correo.leer_yappy(ASUNTOS["pagaste"], PAGASTE)
     assert (y["tipo"], y["monto"], y["contraparte"], y["mensaje"]) == ("gasto", 3429, "Tienda Ejemplo Ecommerce", "Por pedido XYZ123")
-    assert (y["comercio"], y["hora"], y["confirmacion"]) == ("Tienda Ejemplo Ecommerce · Por pedido XYZ123", "11:15", "KLMNO-00000003")
+    assert (y["comercio"], y["hora"], y["confirmacion"]) == ("Yappy en Tienda Ejemplo Ecommerce · Por pedido XYZ123", "11:15", "KLMNO-00000003")
 
 
 def test_con_mensaje_la_nota_lleva_la_persona_y_el_mensaje():
     texto = TE_ENVIARON.replace(" Mensaje\n Confirmación", " Mensaje\n Por pedido XYZ123\n Confirmación")
-    assert correo.leer_yappy(ASUNTOS["ingreso"], texto)["comercio"] == "Ana R. · Por pedido XYZ123"
+    assert correo.leer_yappy(ASUNTOS["ingreso"], texto)["comercio"] == "Yappy de Ana R. · Por pedido XYZ123"
 
 
 @pytest.mark.parametrize("hora_12, hora_24", [("12:05 a. m.", "00:05"), ("12:30 p. m.", "12:30"), ("01:00 p. m.", "13:00"),
@@ -146,38 +146,119 @@ def test_sin_cuenta_de_yappy_queda_para_revisar_con_el_motivo(con):
     assert correo.procesar(con, yappy(PAGASTE, ASUNTOS["pagaste"]), claude, HOY, elector) == "nuevo"
     p = fila(con)
     assert (p["origen"], p["motivo"], p["monto"], p["categoria_id"]) == ("yappy", "¿De qué cuenta sale tu Yappy?", 3429, "compras")
-    assert claude.llamadas == 0 and len(elector.llamadas) == 1
-    # El elector solo ve las categorías del tipo del movimiento.
-    assert "sueldo" not in elector.llamadas[0][1] and "comida" in elector.llamadas[0][1]
-    assert elector.llamadas[0][0]["comercio"] == "Tienda Ejemplo Ecommerce"
+    assert (p["contraparte"], p["referencia"]) == ("Tienda Ejemplo Ecommerce", "KLMNO-00000003")
+    assert p["comercio"] == "Yappy en Tienda Ejemplo Ecommerce · Por pedido XYZ123"
+    assert claude.llamadas == 0 and elector.llamadas == []  # los Yappy no llaman a Claude
+
+
+def primera_de(con, tipo):
+    return con.execute("SELECT id FROM categoria WHERE tipo = ? ORDER BY orden, creado", (tipo,)).fetchone()[0]
+
+
+def categoria_del_movimiento(con):
+    return con.execute("SELECT categoria_id FROM movimiento WHERE origen = 'yappy' ORDER BY rowid DESC").fetchone()[0]
 
 
 def test_con_cuenta_de_yappy_entra_sola_con_origen_yappy(con):
     poner_cuenta_yappy(con)
-    assert correo.procesar(con, yappy(TE_ENVIARON, ASUNTOS["ingreso"]), SinClaude(), HOY, Elector("regalos")) == "agregado"
+    assert correo.procesar(con, yappy(TE_ENVIARON, ASUNTOS["ingreso"]), SinClaude(), HOY, Elector()) == "agregado"
     m = dict(con.execute("SELECT * FROM movimiento").fetchone())
     assert (m["origen"], m["tipo"], m["monto"], m["nota"], m["cuenta_id"], m["categoria_id"], m["fecha"], m["hora"]) == \
-           ("yappy", "ingreso", 3000, "Ana R.", "efectivo", "regalos", "2026-10-30", "19:00")
+           ("yappy", "ingreso", 3000, "Yappy de Ana R.", "efectivo", primera_de(con, "ingreso"), "2026-10-30", "19:00")
 
 
-def test_la_categoria_de_la_memoria_gana_a_claude(con):
+def test_los_tres_formatos_de_nota(con):
     poner_cuenta_yappy(con)
-    marca = db.ahora()
+    for i, (t, a) in enumerate([(TE_ENVIARON, "ingreso"), (ENVIASTE, "enviaste"), (PAGASTE, "pagaste")]):
+        correo.procesar(con, yappy(t, ASUNTOS[a], f"<n{i}@x>"), SinClaude(), HOY)
+    notas = {f[0] for f in con.execute("SELECT nota FROM movimiento")}
+    assert notas == {"Yappy de Ana R.", "Yappy a Luis Pérez", "Yappy en Tienda Ejemplo Ecommerce · Por pedido XYZ123"}
+
+
+def test_categoria_por_defecto_compras_para_gasto_y_primera_para_ingreso(con):
+    poner_cuenta_yappy(con)
+    correo.procesar(con, yappy(ENVIASTE, ASUNTOS["enviaste"], "<a@x>"), SinClaude(), HOY)
+    assert categoria_del_movimiento(con) == "compras"
+    correo.procesar(con, yappy(TE_ENVIARON, ASUNTOS["ingreso"], "<b@x>"), SinClaude(), HOY)
+    assert categoria_del_movimiento(con) == primera_de(con, "ingreso")
+
+
+def test_sin_compras_el_gasto_va_a_la_primera_de_gasto(con):
+    poner_cuenta_yappy(con)
     with con:
-        con.execute("""INSERT INTO movimiento VALUES ('antes', 'gasto', 500, '2026-09-01', NULL, 'efectivo', NULL, 'entretenimiento',
-                       'Luis Pérez', NULL, 'manual', ?, ?)""", (marca, marca))
-    elector = Elector()
-    assert correo.procesar(con, yappy(ENVIASTE, ASUNTOS["enviaste"]), SinClaude(), HOY, elector) == "agregado"
-    assert con.execute("SELECT categoria_id FROM movimiento WHERE origen = 'yappy'").fetchone()[0] == "entretenimiento"
-    assert elector.llamadas == []
+        con.execute("DELETE FROM categoria WHERE id = 'compras'")
+    correo.procesar(con, yappy(ENVIASTE, ASUNTOS["enviaste"]), SinClaude(), HOY)
+    assert categoria_del_movimiento(con) == primera_de(con, "gasto")
 
 
-def test_si_no_se_puede_elegir_la_categoria_va_a_revisar(con):
+def test_categoria_configurada_gana_y_si_se_borra_vuelve_a_automatica(con):
     poner_cuenta_yappy(con)
-    for elector in (Elector(error=correo.ErrorDeCorreo("Claude tardó demasiado")), Elector("no-existe"), Elector("sueldo")):
-        con.execute("DELETE FROM pendiente")
-        assert correo.procesar(con, yappy(PAGASTE, ASUNTOS["pagaste"]), SinClaude(), HOY, elector) == "nuevo"
-        assert fila(con)["motivo"] == "No pude elegir la categoría"
+    with con:
+        con.execute("INSERT INTO ajuste VALUES ('yappy_categoria_gasto', 'comida')")
+    correo.procesar(con, yappy(ENVIASTE, ASUNTOS["enviaste"], "<a@x>"), SinClaude(), HOY)
+    assert categoria_del_movimiento(con) == "comida"
+    with con:
+        con.execute("UPDATE movimiento SET categoria_id = 'otros'")
+        con.execute("DELETE FROM categoria WHERE id = 'comida'")
+    correo.procesar(con, yappy(PAGASTE, ASUNTOS["pagaste"], "<b@x>"), SinClaude(), HOY)
+    assert categoria_del_movimiento(con) == "compras"
+    with con:  # una configurada del tipo equivocado tampoco vale
+        con.execute("UPDATE ajuste SET valor = 'sueldo' WHERE clave = 'yappy_categoria_gasto'")
+    assert correo.categoria_yappy_por_defecto(con, "gasto") == "compras"
+
+
+def test_memoria_por_contraparte_usa_la_categoria_actual_del_movimiento(con):
+    poner_cuenta_yappy(con)
+    correo.procesar(con, yappy(ENVIASTE, ASUNTOS["enviaste"], "<a@x>"), SinClaude(), HOY)
+    # El usuario le cambia la categoría y también el nombre de la nota.
+    with con:
+        con.execute("UPDATE movimiento SET categoria_id = 'entretenimiento', nota = 'Pizza con Luis'")
+    otro = ENVIASTE.replace("FGHIJ-00000002", "FGHIJ-00000010").replace("Luis\n Pérez", "luis\n pérez")
+    assert correo.procesar(con, yappy(otro, ASUNTOS["enviaste"], "<b@x>"), SinClaude(), HOY) == "agregado"
+    assert categoria_del_movimiento(con) == "entretenimiento"
+
+
+def test_la_memoria_ignora_otro_tipo_y_movimientos_borrados(con):
+    poner_cuenta_yappy(con)
+    correo.procesar(con, yappy(ENVIASTE, ASUNTOS["enviaste"], "<a@x>"), SinClaude(), HOY)
+    with con:
+        con.execute("UPDATE movimiento SET categoria_id = 'entretenimiento'")
+    # Un ingreso de la misma persona no hereda la categoría de gasto.
+    recibido = TE_ENVIARON.replace("Ana\n R.", "Luis\n Pérez")
+    correo.procesar(con, yappy(recibido, ASUNTOS["ingreso"], "<b@x>"), SinClaude(), HOY)
+    assert categoria_del_movimiento(con) == primera_de(con, "ingreso")
+    with con:
+        con.execute("DELETE FROM movimiento WHERE tipo = 'gasto'")
+    otro = ENVIASTE.replace("FGHIJ-00000002", "FGHIJ-00000011")
+    correo.procesar(con, yappy(otro, ASUNTOS["enviaste"], "<c@x>"), SinClaude(), HOY)
+    assert categoria_del_movimiento(con) == "compras"
+
+
+def test_sin_categorias_del_tipo_va_a_revisar(con):
+    poner_cuenta_yappy(con)
+    with con:
+        con.execute("DELETE FROM categoria WHERE tipo = 'ingreso'")
+    assert correo.procesar(con, yappy(TE_ENVIARON, ASUNTOS["ingreso"]), SinClaude(), HOY) == "nuevo"
+    assert fila(con)["motivo"] == "No pude elegir la categoría"
+
+
+def test_la_misma_referencia_en_otro_correo_no_se_anota_dos_veces(con):
+    poner_cuenta_yappy(con)
+    assert correo.procesar(con, yappy(ENVIASTE, ASUNTOS["enviaste"], "<a@x>"), SinClaude(), HOY) == "agregado"
+    assert correo.procesar(con, yappy(ENVIASTE, ASUNTOS["enviaste"], "<b@x>"), SinClaude(), HOY) is None
+    assert correo.procesar(con, yappy(ENVIASTE, ASUNTOS["enviaste"], "<a@x>"), SinClaude(), HOY) is None
+    assert con.execute("SELECT COUNT(*) FROM movimiento").fetchone()[0] == 1
+    assert fila(con, "<b@x>")["estado"] == "ignorado"  # su clave queda: no se vuelve a bajar
+
+
+def test_lo_borrado_no_se_vuelve_a_crear(con):
+    poner_cuenta_yappy(con)
+    correo.procesar(con, yappy(ENVIASTE, ASUNTOS["enviaste"], "<a@x>"), SinClaude(), HOY)
+    with con:
+        con.execute("DELETE FROM movimiento")
+    assert correo.procesar(con, yappy(ENVIASTE, ASUNTOS["enviaste"], "<a@x>"), SinClaude(), HOY) is None  # mismo correo
+    assert correo.procesar(con, yappy(ENVIASTE, ASUNTOS["enviaste"], "<otro@x>"), SinClaude(), HOY) is None  # mismo código
+    assert con.execute("SELECT COUNT(*) FROM movimiento").fetchone()[0] == 0
 
 
 def test_un_yappy_que_no_se_entiende_sigue_el_camino_de_claude(con):
@@ -318,6 +399,24 @@ def test_aceptar_no_cambia_la_cuenta_de_yappy_si_ya_estaba(api, config):
                                           "categoria_id": "compras"})
     api.put(f"/api/pendientes/{p}", json={"estado": "aceptado", "movimiento_id": "m1"})
     assert api.get("/api/datos").json()["cuenta_yappy"] == "efectivo"
+
+
+def test_ajustes_de_categoria_de_yappy(api):
+    assert api.get("/api/datos").json()["yappy_categorias"] == {"gasto": None, "ingreso": None}
+    r = api.put("/api/ajustes", json={"yappy_categoria_gasto": "comida", "yappy_categoria_ingreso": "sueldo"})
+    assert r.status_code == 200 and r.json()["yappy_categorias"] == {"gasto": "comida", "ingreso": "sueldo"}
+    assert api.get("/api/datos").json()["yappy_categorias"] == {"gasto": "comida", "ingreso": "sueldo"}
+    assert "yappy_categorias" not in api.get("/api/exportar").json()
+    assert api.put("/api/ajustes", json={"moneda": "$"}).json()["yappy_categorias"]["gasto"] == "comida"  # no se pierde
+    r = api.put("/api/ajustes", json={"yappy_categoria_gasto": ""})
+    assert r.json()["yappy_categorias"] == {"gasto": None, "ingreso": "sueldo"}
+
+
+@pytest.mark.parametrize("cuerpo", [{"yappy_categoria_gasto": "sueldo"}, {"yappy_categoria_ingreso": "comida"},
+                                    {"yappy_categoria_gasto": "fantasma"}])
+def test_categoria_de_yappy_invalida_es_422(api, cuerpo):
+    assert api.put("/api/ajustes", json=cuerpo).status_code == 422
+    assert api.get("/api/datos").json()["yappy_categorias"] == {"gasto": None, "ingreso": None}
 
 
 # --- Apple Pay --------------------------------------------------------------------------------------

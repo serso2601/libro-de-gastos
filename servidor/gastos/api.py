@@ -190,6 +190,8 @@ class AjustesIn(BaseModel):
     presupuesto_periodo: Literal["semanal", "catorcenal", "quincenal", "mensual"] | None = None
     presupuesto_inicio: str | None = Field(default=None, max_length=10)
     cuenta_yappy: str | None = Field(default=None, max_length=100)  # id de la cuenta; "" la quita
+    yappy_categoria_gasto: str | None = Field(default=None, max_length=100)  # id de categoría; "" = automática
+    yappy_categoria_ingreso: str | None = Field(default=None, max_length=100)
 
 
 def _existe(con: sqlite3.Connection, tabla: str, id_: str | None) -> bool:
@@ -262,6 +264,16 @@ def _pendientes(con: sqlite3.Connection) -> list[dict]:
         f"SELECT {CAMPOS_PENDIENTE} FROM pendiente WHERE estado = 'nuevo' ORDER BY recibido DESC, creado DESC")]
 
 
+def _yappy_categorias(con: sqlite3.Connection) -> dict:
+    """Lo guardado para los Yappy (null = automática, o la elegida ya no existe)."""
+    salida = {}
+    for tipo in ("gasto", "ingreso"):
+        f = con.execute("SELECT c.id FROM ajuste a JOIN categoria c ON c.id = a.valor "
+                        "WHERE a.clave = ? AND c.tipo = ?", (f"yappy_categoria_{tipo}", tipo)).fetchone()
+        salida[tipo] = f["id"] if f else None
+    return salida
+
+
 def leer_todo(con: sqlite3.Connection, hoy: date) -> dict:
     cuentas = [_cuenta(f) for f in con.execute(
         """SELECT c.*, c.saldo_inicial
@@ -284,6 +296,7 @@ def leer_todo(con: sqlite3.Connection, hoy: date) -> dict:
         "catalogo": CATALOGO,
         "pendientes": _pendientes(con),
         "cuenta_yappy": correo.cuenta_yappy(con),
+        "yappy_categorias": _yappy_categorias(con),
     }
 
 
@@ -694,16 +707,26 @@ def create_app(config: Config | None = None, hoy=date.today, web: Path = WEB, ex
             if not _existe(con, "cuenta", a.cuenta_yappy):
                 raise HTTPException(422, "La cuenta de Yappy no existe")
             guardar["cuenta_yappy"] = a.cuenta_yappy
+        borrar = ["cuenta_yappy"] if a.cuenta_yappy == "" else []
+        for tipo, valor in (("gasto", a.yappy_categoria_gasto), ("ingreso", a.yappy_categoria_ingreso)):
+            if valor is None:
+                continue
+            if valor == "":
+                borrar.append(f"yappy_categoria_{tipo}")
+            elif con.execute("SELECT 1 FROM categoria WHERE id = ? AND tipo = ?", (valor, tipo)).fetchone():
+                guardar[f"yappy_categoria_{tipo}"] = valor
+            else:
+                raise HTTPException(422, f"La categoría de los Yappy de {tipo}s no existe o no es de ese tipo")
         with con:
             con.executemany("INSERT INTO ajuste VALUES (?, ?) ON CONFLICT (clave) DO UPDATE SET valor = excluded.valor",
                             list(guardar.items()))
-            if a.cuenta_yappy == "":
-                con.execute("DELETE FROM ajuste WHERE clave = 'cuenta_yappy'")
+            for clave in borrar:
+                con.execute("DELETE FROM ajuste WHERE clave = ?", (clave,))
         if a.cuenta_yappy:
             correo.reintentar_yappy(con)
         moneda = con.execute("SELECT valor FROM ajuste WHERE clave = 'moneda'").fetchone()
         return {"moneda": moneda["valor"] if moneda else "$", "presupuesto": _presupuesto(con),
-                "cuenta_yappy": correo.cuenta_yappy(con)}
+                "cuenta_yappy": correo.cuenta_yappy(con), "yappy_categorias": _yappy_categorias(con)}
 
     @r.post("/importar")
     async def importar_vieja(request: Request, simular: bool = False, con: sqlite3.Connection = Depends(conexion)):
@@ -724,7 +747,7 @@ def create_app(config: Config | None = None, hoy=date.today, web: Path = WEB, ex
     @r.get("/exportar")
     def exportar(con: sqlite3.Connection = Depends(conexion)):
         todo = leer_todo(con, hoy())
-        for clave in ("proximos", "catalogo", "pendientes", "cuenta_yappy"):
+        for clave in ("proximos", "catalogo", "pendientes", "cuenta_yappy", "yappy_categorias"):
             todo.pop(clave)
         return {"app": "libro-de-gastos", "version": db.VERSION, "exportado": db.ahora(), **todo}
 

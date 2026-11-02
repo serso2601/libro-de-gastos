@@ -229,6 +229,10 @@ Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
   fijo). Los Yappy **entran solos, como vengan** (el usuario corrige lo que no sea suyo), con un lector
   fijo sin IA; Claude solo elige la categoría si no hay memoria del contacto. Van a la cuenta marcada
   «Mi Yappy está en esta cuenta» (ajuste `cuenta_yappy`). Ya no se leen los correos de `bgeneral.com`.
+  La nota es «Yappy de/a/en <persona o comercio>». Categoría sin IA: la que el usuario dejó la última vez
+  en un Yappy con esa persona o comercio; si no, la por defecto (Compras para gastos, la primera de
+  ingreso), que se cambia en Ajustes → «Categoría de los Yappy». Cada aviso queda registrado (`pendiente`,
+  por correo y por código de confirmación): lo borrado o renombrado no se vuelve a crear.
 - **Apple Pay** (el usuario paga casi todo con el iPhone): automatización «Transacción» de Atajos →
   `POST /api/entrada` con monto, comercio y los 4 dígitos. No necesita la cuenta de pago de Apple; sí
   Tailscale prendido en el iPhone. Los pasos están en Ajustes → «Anotar solo con Apple Pay».

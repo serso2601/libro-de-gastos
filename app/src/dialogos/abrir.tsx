@@ -12,6 +12,7 @@ import { DialogoPeriodo } from './periodo';
 import type { Periodo } from '@/lib/calculos';
 import { DialogoPresupuesto, DialogoTopes } from './presupuesto';
 import { DialogoRecurrencia } from './recurrencia';
+import { DialogoYappy } from './yappy';
 
 /** Lo que se puede dejar listo al abrir la hoja de anotar (el pago sugerido de una tarjeta, por ejemplo). */
 export interface OpcionesAnotar {
@@ -33,7 +34,9 @@ export type Dialogo =
   | { tipo: 'periodo' }
   | { tipo: 'topes' }
   /** Cómo anotar solo los pagos con Apple Pay (un Atajo del iPhone). */
-  | { tipo: 'applePay' };
+  | { tipo: 'applePay' }
+  /** La categoría por defecto de los Yappy que entran solos. */
+  | { tipo: 'yappy' };
 
 const Contexto = createContext<((d: Dialogo) => void) | null>(null);
 
@@ -73,6 +76,7 @@ export function AnfitrionDialogos({ children }: { children: ReactNode }) {
       {d?.tipo === 'topes' && <DialogoTopes alCerrar={cerrar} />}
       {d?.tipo === 'periodo' && <DialogoPeriodo alCerrar={cerrar} />}
       {d?.tipo === 'applePay' && <DialogoApplePay alCerrar={cerrar} />}
+      {d?.tipo === 'yappy' && <DialogoYappy alCerrar={cerrar} />}
     </Contexto.Provider>
   );
 }

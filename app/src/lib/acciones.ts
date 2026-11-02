@@ -148,6 +148,12 @@ export function useAcciones() {
           (d) => ({ ...d, cuenta_yappy: id }));
       },
 
+      /** La categoría por defecto de los Yappy de gasto o de ingreso (null vuelve a la automática). */
+      guardarCategoriaYappy(tipo: 'gasto' | 'ingreso', id: string | null) {
+        cambiar({ metodo: 'PUT', ruta: '/api/ajustes', cuerpo: { [`yappy_categoria_${tipo}`]: id ?? '' }, descripcion: 'Guardar la categoría de los Yappy' },
+          (d) => ({ ...d, yappy_categorias: { gasto: null, ingreso: null, ...d.yappy_categorias, [tipo]: id } }));
+      },
+
       /** Cambiar el periodo del presupuesto. Convertir los topes, si se quiere, va aparte (guardarCategoria). */
       guardarPeriodo(config: ConfigPresupuesto) {
         cambiar({ metodo: 'PUT', ruta: '/api/ajustes', cuerpo: { presupuesto_periodo: config.periodo, presupuesto_inicio: config.inicio },

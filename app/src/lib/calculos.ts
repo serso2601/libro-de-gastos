@@ -388,3 +388,12 @@ export function pagoSugerido(d: Datos, cuenta: Cuenta): { total: number; minimo:
   if (pagado) return null;
   return { total: deuda, minimo: cuenta.pago_minimo ?? null, fecha: ciclo.fechaPago };
 }
+
+/** La categoría que se les pone a los Yappy de ese tipo: la elegida, o la automática (Compras / la primera del tipo). */
+export function categoriaYappy(d: Datos, tipo: 'gasto' | 'ingreso'): { categoria: Categoria | undefined; automatica: boolean } {
+  const lista = d.categorias.filter((x) => x.tipo === tipo).sort((a, b) => a.orden - b.orden);
+  const elegida = lista.find((x) => x.id === d.yappy_categorias?.[tipo]);
+  if (elegida) return { categoria: elegida, automatica: false };
+  const compras = tipo === 'gasto' ? lista.find((x) => x.id === 'compras') : undefined;
+  return { categoria: compras ?? lista[0], automatica: true };
+}

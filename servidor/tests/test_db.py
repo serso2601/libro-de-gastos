@@ -6,9 +6,16 @@ import pytest
 from gastos import db
 
 
+def esquema_v5() -> str:
+    """El esquema de la versión 5: el actual sin lo que agregó la 6 (contraparte y referencia de la bandeja)."""
+    s = db.ESQUEMA.read_text(encoding="utf-8")
+    s = re.sub(r"    contraparte   TEXT,[^\n]*\n    referencia    TEXT,[^\n]*\n", "", s)
+    return re.sub(r"\nCREATE UNIQUE INDEX IF NOT EXISTS pendiente_referencia[^\n]*", "", s)
+
+
 def esquema_v4() -> str:
     """El esquema de la versión 4: el actual sin lo que agregó la 5 (banco y terminación de la cuenta, bandeja)."""
-    s = re.sub(r",\n    -- Vínculo con el catálogo.*?terminacion     TEXT", "", db.ESQUEMA.read_text(encoding="utf-8"), flags=re.S)
+    s = re.sub(r",\n    -- Vínculo con el catálogo.*?terminacion     TEXT", "", esquema_v5(), flags=re.S)
     return s[:s.index("-- La bandeja de avisos")]
 
 
@@ -120,7 +127,7 @@ def test_migracion_5_agrega_banco_terminacion_y_la_bandeja(tmp_path):
 
     db.inicializar(con)
 
-    assert con.execute("PRAGMA user_version").fetchone()[0] == 5
+    assert con.execute("PRAGMA user_version").fetchone()[0] == db.VERSION
     cuenta = dict(con.execute("SELECT * FROM cuenta").fetchone())
     assert (cuenta["nombre"], cuenta["banco"], cuenta["terminacion"]) == ("Cuenta", None, None)
     assert tuple(con.execute("SELECT id, nota FROM movimiento").fetchone()) == ("m", "x")
@@ -131,6 +138,29 @@ def test_migracion_5_agrega_banco_terminacion_y_la_bandeja(tmp_path):
     with pytest.raises(sqlite3.IntegrityError):
         con.execute("UPDATE pendiente SET estado = 'raro'")
     assert con.execute("PRAGMA foreign_key_check").fetchall() == []
+
+
+def test_migracion_6_agrega_contraparte_y_referencia_unica(tmp_path):
+    con = db.conectar(tmp_path / "v5.db")
+    con.executescript(esquema_v5())
+    assert "referencia" not in {f["name"] for f in con.execute("PRAGMA table_info(pendiente)")}
+    con.execute("PRAGMA user_version = 5")
+    marca = db.ahora()
+    with con:
+        con.execute("INSERT INTO pendiente (id, origen, recibido, creado, actualizado) VALUES ('p', 'yappy', ?, ?, ?)",
+                    (marca, marca, marca))
+
+    db.inicializar(con)
+
+    assert con.execute("PRAGMA user_version").fetchone()[0] == 6
+    assert tuple(con.execute("SELECT contraparte, referencia FROM pendiente").fetchone()) == (None, None)
+    with con:
+        con.execute("UPDATE pendiente SET referencia = 'X-1'")
+        con.execute("INSERT INTO pendiente (id, origen, referencia, recibido, creado, actualizado) VALUES ('q', 'wallet', 'X-1', ?, ?, ?)",
+                    (marca, marca, marca))  # otro origen: puede
+    with pytest.raises(sqlite3.IntegrityError):
+        con.execute("INSERT INTO pendiente (id, origen, referencia, recibido, creado, actualizado) VALUES ('r', 'yappy', 'X-1', ?, ?, ?)",
+                    (marca, marca, marca))
 
 
 def test_base_nueva_trae_simbolos_y_la_version_actual(tmp_path):

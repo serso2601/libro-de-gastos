@@ -5,7 +5,7 @@ import { Platform, Pressable, View } from 'react-native';
 import { useAbrir } from '@/dialogos/abrir';
 import { useAcciones } from '@/lib/acciones';
 import { compartirArchivo } from '@/lib/compartir';
-import { configPresupuesto, ORDEN_SALDOS, POR_PERIODO, saldos } from '@/lib/calculos';
+import { categoriaYappy, configPresupuesto, ORDEN_SALDOS, POR_PERIODO, saldos } from '@/lib/calculos';
 import { useAlmacen, useDatos } from '@/lib/datos';
 import { conSigno, dineroCorto, fechaISO, neto } from '@/lib/formato';
 import type { TipoCategoria } from '@/lib/tipos';
@@ -54,6 +54,8 @@ function ContenidoAjustes() {
   const prefs = usePreferencias();
   const [moneda, setMoneda] = useState(d.moneda);
   const formas = saldos(d);
+  const nombreYappy = (tipo: 'gasto' | 'ingreso') => categoriaYappy(d, tipo).categoria?.nombre ?? 'sin categoría';
+  const detalleYappy = `${nombreYappy('gasto')} · ${nombreYappy('ingreso')}`;
   const acento = prefs.acento ?? ACENTOS[0];
 
   const categoriasDe = (tipo: TipoCategoria) => d.categorias.filter((x) => x.tipo === tipo);
@@ -184,6 +186,8 @@ function ContenidoAjustes() {
         <FilaSimple primera texto="Anotar solo con Apple Pay" detalle="Un Atajo del iPhone avisa a la PC en cada pago"
           onPress={() => abrir({ tipo: 'applePay' })}
           izquierda={<View style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: c.suave, alignItems: 'center', justifyContent: 'center' }}><Icono nombre="reloj" tam={15} color={c.tenue} /></View>} />
+        <FilaSimple primera={false} texto="Categoría de los Yappy" detalle={detalleYappy} onPress={() => abrir({ tipo: 'yappy' })}
+          izquierda={<View style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: c.suave, alignItems: 'center', justifyContent: 'center' }}><Icono nombre="lista" tam={15} color={c.tenue} /></View>} />
       </Lista>
 
       <TituloSeccion>Respaldo</TituloSeccion>

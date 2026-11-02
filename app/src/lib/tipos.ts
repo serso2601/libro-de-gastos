@@ -161,6 +161,8 @@ export interface Datos {
   pendientes?: Pendiente[];
   /** La cuenta de la que salen (o a la que llegan) los Yappy; null si no se ha elegido. */
   cuenta_yappy?: string | null;
+  /** La categoría que se les pone a los Yappy por defecto, por tipo; null = automática. */
+  yappy_categorias?: { gasto: string | null; ingreso: string | null };
 }
 
 export const FRECUENCIAS: [Frecuencia, string][] = [

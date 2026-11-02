@@ -21,8 +21,8 @@ Autorizar (una sola vez): `uv run python -m gastos.correo --autorizar`.
 Para probar la extracción sin guardar nada: `uv run python -m gastos.correo --probar aviso.txt`.
 Para ver qué haría con los avisos de Gmail sin guardar nada: `uv run python -m gastos.correo --simular`.
 
-Yappy no se lee con Claude: su aviso tiene formato fijo (`leer_yappy`). Claude solo elige la categoría
-cuando no hay una guardada para esa persona o comercio. Apple Pay llega por `POST /api/entrada` con los
+Yappy no se lee con Claude: su aviso tiene formato fijo (`leer_yappy`) y su categoría sale de la última
+que tuvo esa persona o comercio, o de la que el usuario eligió para los Yappy (o Compras / la primera). Apple Pay llega por `POST /api/entrada` con los
 campos sueltos que manda un Atajo del iPhone, y sigue el mismo camino.
 """
 
@@ -456,9 +456,11 @@ def leer_yappy(asunto: str, texto: str) -> dict | None:
     bajas = [l.casefold() for l in lineas]
     pistas = f"{asunto} {lineas[0] if lineas else ''}".casefold()
     if "te enviaron" in pistas:
-        tipo = "ingreso"
-    elif "enviaste" in pistas or "pagaste" in pistas:
-        tipo = "gasto"
+        tipo, via = "ingreso", "recibido"
+    elif "enviaste" in pistas:
+        tipo, via = "gasto", "enviado"
+    elif "pagaste" in pistas:
+        tipo, via = "gasto", "pagado"
     else:
         return None
     monto = next((a_centavos(m.group(1)) for m in re.finditer(r"\$\s*([\d.,]*\d)", texto or "")), None)
@@ -506,7 +508,8 @@ def leer_yappy(asunto: str, texto: str) -> dict | None:
         mensaje = " ".join(sigue)[:100]
     if "confirmacion" in sin_tilde and sin_tilde.index("confirmacion") + 1 < len(lineas):
         codigo = lineas[sin_tilde.index("confirmacion") + 1]
-    nota = f"{contraparte} · {mensaje}" if mensaje else contraparte
+    prefijo = {"recibido": "Yappy de", "enviado": "Yappy a", "pagado": "Yappy en"}[via]
+    nota = f"{prefijo} {contraparte} · {mensaje}" if mensaje else f"{prefijo} {contraparte}"
     return {"tipo": tipo, "monto": monto, "contraparte": contraparte, "mensaje": mensaje, "comercio": nota[:200],
             "fecha": fecha, "hora": hora, "confirmacion": codigo}
 
@@ -632,19 +635,49 @@ def reintentar_yappy(con: sqlite3.Connection) -> int:
     return len(filas)
 
 
-def _resolver_directo(con: sqlite3.Connection, id_: str, d: dict, cats: list[dict], elegir: Elector) -> str:
-    """Un aviso ya entendido sin Claude (Yappy, Apple Pay): categoría por memoria o por Claude, y a la cuenta."""
+def categoria_yappy_por_defecto(con: sqlite3.Connection, tipo: str) -> str | None:
+    """La categoría que se les pone a los Yappy de ese tipo: la del ajuste si sigue siendo válida; si no, la automática."""
+    f = con.execute("SELECT c.id FROM ajuste a JOIN categoria c ON c.id = a.valor "
+                    "WHERE a.clave = ? AND c.tipo = ?", (f"yappy_categoria_{tipo}", tipo)).fetchone()
+    if f:
+        return f["id"]
+    if tipo == "gasto" and (f := con.execute("SELECT id FROM categoria WHERE id = 'compras' AND tipo = 'gasto'").fetchone()):
+        return f["id"]
+    f = con.execute("SELECT id FROM categoria WHERE tipo = ? ORDER BY orden, creado", (tipo,)).fetchone()
+    return f["id"] if f else None
+
+
+def _categoria_yappy_por_memoria(con: sqlite3.Connection, tipo: str, contraparte: str) -> str | None:
+    """La categoría ACTUAL del movimiento del último Yappy con esa persona o comercio (si el movimiento sigue existiendo)."""
+    for f in con.execute("SELECT p.contraparte, m.categoria_id FROM pendiente p JOIN movimiento m ON m.id = p.movimiento_id "
+                         "JOIN categoria c ON c.id = m.categoria_id "
+                         "WHERE p.origen = 'yappy' AND p.contraparte IS NOT NULL AND m.tipo = ? AND c.tipo = ? "
+                         "ORDER BY p.creado DESC", (tipo, tipo)):
+        if f["contraparte"].casefold() == contraparte.casefold():
+            return f["categoria_id"]
+    return None
+
+
+def _resolver_directo(con: sqlite3.Connection, id_: str, d: dict, cats: list[dict], elegir: Elector, origen: str) -> str:
+    """Un aviso ya entendido sin Claude para leerlo (Yappy, Apple Pay): categoría y a la cuenta.
+
+    Yappy no llama a Claude: categoría por memoria de la persona o la por defecto. Apple Pay sí le pregunta.
+    """
     tipo = d["tipo"]
     base = dict(tipo=tipo, monto=d["monto"], fecha=d["fecha"], hora=d.get("hora"), comercio=d["comercio"],
                 terminacion=d.get("terminacion"))
-    categoria = _categoria_por_memoria(con, tipo, d["comercio"]) or _categoria_por_memoria(con, tipo, d["contraparte"])
-    if categoria is None:
-        posibles = [c for c in cats if c["tipo"] == tipo]
-        try:
-            elegida = elegir({"tipo": tipo, "comercio": d["contraparte"], "mensaje": d.get("mensaje", "")}, posibles)
-        except Exception:  # Claude caído o respuesta rara
-            elegida = None
-        categoria = next((c["id"] for c in posibles if c["id"] == elegida), None)
+    if origen == "yappy":
+        base.update(contraparte=d["contraparte"], referencia=d.get("confirmacion") or None)
+        categoria = _categoria_yappy_por_memoria(con, tipo, d["contraparte"]) or categoria_yappy_por_defecto(con, tipo)
+    else:
+        categoria = _categoria_por_memoria(con, tipo, d["comercio"]) or _categoria_por_memoria(con, tipo, d["contraparte"])
+        if categoria is None:
+            posibles = [c for c in cats if c["tipo"] == tipo]
+            try:
+                elegida = elegir({"tipo": tipo, "comercio": d["contraparte"], "mensaje": d.get("mensaje", "")}, posibles)
+            except Exception:  # Claude caído o respuesta rara
+                elegida = None
+            categoria = next((c["id"] for c in posibles if c["id"] == elegida), None)
     if categoria is None:
         _guardar(con, id_, estado="nuevo", motivo="No pude elegir la categoría", **base)
         return "nuevo"
@@ -677,7 +710,7 @@ def resolver(con: sqlite3.Connection, id_: str, entrada: dict, extraer: Extracto
     cats, ctas = _categorias_y_cuentas(con)
     fecha_aviso = _fecha_valida(entrada.get("fecha")) or hoy.isoformat()
     if (directo := _aviso_directo({**entrada, "fecha": entrada.get("fecha") or fecha_aviso})) is not None:
-        return _resolver_directo(con, id_, directo, cats, elegir or elegir_categoria)
+        return _resolver_directo(con, id_, directo, cats, elegir or elegir_categoria, entrada.get("origen", ""))
     aviso = {"remitente": entrada.get("remitente", ""), "asunto": entrada.get("asunto", ""),
              "texto": entrada.get("texto", ""), "fecha": fecha_aviso}
     try:
@@ -723,10 +756,17 @@ def procesar(con: sqlite3.Connection, entrada: dict, extraer: Extractor, hoy: da
     Devuelve el estado en que quedó, o None si ya se había leído (misma `clave`). Un aviso de Yappy
     que `leer_yappy` entiende queda con origen `yappy`; si no lo entiende, sigue el camino de Claude.
     """
-    if es_de_yappy(entrada.get("remitente", "")) and leer_yappy(entrada.get("asunto", ""), entrada.get("texto", "")):
+    y = leer_yappy(entrada.get("asunto", ""), entrada.get("texto", "")) if es_de_yappy(entrada.get("remitente", "")) else None
+    if y:
         entrada = {**entrada, "origen": "yappy"}
     id_ = registrar(con, entrada)
-    return None if id_ is None else resolver(con, id_, entrada, extraer, hoy, elegir)
+    if id_ is None:
+        return None
+    if y and y["confirmacion"] and con.execute("SELECT 1 FROM pendiente WHERE origen = 'yappy' AND referencia = ?",
+                                               (y["confirmacion"],)).fetchone():
+        _guardar(con, id_, estado="ignorado", motivo="")  # el mismo Yappy en otro correo: ya se leyó
+        return None
+    return resolver(con, id_, entrada, extraer, hoy, elegir)
 
 
 # --- Leer el correo --------------------------------------------------------------------------------
