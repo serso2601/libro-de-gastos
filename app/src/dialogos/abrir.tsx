@@ -4,6 +4,7 @@
 import { createContext, useContext, useState, type ReactNode } from 'react';
 import type { Categoria, Cuenta, Movimiento, Pendiente, Recurrencia, TipoCategoria, TipoMovimiento } from '@/lib/tipos';
 import { DialogoCategoria } from './categoria';
+import { DialogoApplePay } from './applePay';
 import { DialogoCuenta } from './cuenta';
 import { DialogoDetalleCategoria } from './detalleCategoria';
 import { DialogoMovimiento } from './movimiento';
@@ -30,7 +31,9 @@ export type Dialogo =
   | { tipo: 'detalleCategoria'; categoria: Categoria; periodo: Periodo }
   /** Elegir cada cuánto se reinicia el presupuesto (y convertir los topes). */
   | { tipo: 'periodo' }
-  | { tipo: 'topes' };
+  | { tipo: 'topes' }
+  /** Cómo anotar solo los pagos con Apple Pay (un Atajo del iPhone). */
+  | { tipo: 'applePay' };
 
 const Contexto = createContext<((d: Dialogo) => void) | null>(null);
 
@@ -69,6 +72,7 @@ export function AnfitrionDialogos({ children }: { children: ReactNode }) {
       )}
       {d?.tipo === 'topes' && <DialogoTopes alCerrar={cerrar} />}
       {d?.tipo === 'periodo' && <DialogoPeriodo alCerrar={cerrar} />}
+      {d?.tipo === 'applePay' && <DialogoApplePay alCerrar={cerrar} />}
     </Contexto.Provider>
   );
 }

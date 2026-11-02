@@ -142,6 +142,12 @@ export function useAcciones() {
           (d) => ({ ...d, moneda }));
       },
 
+      /** Marcar en qué cuenta está el Yappy (null la quita). */
+      guardarCuentaYappy(id: string | null) {
+        cambiar({ metodo: 'PUT', ruta: '/api/ajustes', cuerpo: { cuenta_yappy: id ?? '' }, descripcion: 'Guardar la cuenta del Yappy' },
+          (d) => ({ ...d, cuenta_yappy: id }));
+      },
+
       /** Cambiar el periodo del presupuesto. Convertir los topes, si se quiere, va aparte (guardarCategoria). */
       guardarPeriodo(config: ConfigPresupuesto) {
         cambiar({ metodo: 'PUT', ruta: '/api/ajustes', cuerpo: { presupuesto_periodo: config.periodo, presupuesto_inicio: config.inicio },

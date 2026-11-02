@@ -23,14 +23,16 @@ export function familia(peso: Peso): string {
   return ESTILO.fuentes[peso];
 }
 
-export function Texto({ children, tam = 15, peso = 'normal', num = false, color, style, lineas, centro, ajustar }: {
+export function Texto({ children, tam = 15, peso = 'normal', num = false, color, style, lineas, centro, ajustar, selectable }: {
   children: ReactNode; tam?: number; peso?: Peso; num?: boolean; color?: string; style?: StyleProp<TextStyle>; lineas?: number; centro?: boolean;
   /** Achica la letra para que entre en `lineas` en vez de cortar con «…» (montos). */
   ajustar?: boolean;
+  /** Se puede seleccionar y copiar con el dedo o el cursor. */
+  selectable?: boolean;
 }) {
   const { c } = useTema();
   return (
-    <Text numberOfLines={lineas} adjustsFontSizeToFit={ajustar} minimumFontScale={ajustar ? 0.6 : undefined} style={[{
+    <Text selectable={selectable} numberOfLines={lineas} adjustsFontSizeToFit={ajustar} minimumFontScale={ajustar ? 0.6 : undefined} style={[{
       fontFamily: familia(peso), fontSize: tam, color: color ?? c.tinta,
       fontVariant: num ? ['tabular-nums'] : undefined, textAlign: centro ? 'center' : undefined,
     }, style]}>

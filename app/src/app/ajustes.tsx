@@ -179,6 +179,13 @@ function ContenidoAjustes() {
         </Tocable>
       </Tarjeta>
 
+      <TituloSeccion>Anotar solo</TituloSeccion>
+      <Lista>
+        <FilaSimple primera texto="Anotar solo con Apple Pay" detalle="Un Atajo del iPhone avisa a la PC en cada pago"
+          onPress={() => abrir({ tipo: 'applePay' })}
+          izquierda={<View style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: c.suave, alignItems: 'center', justifyContent: 'center' }}><Icono nombre="reloj" tam={15} color={c.tenue} /></View>} />
+      </Lista>
+
       <TituloSeccion>Respaldo</TituloSeccion>
       <Tarjeta style={{ padding: 14, gap: 12 }}>
         <Texto tam={14} color={c.tenue} style={{ lineHeight: 20 }}>La PC guarda una copia de la base cada día. Además puedes sacar todo en un archivo .json.</Texto>

@@ -1,7 +1,8 @@
 // Lo que el banco le va a dar o cobrar a una cuenta vinculada, calculado con el catálogo (bancos.json) y los
 // saldos de cada día del mes. Funciones puras, sin React. Montos en centavos; el redondeo va solo al final.
 
-import { diasDelMes } from './calculos';
+import { cicloTarjeta, diasDelMes } from './calculos';
+import { aFecha, fechaISO } from './formato';
 import type { Banco, Catalogo, Cuenta, Datos, InteresCuenta, ProductoCuenta, SeguroTarjeta, Tarjeta, VersionCuenta, VersionTarjeta } from './tipos';
 
 /** La versión del producto con mayor `vigente_desde` que no pase de la fecha; si la fecha es anterior a todas, la primera. */
@@ -188,4 +189,43 @@ export function resumenBanco(d: Datos, cuenta: Cuenta, mes: string): ResumenBanc
   const cargos = cargosDelMes(vinculo.producto, vinculo.tarjeta, cuenta.banco, del, mes);
   const neto = (interes?.alCierre ?? 0) - cargos.cargos.reduce((s, c) => s + c.monto, 0);
   return { vinculo, interes, cargos, neto, credito: null };
+}
+
+export interface ResumenMes {
+  /** Saldo antes del primer día del mes. */
+  abre: number;
+  entro: number;
+  salio: number;
+  /** Saldo al cierre de lo anotado: hasta hoy si es el mes actual, al fin del mes si ya pasó. */
+  cierra: number;
+  esActual: boolean;
+}
+
+/** Lo anotado en una cuenta en un mes ('YYYY-MM'): con qué empezó, qué entró, qué salió y con qué quedó. */
+export function resumenMes(d: Datos, cuenta: Cuenta, mes: string): ResumenMes {
+  const primero = `${mes}-01`;
+  const esActual = d.hoy.startsWith(mes);
+  const ultimo = esActual ? d.hoy : `${mes}-31`;
+  let abre = cuenta.saldo_inicial;
+  let entro = 0;
+  let salio = 0;
+  for (const x of d.movimientos) {
+    // Lo que sale de la cuenta (gasto o transferencia) y lo que entra (ingreso o transferencia que llega).
+    const sale = x.cuenta_id === cuenta.id && x.tipo !== 'ingreso' ? x.monto : 0;
+    const entra = (x.cuenta_id === cuenta.id && x.tipo === 'ingreso' ? x.monto : 0) + (x.cuenta_destino_id === cuenta.id ? x.monto : 0);
+    if (x.fecha < primero) abre += entra - sale;
+    else if (x.fecha <= ultimo) { entro += entra; salio += sale; }
+  }
+  return { abre, entro, salio, cierra: abre + entro - salio, esActual };
+}
+
+/** Lo gastado con la tarjeta en los últimos `dias` días antes del próximo corte: puede pasar al corte siguiente. */
+export function comprasCercaDelCorte(d: Datos, cuenta: Cuenta, dias = 3): number {
+  const ciclo = cicloTarjeta(cuenta, d.hoy);
+  if (!ciclo) return 0;
+  const corte = aFecha(ciclo.proximoCorte);
+  corte.setDate(corte.getDate() - dias);
+  const desde = fechaISO(corte);
+  return d.movimientos.reduce((s, m) => s + (m.cuenta_id === cuenta.id && m.tipo !== 'ingreso' && m.fecha > desde
+    && m.fecha > ciclo.corteAnterior && m.fecha <= ciclo.proximoCorte ? m.monto : 0), 0);
 }

@@ -57,7 +57,7 @@ export interface VersionTarjeta {
 }
 export interface Tarjeta { id: string; nombre: string; clase: 'debito' | 'credito'; versiones: VersionTarjeta[] }
 
-export interface Banco { id: string; nombre: string; cuentas: ProductoCuenta[]; tarjetas: Tarjeta[] }
+export interface Banco { id: string; nombre: string; banca?: { nombre: string; url: string; pasos: string }; cuentas: ProductoCuenta[]; tarjetas: Tarjeta[] }
 export interface Catalogo { acerca?: string; notas?: string[]; bancos: Banco[] }
 
 /** Un aviso del banco (llegó al correo) que espera que el usuario lo revise. */
@@ -159,6 +159,8 @@ export interface Datos {
   /** Faltan en datos viejos guardados en el teléfono. */
   catalogo?: Catalogo;
   pendientes?: Pendiente[];
+  /** La cuenta de la que salen (o a la que llegan) los Yappy; null si no se ha elegido. */
+  cuenta_yappy?: string | null;
 }
 
 export const FRECUENCIAS: [Frecuencia, string][] = [

@@ -37,7 +37,7 @@ function GrillaDias({ valor, alCambiar }: { valor: number | null; alCambiar: (d:
 }
 
 export function DialogoCuenta({ inicial, alCerrar }: { inicial?: Cuenta; alCerrar: () => void }) {
-  const { cuentas, movimientos, recurrencias, moneda, catalogo, hoy } = useDatos();
+  const { cuentas, movimientos, recurrencias, moneda, catalogo, hoy, cuenta_yappy } = useDatos();
   const { c } = useTema();
   const acciones = useAcciones();
   const [nombre, setNombre] = useState(inicial?.nombre ?? '');
@@ -56,6 +56,8 @@ export function DialogoCuenta({ inicial, alCerrar }: { inicial?: Cuenta; alCerra
   const [seguroId, setSeguroId] = useState<string | null>(v0?.seguro ?? null);
   const [verBanco, setVerBanco] = useState(false);
   const [terminacion, setTerminacion] = useState(inicial?.terminacion ?? '');
+  const eraYappy = !!inicial && cuenta_yappy === inicial.id;
+  const [yappy, setYappy] = useState<'si' | 'no'>(eraYappy ? 'si' : 'no');
   const [error, setError] = useState('');
   const esTarjeta = credito === 'si';
 
@@ -75,12 +77,17 @@ export function DialogoCuenta({ inicial, alCerrar }: { inicial?: Cuenta; alCerra
       membresia: debito ? membresia : 'mensual',
       seguro: debito ? seguroId : null,
     } : null;
+    const id = inicial?.id ?? nuevoId();
     acciones.guardarCuenta({
-      ...inicial, id: inicial?.id ?? nuevoId(), nombre: nombre.trim(), color, orden: inicial?.orden ?? 999,
+      ...inicial, id, nombre: nombre.trim(), color, orden: inicial?.orden ?? 999,
       saldo_inicial: esTarjeta || negativo === 'si' ? -abs : abs,
       es_credito: esTarjeta, dia_corte: esTarjeta ? corte : null, dia_pago: esTarjeta ? pago : null, pago_minimo: esTarjeta ? min : null,
       banco: vinculo, terminacion: final4 === '' ? null : final4,
     });
+    // El Yappy solo se marca en cuentas que no son de crédito; si cambió, se avisa a la PC.
+    const quiereYappy = !esTarjeta && yappy === 'si';
+    if (quiereYappy && !eraYappy) acciones.guardarCuentaYappy(id);
+    else if (!quiereYappy && eraYappy) acciones.guardarCuentaYappy(null);
     alCerrar();
   }
 
@@ -221,6 +228,13 @@ export function DialogoCuenta({ inicial, alCerrar }: { inicial?: Cuenta; alCerra
         <Campo value={terminacion} onChangeText={(t) => setTerminacion(t.replace(/\D/g, '').slice(0, 4))} placeholder="1234" keyboardType="number-pad" maxLength={4} />
         <Texto tam={13} color={c.tenue}>Para reconocer los avisos del banco que llegan al correo.</Texto>
       </View>
+      {!esTarjeta && (
+        <View style={{ gap: 8 }}>
+          <Etiqueta>Mi Yappy está en esta cuenta</Etiqueta>
+          <Segmentos<'no' | 'si'> opciones={[['no', 'No'], ['si', 'Sí']]} valor={yappy} alCambiar={setYappy} />
+          <Texto tam={13} color={c.tenue}>Los Yappy que te lleguen al correo se anotan en esta cuenta.</Texto>
+        </View>
+      )}
     </Hoja>
   );
 }

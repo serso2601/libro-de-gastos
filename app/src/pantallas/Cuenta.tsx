@@ -1,17 +1,20 @@
 // Una cuenta abierta: su saldo, lo que entró y salió este mes y sus movimientos por día. La parte de
 // arriba toma el color de la cuenta (con letra que se lea encima); los movimientos van debajo.
 
+import * as Haptics from 'expo-haptics';
 import { StatusBar } from 'expo-status-bar';
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Linking, Pressable, ScrollView, View } from 'react-native';
 import { useAbrir, useAnotar } from '@/dialogos/abrir';
-import { interesSiNoPagas, resumenBanco } from '@/lib/banco';
+import { comprasCercaDelCorte, interesSiNoPagas, resumenBanco, resumenMes, vinculoDe } from '@/lib/banco';
 import { configPresupuesto, deudaTarjeta, flujoCuenta, gastadoEnCorte, montoEnCuenta, pagoSugerido, periodoDe, porDia, porVenirDelMes } from '@/lib/calculos';
 import { useDatos } from '@/lib/datos';
 import { conSigno, dineroCorto, MESES, neto, ordenarPorFecha, saldo, tituloDia } from '@/lib/formato';
 import type { Cuenta as TCuenta } from '@/lib/tipos';
-import { BotonRedondo, Buscador, CabeceraDia, FilaMovimiento, Lista, Num, Rotulo, Tarjeta, Texto, Vacio } from '@/ui/componentes';
+import { BotonRedondo, Buscador, CabeceraDia, Enlace, FilaMovimiento, Lista, Num, Rotulo, Tarjeta, Texto, Vacio } from '@/ui/componentes';
 import { useVez } from '@/ui/animar';
+import { avisar } from '@/ui/aviso';
+import { Deslizar } from '@/ui/deslizar';
 import { ANCHO_COLUMNA, ANCHO_LECTURA, useDisposicion } from '@/ui/disposicion';
 import { FilaViva, GrupoVivo, ListaViva } from '@/ui/filaViva';
 import { Icono } from '@/ui/iconos';
@@ -95,57 +98,137 @@ function LoQueViene({ cuenta }: { cuenta: TCuenta }) {
   );
 }
 
-/** Lo que el banco le da o cobra a esta cuenta este mes, calculado con el catálogo. Callado: sin avisos ni colores de alerta. */
-function BloqueBanco({ cuenta, fondo }: { cuenta: TCuenta; fondo: string }) {
-  const d = useDatos();
+/** Una fila de cifras: rótulo a la izquierda, valor a la derecha. `tenue` es la versión chica y callada. */
+function FilaCifra({ texto, valor, color, tenue = false }: { texto: string; valor: string; color?: string; tenue?: boolean }) {
   const { c } = useTema();
-  const mes = d.hoy.slice(0, 7);
-  const res = useMemo(() => resumenBanco(d, cuenta, mes), [d, cuenta, mes]);
-  if (!res) return null;
-  const { vinculo, interes, cargos, credito } = res;
-  const nombre = [vinculo.banco.nombre, cuenta.es_credito ? vinculo.tarjeta?.nombre : vinculo.producto?.nombre, !cuenta.es_credito ? vinculo.tarjeta?.nombre : null]
-    .filter(Boolean).join(' · ');
-  const fila = (clave: string, texto: string, valor: string, color?: string, tenue = false) => (
-    <View key={clave} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, minHeight: 28 }}>
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, minHeight: 28 }}>
       <Texto tam={tenue ? 13 : 15} color={tenue ? c.tenue : undefined} style={{ flex: 1, minWidth: 0 }}>{texto}</Texto>
       <Texto num tam={tenue ? 13 : 15} peso={tenue ? 'normal' : 'medio'} color={color ?? (tenue ? c.tenue : undefined)}>{valor}</Texto>
     </View>
   );
-  const hayAlgo = !!interes || cargos.cargos.length > 0 || !!cargos.anual || !!credito;
+}
+
+/** El mes anterior o siguiente de una clave 'YYYY-MM'. */
+function moverMes(clave: string, delta: number): string {
+  const [y, m] = clave.split('-').map(Number);
+  const dt = new Date(y, m - 1 + delta, 1);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/** Al pie del bloque: de dónde sale el estado de cuenta de verdad y cómo abrirlo. */
+function PieBanca({ banca }: { banca: { nombre: string; url: string; pasos: string } }) {
+  const { c } = useTema();
+  return (
+    <View style={{ marginTop: 4, gap: 4, alignItems: 'flex-start' }}>
+      <Texto tam={12} color={c.tenue}>El estado de cuenta completo está en la {banca.nombre}: {banca.pasos}.</Texto>
+      <Enlace tam={13} onPress={() => { Linking.openURL(banca.url).catch(() => avisar('No se pudo abrir la banca')); }}>Abrir la banca</Enlace>
+    </View>
+  );
+}
+
+/** Resumen del mes de una cuenta (no de crédito): lo anotado y, si está vinculada a un banco, lo que él da o cobra. Callado. */
+function ResumenDelMes({ cuenta, fondo }: { cuenta: TCuenta; fondo: string }) {
+  const d = useDatos();
+  const { c } = useTema();
+  const actual = d.hoy.slice(0, 7);
+  const [mes, setMes] = useState(actual);
+  const sel = mes > actual ? actual : mes;
+  const nombreMes = MESES[Number(sel.slice(5, 7)) - 1];
+  const r = useMemo(() => resumenMes(d, cuenta, sel), [d, cuenta, sel]);
+  const res = useMemo(() => resumenBanco(d, cuenta, sel), [d, cuenta, sel]);
+  const vinculo = vinculoDe(d.catalogo, cuenta);
+  const banca = vinculo?.banco.banca;
+  const interes = res?.interes ?? null;
+  const cargos = res?.cargos;
+  const hayBanco = !!res && (!!interes || (!!cargos && (cargos.cargos.length > 0 || !!cargos.anual)));
+  const flecha = (delta: number, activa: boolean) => (
+    <Pressable onPress={() => { Haptics.selectionAsync(); setMes(moverMes(sel, delta)); }} disabled={!activa} hitSlop={6}
+      accessibilityLabel={delta < 0 ? 'Mes anterior' : 'Mes siguiente'}
+      style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center', opacity: activa ? 1 : 0.3 }}>
+      <Icono nombre={delta < 0 ? 'atras' : 'adelante'} tam={16} color={c.tenue} grosor={2.2} />
+    </Pressable>
+  );
+  return (
+    <View style={{ gap: 6 }}>
+      <Rotulo derecha={<View style={{ flexDirection: 'row' }}>{flecha(-1, true)}{flecha(1, sel < actual)}</View>}>Resumen de {nombreMes}</Rotulo>
+      <Tarjeta color={fondo} style={{ paddingHorizontal: 16, paddingVertical: 10, gap: 2, overflow: 'hidden' }}>
+        <Deslizar clave={sel}>
+          <View style={{ gap: 2 }}>
+            <FilaCifra texto={`Saldo al empezar ${nombreMes.toLowerCase()}`} valor={neto(r.abre, d.moneda)} tenue />
+            <FilaCifra texto="Entró" valor={`+${neto(r.entro, d.moneda)}`} color={c.ingreso} />
+            <FilaCifra texto="Salió" valor={`−${neto(r.salio, d.moneda)}`} color={c.gasto} />
+            <View style={{ borderTopWidth: 1, borderTopColor: c.linea, marginTop: 4, paddingTop: 4 }}>
+              <FilaCifra texto={r.esActual ? 'Saldo hoy' : 'Saldo al cierre'} valor={neto(r.cierra, d.moneda)} />
+            </View>
+            {res && hayBanco && (
+              <View style={{ borderTopWidth: 1, borderTopColor: c.linea, marginTop: 6, paddingTop: 6 }}>
+                <Texto tam={13} color={c.tenue} style={{ marginBottom: 2 }}>
+                  {[vinculo?.banco.nombre, vinculo?.producto?.nombre, vinculo?.tarjeta?.nombre].filter(Boolean).join(' · ')}
+                </Texto>
+                {interes && (
+                  <>
+                    <FilaCifra texto="Interés (aprox.)" valor={`+${neto(interes.alCierre, d.moneda)}`} color={c.ingreso} />
+                    {r.esActual && <FilaCifra texto="hasta hoy" valor={`+${neto(interes.hastaHoy, d.moneda)}`} tenue />}
+                    {interes.diasBajoMinimo > 0 && (
+                      <Texto tam={13} color={c.tenue}>
+                        {interes.diasBajoMinimo} {interes.diasBajoMinimo === 1 ? 'día bajo' : 'días bajo'} {dineroCorto(vinculo?.producto ? (vinculo.producto.versiones[vinculo.producto.versiones.length - 1].interes?.minimo_diario ?? 0) : 0, d.moneda)} no {interes.diasBajoMinimo === 1 ? 'ganó' : 'ganaron'} interés
+                      </Texto>
+                    )}
+                  </>
+                )}
+                {cargos?.cargos.map((x, i) => <FilaCifra key={`cargo${i}`} texto={x.nombre} valor={`−${neto(x.monto, d.moneda)}`} color={c.gasto} />)}
+                {cargos?.anual && <FilaCifra texto={`${cargos.anual.nombre} (se cobra una vez al año)`} valor={neto(cargos.anual.monto, d.moneda)} tenue />}
+                {(interes || (cargos && cargos.cargos.length > 0)) && (
+                  <FilaCifra texto="Neto del banco (aprox.)" valor={neto(res.neto, d.moneda, true)} />
+                )}
+                {interes && <Texto tam={12} color={c.tenue} style={{ marginTop: 4 }}>Estimado con el saldo de cada día. El banco lo acredita al cierre del mes.</Texto>}
+              </View>
+            )}
+          </View>
+        </Deslizar>
+        <Texto tam={12} color={c.tenue} style={{ marginTop: 6 }}>Solo lo que anotaste: lo que entró y gastaste tú.</Texto>
+        {banca && <PieBanca banca={banca} />}
+      </Tarjeta>
+    </View>
+  );
+}
+
+/** Tarjeta de crédito: lo que va del corte y lo que dice el banco (tasa, interés si no pagas el total, pago atrasado). */
+function ResumenTarjeta({ cuenta, fondo }: { cuenta: TCuenta; fondo: string }) {
+  const d = useDatos();
+  const { c } = useTema();
+  const res = useMemo(() => resumenBanco(d, cuenta, d.hoy.slice(0, 7)), [d, cuenta]);
+  const vinculo = vinculoDe(d.catalogo, cuenta);
+  const credito = res?.credito ?? null;
+  const cerca = comprasCercaDelCorte(d, cuenta);
+  const nombre = vinculo ? [vinculo.banco.nombre, vinculo.tarjeta?.nombre].filter(Boolean).join(' · ') : 'Tarjeta de crédito';
+  const banca = vinculo?.banco.banca;
   return (
     <View style={{ gap: 6 }}>
       <Rotulo>{nombre}</Rotulo>
       <Tarjeta color={fondo} style={{ paddingHorizontal: 16, paddingVertical: 10, gap: 2 }}>
-        {interes && (
-          <>
-            {fila('interes', 'Interés de este mes', `+${neto(interes.alCierre, d.moneda)}`, c.ingreso)}
-            {fila('hasta', 'hasta hoy', `+${neto(interes.hastaHoy, d.moneda)}`, undefined, true)}
-            {interes.diasBajoMinimo > 0 && (
-              <Texto tam={13} color={c.tenue}>
-                {interes.diasBajoMinimo} {interes.diasBajoMinimo === 1 ? 'día bajo' : 'días bajo'} {dineroCorto(vinculo.producto ? (vinculo.producto.versiones[vinculo.producto.versiones.length - 1].interes?.minimo_diario ?? 0) : 0, d.moneda)} no {interes.diasBajoMinimo === 1 ? 'ganó' : 'ganaron'} interés
-              </Texto>
-            )}
-          </>
-        )}
-        {cargos.cargos.map((x, i) => fila(`cargo${i}`, x.nombre, `−${neto(x.monto, d.moneda)}`, c.gasto))}
-        {cargos.anual && fila('anual', `${cargos.anual.nombre} (se cobra una vez al año)`, neto(cargos.anual.monto, d.moneda), undefined, true)}
-        {!credito && (interes || cargos.cargos.length > 0) && (
-          <View style={{ borderTopWidth: 1, borderTopColor: c.linea, marginTop: 6, paddingTop: 6 }}>
-            {fila('neto', 'Neto al cierre', neto(res.neto, d.moneda, true))}
-          </View>
+        <FilaCifra texto="Al corte (aprox.)" valor={neto(gastadoEnCorte(d, cuenta), d.moneda)} />
+        {cerca > 0 && (
+          <Texto tam={13} color={c.tenue}>Las compras de los últimos días antes del corte pueden pasar al siguiente: {neto(cerca, d.moneda)}</Texto>
         )}
         {credito && (
           <>
-            {fila('tasa', 'Tasa anual', `${credito.tasa}%`)}
+            <FilaCifra texto="Tasa anual" valor={`${credito.tasa}%`} />
             <Texto tam={13} color={c.tenue}>Si no pagas el total: unos {neto(interesSiNoPagas(deudaTarjeta(d, cuenta), credito.tasa), d.moneda)} de interés al mes</Texto>
-            {credito.pagoAtrasado > 0 && fila('atraso', 'Pago atrasado', neto(credito.pagoAtrasado, d.moneda), undefined, true)}
+            {credito.pagoAtrasado > 0 && <FilaCifra texto="Pago atrasado" valor={neto(credito.pagoAtrasado, d.moneda)} tenue />}
           </>
         )}
-        {!hayAlgo && <Texto tam={13} color={c.tenue}>Sin cargos este mes.</Texto>}
-        {!credito && <Texto tam={12} color={c.tenue} style={{ marginTop: 6 }}>Estimado con el saldo de cada día. El banco lo acredita al cierre del mes.</Texto>}
+        <Texto tam={12} color={c.tenue} style={{ marginTop: 6 }}>Solo lo que anotaste. El corte real lo da tu banco.</Texto>
+        {banca && <PieBanca banca={banca} />}
       </Tarjeta>
     </View>
   );
+}
+
+/** El bloque de la cuenta con lo del mes (o del corte, si es tarjeta de crédito). */
+function BloqueBanco({ cuenta, fondo }: { cuenta: TCuenta; fondo: string }) {
+  return cuenta.es_credito ? <ResumenTarjeta cuenta={cuenta} fondo={fondo} /> : <ResumenDelMes cuenta={cuenta} fondo={fondo} />;
 }
 
 const TOP_CATEGORIAS = 5;
