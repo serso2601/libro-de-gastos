@@ -215,6 +215,26 @@ Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
   Se descartan duplicados (misma cuenta, tipo y monto a ±2 días). `POST /api/entrada` mete un texto
   por el mismo camino (para un Atajo de iPhone con el SMS del banco). Se descartó Gemini (`agy`):
   daba más problemas que otra cosa.
+- **Qué lleva la app (2/nov/2026, comparando con el estado de cuenta de octubre)**: lo que es **del
+  usuario**, cuánto gastó y cuánto le entró. No es el estado de cuenta del banco. El dinero que solo
+  pasa por la cuenta (p. ej. la mamá le manda $300 para comprarle algo y $50 son suyos: anota solo +$50)
+  no se anota, y **no habrá marca de «dinero de otros»** (anotar todo haría que la gente dejara la app).
+  El resumen del mes de cada cuenta lo aclara y manda a la banca del banco (`banca` en `bancos.json`)
+  para el estado de cuenta completo. El banco fecha las compras con tarjeta 2–4 días después que la
+  app (que usa el día en que se pagó). Las estimaciones (interés, corte) van rotuladas «aprox.»: en
+  octubre el interés estimado dio $0.17 y el real $0.20 (probablemente el periodo de BG no es del 1 al
+  31). La tarjeta de crédito sí se lleva entera (lo que entra y sale) cuando el usuario la agregue.
+- **BG no manda avisos de compras al correo** (solo promociones, facturas electrónicas y alertas de
+  seguridad); **Yappy sí** (`notificaciones@yappy.com.pa`: «Te enviaron», «Enviaste», «Pagaste», formato
+  fijo). Los Yappy **entran solos, como vengan** (el usuario corrige lo que no sea suyo), con un lector
+  fijo sin IA; Claude solo elige la categoría si no hay memoria del contacto. Van a la cuenta marcada
+  «Mi Yappy está en esta cuenta» (ajuste `cuenta_yappy`). Ya no se leen los correos de `bgeneral.com`.
+- **Apple Pay** (el usuario paga casi todo con el iPhone): automatización «Transacción» de Atajos →
+  `POST /api/entrada` con monto, comercio y los 4 dígitos. No necesita la cuenta de pago de Apple; sí
+  Tailscale prendido en el iPhone. Los pasos están en Ajustes → «Anotar solo con Apple Pay».
+- **Cargos fijos del banco**: al vincular una tarjeta de débito con membresía mensual, el servidor crea
+  las reglas de membresía y seguro (día 3, categoría «Cargos del banco», montos del catálogo).
+- Descartado el 2/nov: importar estados de cuenta, saldo ancla y marca de «dinero de otros».
 
 ## Estado (20/oct/2026)
 
@@ -241,18 +261,10 @@ Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
    movimiento → bandeja «Por revisar» (nada entra solo).
 3. **Foto del recibo** → monto, comercio y categoría → la misma bandeja.
 4. Resumen semanal/mensual con IA.
-5. **Bancos y captura, siguientes fases** (de `datos\propuesta-bancos-panama.md`; hechos: catálogo de
-   BG, cálculo del mes, lectura de correos y «Por revisar»):
-   - **Saldo real como ancla**: «el banco dice que tengo $X hoy»; la app ajusta desde esa fecha. Sin
-     esto el interés estimado se desvía si falta un movimiento.
-   - **Conciliar el interés**: comparar el estimado con el que acredita el banco (primer caso real: un
-     mes pagó $0.20; sirve para saber si los tramos son combinados).
-   - Sugerir la comisión al anotar un retiro en cajero de otro banco; cargos fijos como reglas.
-   - **Importar estados de cuenta** (CSV/PDF, PDF con `claude -p`) a «Por revisar», con el saldo final
-     como ancla.
-   - **Atajos de iPhone**: no necesitan la cuenta de pago de Apple. Un Atajo con «Obtener contenido de
-     URL» manda el texto a `POST /api/entrada` por Tailscale con el token (automatización «Mensaje» para
-     los SMS del banco, «Transacción» para Apple Pay). Falta armarlo y documentar los pasos.
+5. **Bancos y captura, lo que sigue** (hechos: catálogo de BG, cálculo del mes, «Por revisar», Yappy por
+   correo, Apple Pay por Atajo, cargos fijos automáticos, resumen del mes por cuenta):
+   - Afinar el interés de BG con más estados de cuenta (¿periodo del 30 al 29?).
+   - Sugerir la comisión al anotar un retiro en cajero de otro banco, o el $1.07 al recibir por Kash.
    - Más bancos: Banistmo, BAC, Caja de Ahorros, Banco Nacional, Global Bank, Multibank.
    - Producto público (en veremos): reenvío de correos en vez de IMAP, servidor en la nube, Ley 81 de
      2019. Nada de entrar a la banca en línea con la clave del usuario ni agregadores de pago.

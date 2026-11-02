@@ -6,29 +6,29 @@ se probó sale; lo que quedó a medias entra.
 
 Última actualización: 2/nov/2026.
 
-## Por hacer y probar: bancos y correos (2/nov)
+## Por hacer y probar: Yappy, Apple Pay, resumen del mes y bancos (2/nov)
 
-Hecho el 2/nov (ver «Bancos» y «Captura desde el correo» en `CLAUDE.md`). Pruebas del servidor (89) y
+Ver «Qué lleva la app», Yappy, Apple Pay y cargos fijos en `CLAUDE.md`. Pruebas del servidor (152) y
 compilación de la app pasan; **nada se vio todavía en pantalla**.
-1. **Gmail conectado el 2/nov** (proyecto «My First Project» de Google Cloud, cliente de escritorio en
-   `datos\client_secret_*.json`, permiso en `datos\gmail-permiso.json`). La primera revisión leyó 1 correo de
-   `banco-general@bgeneral.com` (una promoción) y lo descartó bien. **La app de Google sigue «En prueba»**: el
-   permiso vence a los 7 días (~9/nov) y hay que volver a correr `--autorizar`. Para publicarla, en «Información
-   de la marca»: página principal = el repo, política = `PRIVACIDAD.md` del repo, dominio autorizado `github.com`.
-2. **BG no manda avisos de compras al correo**: en 6 meses, sus 36 correos son promociones, facturas
-   electrónicas y cartas. El usuario tiene que activar en la app o banca en línea de BG las notificaciones
-   **por correo** de compras con tarjeta, retiros, transferencias y Yappy. Si BG solo las da por SMS o push,
-   ir por el Atajo de iPhone con los SMS (`POST /api/entrada`). Cuando llegue el primer aviso real, ver qué
-   saca y si la categoría tiene sentido. Las facturas electrónicas de BG podrían servir para conciliar cargos.
-3. **En la app:** a cada cuenta de BG ponerle «Banco» (tipo de cuenta, tarjeta, membresía, seguro) y los
-   **4 últimos dígitos de la tarjeta**; sin eso los avisos quedan en «Por revisar». Revisar a ojo la ficha
-   del banco en la hoja de la cuenta, el bloque de interés y cargos en la pantalla de la cuenta (en la web
-   ancha va sobre una tarjeta, no sobre el color de la cuenta) y la lista «Por revisar» arriba de Movimientos.
-4. **Comparar con un estado de cuenta real**: el interés estimado contra el que pagó el banco. Decide si los
-   tramos son combinados (`combinado` en `bancos.json`) y si la base es 365 o 360.
-5. **Hora automática al anotar** (2/nov): lo nuevo sale con la hora del momento; ver que se cambie tocándola
-   y se quite con la ✕ (en la app y en la web).
-6. Cuando el Gmail funcione: armar el Atajo de iPhone para los SMS del banco (`POST /api/entrada`).
+1. **Yappy entra solo desde el 2/nov** (cuenta de Yappy = la de BG •••6590, la puso Claude; se cambia en la
+   hoja de la cuenta). La simulación con los Yappy reales leyó bien los 3 tipos y marcó como duplicados los
+   que ya estaban anotados a mano. Ver que los nuevos salgan bien y con buena categoría; si no, corregirlos
+   (la app recuerda la categoría por persona o comercio).
+2. **Publicar la app de Google**: ahora importa (Yappy entra por Gmail). Sigue «En prueba» y el permiso vence
+   ~9/nov (entonces: `uv run python -m gastos.correo --autorizar` en `servidor\`). Para publicarla, en
+   «Información de la marca»: página principal = el repo, política = `PRIVACIDAD.md`, dominio `github.com`.
+3. **Atajo de Apple Pay**: armarlo con Ajustes → «Anotar solo con Apple Pay» y probar un pago. Tailscale con
+   «VPN a pedido». Revisar que «Copiar» funcione en la web por http y en el iPhone.
+4. **Cargos del banco**: reglas de membresía ($2.68) y seguro ($1.05) el día 3 en la cuenta de BG. Ver que el
+   3/nov se anoten solos en «Cargos del banco».
+5. **Revisar a ojo**: el «Resumen de <mes>» en la pantalla de cada cuenta (flechas de mes, entró/salió, interés
+   y cargos aprox., enlace a la banca), la ficha del banco y «Mi Yappy está en esta cuenta» en la hoja de la
+   cuenta, y «Por revisar» arriba de Movimientos.
+6. **La Visa •••7489** (es del usuario, la maneja con dinero de la mamá): el usuario la crea como tarjeta de
+   crédito para probar este mes (corte, banco BG, producto, 4 dígitos); ver «Al corte (aprox.)».
+7. **Hora automática al anotar**: ver que se cambie tocándola y se quite con la ✕ (en la app y en la web).
+8. Interés: con el estado de cuenta de noviembre, comparar otra vez ($0.17 estimado contra $0.20 real en
+   octubre; `datos\estado-bg-ahorros-2026-10.xlsx`).
 
 ## Por probar: la app nativa en Expo Go (25/oct)
 

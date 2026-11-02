@@ -12,5 +12,5 @@ Cosas que el usuario mencionó y no son urgentes. Cuando se haga una, se borra d
   «personalizado» (cada N días).
 - Favoritos o plantillas para anotar en un toque; subcategorías; metas y fondos de ahorro.
 - Gasto por voz y foto del recibo, a la bandeja «Por revisar» (ya existe, la llenan los correos).
-- Captura con Atajos de iPhone: no necesita la cuenta de pago; manda el texto a `POST /api/entrada`
-  (ver «Qué sigue» 5 en CLAUDE.md, con el resto de las fases de bancos).
+- Atajo de iPhone con los SMS del banco (automatización «Mensaje»), si algún banco los manda; Apple Pay
+  y Yappy ya entran solos (ver CLAUDE.md).
