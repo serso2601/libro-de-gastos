@@ -175,8 +175,10 @@ Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
   Todo rotulado «aprox.»: sale de lo anotado, no del estado de cuenta.
   **Al crear la tarjeta** (2/nov, el usuario prefirió totales a anotar uno por uno): «Lo que debes hoy» es el
   saldo actual de la banca (`saldo_inicial`, con todo lo de después del corte) y un bloque pide «Saldo al corte
-  (estado de cuenta)» y «Pagos después del corte» (`corte_inicial`, `deuda_al_corte`, `pagos_tras_corte`, esquema
-  v9). Las compras de después salen de la diferencia y cuentan en el corte siguiente
+  (estado de cuenta)» o «Lo que se hizo efectivo después del corte»: **con uno sale el otro** (hoy = al corte +
+  después); si pone los dos y no suman lo de hoy, «No concuerda» (`corte_inicial`, `deuda_al_corte`,
+  `pagos_tras_corte` = lo abonado de más si «después» da negativo; esquema v9). Lo de después cuenta en el corte
+  siguiente
   (`calculos.inicioDeTarjeta`, usado por `deudaAl`, `pagadoDesdeCorte` y `gastadoEnCorte`; igual en `avisos.py`). El
   bloque solo sale al crearla o mientras siga en ese primer corte; de ahí en adelante se anota cada compra y pago.
   **Pagar** (2/nov): en todas las tarjetas, «Pagar» abre Anotar como transferencia a la tarjeta, sin monto, con
