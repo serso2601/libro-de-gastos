@@ -6,9 +6,15 @@ import pytest
 from gastos import db
 
 
+def esquema_v4() -> str:
+    """El esquema de la versión 4: el actual sin lo que agregó la 5 (banco y terminación de la cuenta, bandeja)."""
+    s = re.sub(r",\n    -- Vínculo con el catálogo.*?terminacion     TEXT", "", db.ESQUEMA.read_text(encoding="utf-8"), flags=re.S)
+    return s[:s.index("-- La bandeja de avisos")]
+
+
 def esquema_v3() -> str:
-    """El esquema de la versión 3: el actual sin lo que agregó la 4 (pasar lo que sobra en la categoría)."""
-    return re.sub(r",\n    -- Pasar lo que sobra.*?acumula_desde   TEXT", "", db.ESQUEMA.read_text(encoding="utf-8"), flags=re.S)
+    """El esquema de la versión 3: el de la 4 sin lo que agregó la 4 (pasar lo que sobra en la categoría)."""
+    return re.sub(r",\n    -- Pasar lo que sobra.*?acumula_desde   TEXT", "", esquema_v4(), flags=re.S)
 
 
 def esquema_v2() -> str:
@@ -86,7 +92,7 @@ def test_migracion_4_agrega_acumular_a_las_categorias(tmp_path):
 
     db.inicializar(con)
 
-    assert con.execute("PRAGMA user_version").fetchone()[0] == 4
+    assert con.execute("PRAGMA user_version").fetchone()[0] == db.VERSION
     categoria = dict(con.execute("SELECT * FROM categoria").fetchone())
     assert (categoria["nombre"], categoria["presupuesto"]) == ("Comida", 30000)
     assert (categoria["acumula"], categoria["acumula_desde"]) == (0, None)
@@ -96,6 +102,35 @@ def test_migracion_4_agrega_acumular_a_las_categorias(tmp_path):
     # El CHECK de la columna nueva viaja con la migración.
     with pytest.raises(sqlite3.IntegrityError):
         con.execute("UPDATE categoria SET acumula = 2")
+
+
+def test_migracion_5_agrega_banco_terminacion_y_la_bandeja(tmp_path):
+    con = db.conectar(tmp_path / "v4.db")
+    con.executescript(esquema_v4())
+    assert "banco" not in {f["name"] for f in con.execute("PRAGMA table_info(cuenta)")}
+    assert con.execute("SELECT name FROM sqlite_master WHERE name = 'pendiente'").fetchone() is None
+    con.execute("PRAGMA user_version = 4")
+    marca = db.ahora()
+    with con:
+        con.execute("INSERT INTO cuenta (id, nombre, creado, actualizado) VALUES ('c', 'Cuenta', ?, ?)", (marca, marca))
+        con.execute("INSERT INTO categoria (id, nombre, tipo, creado, actualizado) VALUES ('comida', 'Comida', 'gasto', ?, ?)",
+                    (marca, marca))
+        con.execute("""INSERT INTO movimiento VALUES ('m', 'gasto', 500, '2026-10-01', NULL, 'c', NULL, 'comida', 'x',
+                       NULL, 'manual', ?, ?)""", (marca, marca))
+
+    db.inicializar(con)
+
+    assert con.execute("PRAGMA user_version").fetchone()[0] == 5
+    cuenta = dict(con.execute("SELECT * FROM cuenta").fetchone())
+    assert (cuenta["nombre"], cuenta["banco"], cuenta["terminacion"]) == ("Cuenta", None, None)
+    assert tuple(con.execute("SELECT id, nota FROM movimiento").fetchone()) == ("m", "x")
+    with con:
+        con.execute("INSERT INTO pendiente (id, origen, recibido, creado, actualizado) VALUES ('p', 'correo', ?, ?, ?)",
+                    (marca, marca, marca))
+    assert con.execute("SELECT estado FROM pendiente").fetchone()[0] == "nuevo"
+    with pytest.raises(sqlite3.IntegrityError):
+        con.execute("UPDATE pendiente SET estado = 'raro'")
+    assert con.execute("PRAGMA foreign_key_check").fetchall() == []
 
 
 def test_base_nueva_trae_simbolos_y_la_version_actual(tmp_path):

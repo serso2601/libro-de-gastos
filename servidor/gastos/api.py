@@ -15,9 +15,11 @@ viene de la red de la casa o de cualquier otro lado se rechaza antes de mirar el
 """
 
 import ipaddress
+import json
 import mimetypes
 import secrets
 import sqlite3
+import threading
 from collections.abc import Iterator
 from datetime import date
 from pathlib import Path
@@ -28,13 +30,16 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field, model_validator
 
-from . import db, importar, pagina, recurrencias
+from . import correo, db, importar, pagina, recurrencias
 from .config import Config
 
 SIN_ENTRADA = "Falta el token o no es el de este servidor"
 WEB = Path(__file__).resolve().parents[2] / "app" / "dist"  # `npx expo export --platform web` en app/
 # Python en Windows no conoce la letra de la app (.ttf) y la mandaba como application/octet-stream.
 mimetypes.add_type("font/ttf", ".ttf")
+
+# El catálogo de bancos (tarifas por producto y versión); se lee una vez y viaja tal cual en /api/datos.
+CATALOGO = json.loads(Path(__file__).with_name("bancos.json").read_text(encoding="utf-8"))
 
 # Loopback y los rangos que Tailscale usa para sus equipos (IPv4 100.64.0.0/10, IPv6 fd7a:115c:a1e0::/48).
 RED_PERMITIDA = [ipaddress.ip_network(r) for r in ("127.0.0.0/8", "::1/128", "100.64.0.0/10", "fd7a:115c:a1e0::/48")]
@@ -58,6 +63,34 @@ Hora = Field(default=None, pattern=r"^\d{2}:\d{2}$")
 Color = Field(default="#3DA5F5", pattern=r"^#[0-9A-Fa-f]{6}$")
 
 
+class VinculoBanco(BaseModel):
+    """A qué producto del catálogo corresponde la cuenta (ver `bancos.json`)."""
+
+    banco: str
+    cuenta: str | None = None
+    tarjeta: str | None = None
+    membresia: Literal["mensual", "anual"] = "mensual"
+    seguro: str | None = None
+
+    @model_validator(mode="after")
+    def _contra_el_catalogo(self):
+        banco = next((b for b in CATALOGO["bancos"] if b["id"] == self.banco), None)
+        if banco is None:
+            raise ValueError(f"El banco «{self.banco}» no está en el catálogo")
+        if self.cuenta is not None and self.cuenta not in {c["id"] for c in banco["cuentas"]}:
+            raise ValueError(f"La cuenta «{self.cuenta}» no es de {banco['nombre']}")
+        tarjeta = None
+        if self.tarjeta is not None:
+            tarjeta = next((t for t in banco["tarjetas"] if t["id"] == self.tarjeta), None)
+            if tarjeta is None:
+                raise ValueError(f"La tarjeta «{self.tarjeta}» no es de {banco['nombre']}")
+        if self.seguro is not None:
+            seguros = {s["id"] for v in (tarjeta or {}).get("versiones", []) for s in v.get("seguros", [])}
+            if self.seguro not in seguros:
+                raise ValueError(f"El seguro «{self.seguro}» no es de esa tarjeta")
+        return self
+
+
 class CuentaIn(BaseModel):
     nombre: str = Field(min_length=1, max_length=60)
     color: str = Color
@@ -66,6 +99,8 @@ class CuentaIn(BaseModel):
     dia_corte: int | None = Field(default=None, ge=1, le=31)
     dia_pago: int | None = Field(default=None, ge=1, le=31)
     pago_minimo: int | None = Field(default=None, ge=0)  # centavos; lo copia el usuario de su estado de cuenta
+    banco: VinculoBanco | None = None  # vínculo con el catálogo, para calcular intereses y cargos
+    terminacion: str | None = Field(default=None, pattern=r"^\d{4}$")  # últimos 4 dígitos de su tarjeta
 
     @model_validator(mode="after")
     def _credito(self):
@@ -115,6 +150,16 @@ class RecurrenciaIn(BaseModel):
     fecha_fin: date | None = None
 
 
+class PendienteIn(BaseModel):
+    estado: Literal["aceptado", "descartado"]
+    movimiento_id: str | None = None  # el movimiento que la app creó al aceptar
+
+
+class EntradaIn(BaseModel):
+    texto: str = Field(min_length=1, max_length=20000)
+    origen: Literal["atajo", "correo"] = "atajo"
+
+
 class OrdenIn(BaseModel):
     ids: list[str]
 
@@ -151,8 +196,8 @@ def _validar(con: sqlite3.Connection, m: MovimientoIn | RecurrenciaIn) -> None:
 
 
 def _cuenta(fila: sqlite3.Row | dict) -> dict:
-    """Una cuenta como la ve la API: `es_credito` sale como booleano, no como 0/1."""
-    return {**dict(fila), "es_credito": bool(fila["es_credito"])}
+    """Una cuenta como la ve la API: `es_credito` sale como booleano y `banco` como objeto (o null)."""
+    return {**dict(fila), "es_credito": bool(fila["es_credito"]), "banco": json.loads(fila["banco"]) if fila["banco"] else None}
 
 
 def _categoria(fila: sqlite3.Row | dict) -> dict:
@@ -187,6 +232,16 @@ def _inicio_valido(periodo: str, inicio: str | None) -> str:
     return inicio
 
 
+CAMPOS_PENDIENTE = ("id, origen, recibido, remitente, asunto, texto, tipo, monto, fecha, hora, comercio, "
+                    "categoria_id, cuenta_id, terminacion, motivo")
+
+
+def _pendientes(con: sqlite3.Connection) -> list[dict]:
+    """Los avisos del banco que esperan revisión, los más recientes primero."""
+    return [dict(f) for f in con.execute(
+        f"SELECT {CAMPOS_PENDIENTE} FROM pendiente WHERE estado = 'nuevo' ORDER BY recibido DESC, creado DESC")]
+
+
 def leer_todo(con: sqlite3.Connection, hoy: date) -> dict:
     cuentas = [_cuenta(f) for f in con.execute(
         """SELECT c.*, c.saldo_inicial
@@ -206,11 +261,14 @@ def leer_todo(con: sqlite3.Connection, hoy: date) -> dict:
         "recurrencias": [dict(f) for f in con.execute("SELECT * FROM recurrencia ORDER BY fecha_inicio")],
         "presupuesto": _presupuesto(con),
         "proximos": recurrencias.proximas(con, hoy),
+        "catalogo": CATALOGO,
+        "pendientes": _pendientes(con),
     }
 
 
-def create_app(config: Config | None = None, hoy=date.today, web: Path = WEB) -> FastAPI:
-    """`hoy` es una función para que las pruebas puedan mover el reloj; `web`, dónde está la app web."""
+def create_app(config: Config | None = None, hoy=date.today, web: Path = WEB, extractor=None) -> FastAPI:
+    """`hoy` es una función para que las pruebas puedan mover el reloj; `web`, dónde está la app web;
+    `extractor`, la función que lee un aviso del banco (por defecto Claude; las pruebas ponen una falsa)."""
     config = config or Config.desde_entorno()
     inicial = db.conectar(config.ruta_db)
     try:
@@ -253,7 +311,8 @@ def create_app(config: Config | None = None, hoy=date.today, web: Path = WEB) ->
         host = request.client.host if request.client else ""
         local = host in ("127.0.0.1", "::1") or host.startswith("::ffff:127.")
         qr = pagina.bloque_qr(config.token, request.url.port or 8766) if local else ""
-        return pagina.estado(config, conteos, db.ultimo_respaldo(config.respaldos), qr)
+        return pagina.estado(config, conteos, db.ultimo_respaldo(config.respaldos), qr,
+                              correo.estado_actual(config.carpeta))
 
     @app.get("/app", include_in_schema=False)
     def app_web_sin_barra():
@@ -296,14 +355,16 @@ def create_app(config: Config | None = None, hoy=date.today, web: Path = WEB) ->
             orden = con.execute("SELECT COALESCE(MAX(orden) + 1, 0) FROM cuenta").fetchone()[0]
             con.execute(
                 """INSERT INTO cuenta (id, nombre, color, saldo_inicial, orden, creado, actualizado,
-                     es_credito, dia_corte, dia_pago, pago_minimo)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     es_credito, dia_corte, dia_pago, pago_minimo, banco, terminacion)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                    ON CONFLICT (id) DO UPDATE SET nombre = excluded.nombre, color = excluded.color,
                      saldo_inicial = excluded.saldo_inicial, actualizado = excluded.actualizado,
                      es_credito = excluded.es_credito, dia_corte = excluded.dia_corte,
-                     dia_pago = excluded.dia_pago, pago_minimo = excluded.pago_minimo""",
+                     dia_pago = excluded.dia_pago, pago_minimo = excluded.pago_minimo,
+                     banco = excluded.banco, terminacion = excluded.terminacion""",
                 (id_, c.nombre.strip(), c.color, c.saldo_inicial, orden, marca, marca,
-                 int(c.es_credito), c.dia_corte, c.dia_pago, c.pago_minimo),
+                 int(c.es_credito), c.dia_corte, c.dia_pago, c.pago_minimo,
+                 json.dumps(c.banco.model_dump(), ensure_ascii=False) if c.banco else None, c.terminacion),
             )
         return _cuenta(con.execute("SELECT * FROM cuenta WHERE id = ?", (id_,)).fetchone())
 
@@ -437,6 +498,71 @@ def create_app(config: Config | None = None, hoy=date.today, web: Path = WEB) ->
             con.execute("DELETE FROM recurrencia WHERE id = ?", (id_,))
         return {"ok": True}
 
+    # --- Avisos del banco (correo y atajo) -----------------------------------------------------
+    def extraer(aviso: dict, categorias: list[dict], cuentas: list[dict]) -> dict:
+        if extractor is not None:
+            return extractor(aviso, categorias, cuentas)
+        ajustes = correo.leer_config(config.carpeta)
+        return correo.extraer_con_claude(aviso, categorias, cuentas, ajustes["modelo"] if ajustes else correo.MODELO)
+
+    def leer_en_hilo(id_: str, entrada: dict) -> None:
+        con = db.conectar(config.ruta_db)
+        try:
+            correo.resolver(con, id_, entrada, extraer, hoy())
+        except Exception as e:  # que la fila no se quede «leyendo» para siempre
+            correo.recuperar_interrumpidos(con)
+            print(f"Entrada: falló ({e.__class__.__name__})", flush=True)
+        finally:
+            con.close()
+
+    @r.post("/entrada")
+    def entrada(e: EntradaIn, con: sqlite3.Connection = Depends(conexion)):
+        """Un texto del banco (p. ej. un SMS que manda un Atajo del iPhone): responde ya y lo lee aparte."""
+        aviso = {"texto": e.texto, "origen": e.origen, "fecha": hoy().isoformat()}
+        id_ = correo.registrar(con, aviso)
+        threading.Thread(target=leer_en_hilo, args=(id_, aviso), daemon=True, name="entrada").start()
+        return {"ok": True, "id": id_}
+
+    @r.put("/pendientes/{id_}")
+    def resolver_pendiente(id_: str, p: PendienteIn, con: sqlite3.Connection = Depends(conexion)):
+        """Aceptar (la app ya creó el movimiento) o descartar un aviso. Idempotente.
+
+        Al aceptar, el movimiento queda como `correo`; si el aviso traía los 4 dígitos de una tarjeta y
+        la cuenta del movimiento no tiene los suyos, los aprende, y entonces anota solos los demás
+        avisos que esperaban por esa tarjeta."""
+        fila = con.execute("SELECT * FROM pendiente WHERE id = ?", (id_,)).fetchone()
+        if fila is None:
+            raise HTTPException(404, "Ese aviso no existe")
+        cuenta_id = fila["cuenta_id"]
+        with con:
+            if p.estado == "aceptado" and p.movimiento_id:
+                mov = con.execute("SELECT cuenta_id FROM movimiento WHERE id = ?", (p.movimiento_id,)).fetchone()
+                if mov is None:
+                    raise HTTPException(422, "El movimiento no existe")
+                cuenta_id = mov["cuenta_id"]
+                con.execute("UPDATE movimiento SET origen = 'correo' WHERE id = ?", (p.movimiento_id,))
+                if fila["terminacion"]:
+                    # Solo si ninguna otra cuenta ya la tiene: dos cuentas con la misma terminación confundirían.
+                    con.execute("""UPDATE cuenta SET terminacion = ?, actualizado = ?
+                                   WHERE id = ? AND terminacion IS NULL
+                                     AND NOT EXISTS (SELECT 1 FROM cuenta WHERE terminacion = ?)""",
+                                (fila["terminacion"], db.ahora(), cuenta_id, fila["terminacion"]))
+            con.execute("UPDATE pendiente SET estado = ?, movimiento_id = ?, cuenta_id = ?, motivo = '', actualizado = ? WHERE id = ?",
+                        (p.estado, p.movimiento_id if p.estado == "aceptado" else None, cuenta_id, db.ahora(), id_))
+        if p.estado == "aceptado" and fila["terminacion"]:
+            correo.reintentar_por_terminacion(con, fila["terminacion"])
+        return {"ok": True, "estado": p.estado}
+
+    @r.post("/correo/revisar")
+    def revisar_correo():
+        """Pide revisar el correo ya (el hilo de fondo lo hace; no espera)."""
+        correo.pedido.set()
+        return {"ok": True}
+
+    @r.get("/correo")
+    def estado_correo():
+        return correo.estado_actual(config.carpeta)
+
     # --- Ajustes, importar y exportar --------------------------------------------------------
     @r.put("/ajustes")
     def guardar_ajustes(a: AjustesIn, con: sqlite3.Connection = Depends(conexion)):
@@ -471,7 +597,8 @@ def create_app(config: Config | None = None, hoy=date.today, web: Path = WEB) ->
     @r.get("/exportar")
     def exportar(con: sqlite3.Connection = Depends(conexion)):
         todo = leer_todo(con, hoy())
-        todo.pop("proximos")
+        for clave in ("proximos", "catalogo", "pendientes"):
+            todo.pop(clave)
         return {"app": "libro-de-gastos", "version": db.VERSION, "exportado": db.ahora(), **todo}
 
     app.include_router(r)

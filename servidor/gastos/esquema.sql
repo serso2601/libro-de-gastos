@@ -1,4 +1,4 @@
--- Esquema del Libro de Gastos (versión 4).
+-- Esquema del Libro de Gastos (versión 5).
 --
 -- Los montos son enteros en centavos: $12,50 se guarda como 1250. Las fechas son texto ISO
 -- ('2026-10-16'), las horas 'HH:MM' y las marcas de tiempo ISO con segundos.
@@ -17,7 +17,11 @@ CREATE TABLE IF NOT EXISTS cuenta (
     es_credito      INTEGER NOT NULL DEFAULT 0 CHECK (es_credito IN (0, 1)),
     dia_corte       INTEGER CHECK (dia_corte BETWEEN 1 AND 31),
     dia_pago        INTEGER CHECK (dia_pago BETWEEN 1 AND 31),
-    pago_minimo     INTEGER CHECK (pago_minimo >= 0)
+    pago_minimo     INTEGER CHECK (pago_minimo >= 0),
+    -- Vínculo con el catálogo de bancos (bancos.json), en JSON, o NULL; y los últimos 4 dígitos de
+    -- su tarjeta, con los que se reconoce de qué cuenta es un aviso del banco.
+    banco           TEXT,
+    terminacion     TEXT
 );
 
 CREATE TABLE IF NOT EXISTS categoria (
@@ -66,7 +70,7 @@ CREATE TABLE IF NOT EXISTS movimiento (
     categoria_id        TEXT REFERENCES categoria(id),
     nota                TEXT NOT NULL DEFAULT '',
     recurrencia_id      TEXT REFERENCES recurrencia(id) ON DELETE SET NULL,
-    origen              TEXT NOT NULL DEFAULT 'manual',  -- manual · recurrencia · importado
+    origen              TEXT NOT NULL DEFAULT 'manual',  -- manual · recurrencia · importado · correo
     creado              TEXT NOT NULL,
     actualizado         TEXT NOT NULL,
     CHECK ((tipo = 'transferencia') = (cuenta_destino_id IS NOT NULL)),
@@ -82,4 +86,31 @@ CREATE INDEX IF NOT EXISTS movimiento_recurrencia ON movimiento (recurrencia_id)
 CREATE TABLE IF NOT EXISTS ajuste (
     clave   TEXT PRIMARY KEY,
     valor   TEXT NOT NULL
+);
+
+-- La bandeja de avisos del banco (correo o atajo del iPhone). Todo aviso leído deja una fila, aunque
+-- no sea un movimiento (`ignorado`) o ya estuviera anotado (`duplicado`), para no volver a leerlo
+-- (`clave` = Message-ID). `nuevo` = espera que el usuario lo revise en la app; `agregado` = entró solo.
+CREATE TABLE IF NOT EXISTS pendiente (
+    id            TEXT PRIMARY KEY,
+    origen        TEXT NOT NULL,                 -- correo · atajo
+    clave         TEXT UNIQUE,                   -- Message-ID del correo: no se lee dos veces
+    recibido      TEXT NOT NULL,                 -- marca de tiempo ISO
+    remitente     TEXT NOT NULL DEFAULT '',
+    asunto        TEXT NOT NULL DEFAULT '',
+    texto         TEXT NOT NULL DEFAULT '',      -- extracto del aviso (máx. ~1500 caracteres)
+    tipo          TEXT CHECK (tipo IN ('gasto', 'ingreso')),
+    monto         INTEGER,                       -- centavos
+    fecha         TEXT,
+    hora          TEXT,
+    comercio      TEXT NOT NULL DEFAULT '',
+    categoria_id  TEXT,
+    cuenta_id     TEXT,
+    terminacion   TEXT,
+    estado        TEXT NOT NULL DEFAULT 'nuevo'
+                  CHECK (estado IN ('nuevo', 'agregado', 'aceptado', 'descartado', 'duplicado', 'ignorado')),
+    movimiento_id TEXT,
+    motivo        TEXT NOT NULL DEFAULT '',      -- por qué quedó para revisar (texto corto para el usuario)
+    creado        TEXT NOT NULL,
+    actualizado   TEXT NOT NULL
 );

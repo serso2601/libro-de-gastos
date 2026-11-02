@@ -100,7 +100,22 @@ su código desde esta PC (tarda unos segundos la primera vez).</p>
 <p>O a mano: dirección <b>{escape(ip_tailscale() or '')}:{puerto}</b> y el token de <b>datos\\token.txt</b>.</p></div>"""
 
 
-def estado(config, conteos: dict, ultimo_respaldo: str | None, qr: str = "") -> str:
+def bloque_correo(info: dict) -> str:
+    """La tarjeta «Correo del banco»: si está listo, cuándo revisó y si hubo error; si no, cómo activarlo."""
+    if not info["configurado"]:
+        return """<div class="tarjeta"><h1>Correo del banco <span class="mal">● sin configurar</span></h1>
+<p>Para que los avisos del banco entren solos como movimientos:</p>
+<p>1. En tu cuenta de Google activa la <b>verificación en dos pasos</b>.<br>
+2. Crea una <b>contraseña de aplicación</b> en <b>myaccount.google.com/apppasswords</b>.<br>
+3. Escribe <b>datos\\correo.json</b> con <b>usuario</b> (tu Gmail) y <b>clave_app</b> (esa contraseña).<br>
+4. Reinicia el servidor.</p></div>"""
+    revision = escape(info["ultima_revision"] or "todavía no")
+    error = f'<p class="mal">Error: {escape(info["error"])}</p>' if info["error"] else ""
+    return f"""<div class="tarjeta"><h1>Correo del banco <span class="ok">● activo</span></h1>
+<p>Última revisión: <b>{revision}</b> · avisos leídos desde que arrancó: <b>{info["leidos"]}</b></p>{error}</div>"""
+
+
+def estado(config, conteos: dict, ultimo_respaldo: str | None, qr: str = "", correo: dict | None = None) -> str:
     hoy = date.today().isoformat()
     respaldo = (f'<span class="ok">{ultimo_respaldo}</span>' if ultimo_respaldo == hoy
                 else f'<span class="mal">{ultimo_respaldo or "ninguno todavía"}</span>')
@@ -112,5 +127,6 @@ def estado(config, conteos: dict, ultimo_respaldo: str | None, qr: str = "") -> 
 <div class="tarjeta">
 <p><b>{conteos['cuenta']}</b> cuentas · <b>{conteos['movimiento']}</b> movimientos · <b>{conteos['recurrencia']}</b> recurrencias</p>
 <p>Último respaldo: {respaldo}</p></div>
+{bloque_correo(correo) if correo else ""}
 {qr}
 </body></html>"""

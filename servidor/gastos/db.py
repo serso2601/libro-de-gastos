@@ -9,7 +9,7 @@ from datetime import date, datetime
 from pathlib import Path
 
 ESQUEMA = Path(__file__).with_name("esquema.sql")
-VERSION = 4
+VERSION = 5
 
 # {versión a la que lleva: sql}. Cada paso corre con las claves foráneas apagadas: rehacer una
 # tabla no debe tocar las filas que la apuntan (movimiento.recurrencia_id es ON DELETE SET NULL).
@@ -70,6 +70,37 @@ MIGRACIONES: dict[int, str] = {
     BEGIN;
     ALTER TABLE categoria ADD COLUMN acumula INTEGER NOT NULL DEFAULT 0 CHECK (acumula IN (0, 1));
     ALTER TABLE categoria ADD COLUMN acumula_desde TEXT;
+    COMMIT;
+    """,
+    # La cuenta se vincula a su banco (JSON del catálogo) y guarda los últimos 4 dígitos de su
+    # tarjeta; `pendiente` es la bandeja de avisos del banco (correo, atajo) por revisar.
+    5: """
+    BEGIN;
+    ALTER TABLE cuenta ADD COLUMN banco TEXT;
+    ALTER TABLE cuenta ADD COLUMN terminacion TEXT;
+    CREATE TABLE IF NOT EXISTS pendiente (
+        id            TEXT PRIMARY KEY,
+        origen        TEXT NOT NULL,
+        clave         TEXT UNIQUE,
+        recibido      TEXT NOT NULL,
+        remitente     TEXT NOT NULL DEFAULT '',
+        asunto        TEXT NOT NULL DEFAULT '',
+        texto         TEXT NOT NULL DEFAULT '',
+        tipo          TEXT CHECK (tipo IN ('gasto', 'ingreso')),
+        monto         INTEGER,
+        fecha         TEXT,
+        hora          TEXT,
+        comercio      TEXT NOT NULL DEFAULT '',
+        categoria_id  TEXT,
+        cuenta_id     TEXT,
+        terminacion   TEXT,
+        estado        TEXT NOT NULL DEFAULT 'nuevo'
+                      CHECK (estado IN ('nuevo', 'agregado', 'aceptado', 'descartado', 'duplicado', 'ignorado')),
+        movimiento_id TEXT,
+        motivo        TEXT NOT NULL DEFAULT '',
+        creado        TEXT NOT NULL,
+        actualizado   TEXT NOT NULL
+    );
     COMMIT;
     """,
 }

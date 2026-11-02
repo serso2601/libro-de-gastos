@@ -1,0 +1,225 @@
+{
+  "acerca": "Catálogo de productos bancarios de Panamá. Montos en centavos con ITBMS incluido; tasas en % anual. Cada producto guarda versiones con la fecha desde la que valen: un mes se calcula con la versión vigente en él (antes de la primera versión, con la primera). Las tarifas cambian: volver a verificarlas en la fuente.",
+  "notas": [
+    "SBP, Acuerdo 7-2026 (desde el 4/ene/2027): limita algunas comisiones (depósitos y retiros en sucursal, entre otras). Según la nota de prensa no toca la membresía de la tarjeta de débito. Revisarlo cuando entre en vigor.",
+    "Banco General: el contrato no dice si los tramos de interés se aplican combinados o no, ni si la base es 365 o 360 días. Se asume no combinado y 365 hasta comparar con un estado de cuenta."
+  ],
+  "bancos": [
+    {
+      "id": "bg",
+      "nombre": "Banco General",
+      "cuentas": [
+        {
+          "id": "bg-ahorros-regular",
+          "nombre": "Ahorros Regular",
+          "clase": "ahorros",
+          "versiones": [
+            {
+              "vigente_desde": "2026-03-01",
+              "verificado": "2026-11-01",
+              "fuente": "https://www.bgeneral.com/tasas-comisiones-recargos/",
+              "interes": {
+                "tramos": [
+                  { "desde": 0, "tasa": 0 },
+                  { "desde": 10000, "tasa": 0.75 },
+                  { "desde": 2500001, "tasa": 0.5 },
+                  { "desde": 5000001, "tasa": 0.25 },
+                  { "desde": 100000001, "tasa": 2.5 }
+                ],
+                "minimo_diario": 10000,
+                "base_dias": 365,
+                "combinado": false
+              },
+              "cargos": []
+            }
+          ]
+        },
+        {
+          "id": "bg-ahorros-5-estrellas",
+          "nombre": "Ahorros 5 Estrellas",
+          "clase": "ahorros",
+          "versiones": [
+            {
+              "vigente_desde": "2026-03-01",
+              "verificado": "2026-11-01",
+              "fuente": "https://www.bgeneral.com/tasas-comisiones-recargos/",
+              "interes": {
+                "tramos": [
+                  { "desde": 0, "tasa": 0 },
+                  { "desde": 10000, "tasa": 1.0 },
+                  { "desde": 100000001, "tasa": 2.5 }
+                ],
+                "minimo_diario": 10000,
+                "base_dias": 365,
+                "combinado": false
+              },
+              "cargos": []
+            }
+          ]
+        },
+        {
+          "id": "bg-mis-ahorros",
+          "nombre": "Mis Ahorros",
+          "clase": "ahorros",
+          "nota": "La tabla paga 2% desde $0; el contrato general de ahorros dice que bajo $100 no se gana interés. Verificar con un estado de cuenta.",
+          "versiones": [
+            {
+              "vigente_desde": "2026-03-01",
+              "verificado": "2026-11-01",
+              "fuente": "https://www.bgeneral.com/tasas-comisiones-recargos/",
+              "interes": {
+                "tramos": [
+                  { "desde": 0, "tasa": 2.0 },
+                  { "desde": 1500001, "tasa": 1.0 },
+                  { "desde": 2500001, "tasa": 0.5 },
+                  { "desde": 5000001, "tasa": 0.25 }
+                ],
+                "minimo_diario": 0,
+                "base_dias": 365,
+                "combinado": false
+              },
+              "cargos": []
+            }
+          ]
+        },
+        {
+          "id": "bg-ahorros-joven",
+          "nombre": "Ahorros Joven",
+          "clase": "ahorros",
+          "versiones": [
+            {
+              "vigente_desde": "2026-03-01",
+              "verificado": "2026-11-01",
+              "fuente": "https://www.bgeneral.com/tasas-comisiones-recargos/",
+              "interes": {
+                "tramos": [
+                  { "desde": 0, "tasa": 0 },
+                  { "desde": 10000, "tasa": 1.0 },
+                  { "desde": 2500001, "tasa": 0.5 },
+                  { "desde": 5000001, "tasa": 0.25 }
+                ],
+                "minimo_diario": 10000,
+                "base_dias": 365,
+                "combinado": false
+              },
+              "cargos": []
+            }
+          ]
+        },
+        {
+          "id": "bg-corriente-regular",
+          "nombre": "Corriente Regular",
+          "clase": "corriente",
+          "versiones": [
+            {
+              "vigente_desde": "2025-08-01",
+              "verificado": "2026-11-01",
+              "fuente": "https://www.bgeneral.com/tasas-comisiones-recargos/",
+              "interes": null,
+              "cargos": [
+                { "id": "saldo-promedio-bajo", "nombre": "Saldo promedio bajo", "tipo": "saldo_promedio_bajo", "menor_que": 30000, "monto": 1070 }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "bg-corriente-esencial",
+          "nombre": "Corriente Esencial",
+          "clase": "corriente",
+          "versiones": [
+            {
+              "vigente_desde": "2025-08-01",
+              "verificado": "2026-11-01",
+              "fuente": "https://www.bgeneral.com/tasas-comisiones-recargos/",
+              "interes": null,
+              "cargos": [
+                { "id": "saldo-promedio-bajo", "nombre": "Saldo promedio bajo", "tipo": "saldo_promedio_bajo", "menor_que": 5000, "monto": 535 }
+              ]
+            }
+          ]
+        }
+      ],
+      "tarjetas": [
+        {
+          "id": "bg-visa-debito",
+          "nombre": "Visa Débito",
+          "clase": "debito",
+          "versiones": [
+            {
+              "vigente_desde": "2026-03-01",
+              "verificado": "2026-11-01",
+              "fuente": "https://www.bgeneral.com/tasas-comisiones-recargos/",
+              "membresia": { "mensual": 268, "anual": 3210 },
+              "seguros": [
+                { "id": "fraude-1000", "nombre": "Seguro contra fraude (hasta $1,000)", "mensual": 105 },
+                { "id": "fraude-5000", "nombre": "Seguro contra fraude (hasta $5,000)", "mensual": 210 }
+              ],
+              "por_uso": [
+                { "id": "cajero-otro-banco", "nombre": "Cajero de otro banco en Panamá", "monto": 187 },
+                { "id": "cajero-fuera-clave", "nombre": "Cajero fuera de la red Clave", "porcentaje": 3.21, "minimo": 268 },
+                { "id": "cajero-exterior", "nombre": "Cajero en el exterior", "porcentaje": 3.21, "minimo": 749 },
+                { "id": "reposicion", "nombre": "Reposición de la tarjeta", "monto": 2140 }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "bg-mastercard-debito",
+          "nombre": "Mastercard Débito",
+          "clase": "debito",
+          "versiones": [
+            {
+              "vigente_desde": "2026-03-01",
+              "verificado": "2026-11-01",
+              "fuente": "https://www.bgeneral.com/tasas-comisiones-recargos/",
+              "membresia": { "mensual": 268, "anual": 3210 },
+              "seguros": [
+                { "id": "fraude-1000", "nombre": "Seguro contra fraude (hasta $1,000)", "mensual": 105 },
+                { "id": "fraude-5000", "nombre": "Seguro contra fraude (hasta $5,000)", "mensual": 210 }
+              ],
+              "por_uso": [
+                { "id": "cajero-otro-banco", "nombre": "Cajero de otro banco en Panamá", "monto": 187 },
+                { "id": "cajero-fuera-clave", "nombre": "Cajero fuera de la red Clave", "porcentaje": 3.21, "minimo": 268 },
+                { "id": "cajero-exterior", "nombre": "Cajero en el exterior", "porcentaje": 3.21, "minimo": 749 },
+                { "id": "reposicion", "nombre": "Reposición de la tarjeta", "monto": 2140 }
+              ]
+            }
+          ]
+        },
+        { "id": "bg-credito-estrellas-classic", "nombre": "Crédito Estrellas Classic/Gold", "clase": "credito",
+          "versiones": [{ "vigente_desde": "2025-10-01", "verificado": "2026-11-01", "fuente": "https://www.bgeneral.com/tasas-comisiones-recargos/",
+            "tasa_anual": 21.99, "pago_atrasado": 5350, "adelanto_efectivo": { "porcentaje": 5, "minimo": 749 } }] },
+        { "id": "bg-credito-estrellas-platinum", "nombre": "Crédito Estrellas Platinum", "clase": "credito",
+          "versiones": [{ "vigente_desde": "2025-10-01", "verificado": "2026-11-01", "fuente": "https://www.bgeneral.com/tasas-comisiones-recargos/",
+            "tasa_anual": 19.99, "pago_atrasado": 5350, "adelanto_efectivo": { "porcentaje": 5, "minimo": 749 } }] },
+        { "id": "bg-credito-estrellas-signature", "nombre": "Crédito Estrellas Signature", "clase": "credito",
+          "versiones": [{ "vigente_desde": "2025-10-01", "verificado": "2026-11-01", "fuente": "https://www.bgeneral.com/tasas-comisiones-recargos/",
+            "tasa_anual": 15.0, "pago_atrasado": 5350, "adelanto_efectivo": { "porcentaje": 5, "minimo": 749 } }] },
+        { "id": "bg-credito-mastercard-black", "nombre": "Mastercard Black", "clase": "credito",
+          "versiones": [{ "vigente_desde": "2025-10-01", "verificado": "2026-11-01", "fuente": "https://www.bgeneral.com/tasas-comisiones-recargos/",
+            "tasa_anual": 14.0, "pago_atrasado": 5350, "adelanto_efectivo": { "porcentaje": 5, "minimo": 749 } }] },
+        { "id": "bg-credito-mileageplus-classic", "nombre": "Crédito MileagePlus Classic/Gold", "clase": "credito",
+          "versiones": [{ "vigente_desde": "2025-10-01", "verificado": "2026-11-01", "fuente": "https://www.bgeneral.com/tasas-comisiones-recargos/",
+            "tasa_anual": 22.99, "pago_atrasado": 5350, "adelanto_efectivo": { "porcentaje": 5, "minimo": 749 } }] },
+        { "id": "bg-credito-mileageplus-platinum", "nombre": "Crédito MileagePlus Platinum", "clase": "credito",
+          "versiones": [{ "vigente_desde": "2025-10-01", "verificado": "2026-11-01", "fuente": "https://www.bgeneral.com/tasas-comisiones-recargos/",
+            "tasa_anual": 19.99, "pago_atrasado": 5350, "adelanto_efectivo": { "porcentaje": 5, "minimo": 749 } }] },
+        { "id": "bg-credito-connectmiles-platinum", "nombre": "Crédito ConnectMiles Platinum", "clase": "credito",
+          "versiones": [{ "vigente_desde": "2025-10-01", "verificado": "2026-11-01", "fuente": "https://www.bgeneral.com/tasas-comisiones-recargos/",
+            "tasa_anual": 19.99, "pago_atrasado": 5350, "adelanto_efectivo": { "porcentaje": 5, "minimo": 749 } }] },
+        { "id": "bg-credito-visa-esencial-classic", "nombre": "Visa Esencial Classic/Gold", "clase": "credito",
+          "versiones": [{ "vigente_desde": "2025-10-01", "verificado": "2026-11-01", "fuente": "https://www.bgeneral.com/tasas-comisiones-recargos/",
+            "tasa_anual": 22.99, "pago_atrasado": 5350, "adelanto_efectivo": { "porcentaje": 5, "minimo": 749 } }] },
+        { "id": "bg-credito-cashback-classic", "nombre": "Crédito CashBack Classic/Gold", "clase": "credito",
+          "versiones": [{ "vigente_desde": "2025-10-01", "verificado": "2026-11-01", "fuente": "https://www.bgeneral.com/tasas-comisiones-recargos/",
+            "tasa_anual": 21.99, "pago_atrasado": 5350, "adelanto_efectivo": { "porcentaje": 5, "minimo": 749 } }] },
+        { "id": "bg-credito-cashback-platinum", "nombre": "Crédito CashBack Platinum", "clase": "credito",
+          "versiones": [{ "vigente_desde": "2025-10-01", "verificado": "2026-11-01", "fuente": "https://www.bgeneral.com/tasas-comisiones-recargos/",
+            "tasa_anual": 18.99, "pago_atrasado": 5350, "adelanto_efectivo": { "porcentaje": 5, "minimo": 749 } }] },
+        { "id": "bg-credito-classic", "nombre": "Crédito Banco General Classic", "clase": "credito",
+          "versiones": [{ "vigente_desde": "2025-10-01", "verificado": "2026-11-01", "fuente": "https://www.bgeneral.com/tasas-comisiones-recargos/",
+            "tasa_anual": 21.99, "pago_atrasado": 5350, "adelanto_efectivo": { "porcentaje": 5, "minimo": 749 } }] }
+      ]
+    }
+  ]
+}

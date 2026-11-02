@@ -8,7 +8,7 @@ import time
 
 import uvicorn
 
-from . import db, recurrencias
+from . import correo, db, recurrencias
 from .api import create_app
 from .config import Config
 
@@ -57,6 +57,7 @@ def main() -> None:
 
     parar = threading.Event()
     threading.Thread(target=mantenimiento, args=(config, parar), daemon=True, name="mantenimiento").start()
+    threading.Thread(target=correo.hilo_de_revision, args=(config.carpeta, config.ruta_db, parar), daemon=True, name="correo").start()
     logging.getLogger("uvicorn.access").addFilter(SinClaveEnLaDireccion())
     uvicorn.run(app, host=args.host, port=args.puerto)
 
