@@ -9,15 +9,17 @@ se probó sale; lo que quedó a medias entra.
 ## Por hacer y probar: bancos y correos (2/nov)
 
 Hecho el 2/nov (ver «Bancos» y «Captura desde el correo» en `CLAUDE.md`). Pruebas del servidor (89) y
-compilación de la app pasan; **nada se vio todavía en pantalla ni con Gmail de verdad**.
-1. **Conectar Gmail (una vez):** el usuario crea en Google Cloud el proyecto con la API de Gmail, la publica
-   «En producción» y baja el ID de cliente de «App de escritorio» a `datos\`. Luego Claude corre
-   `uv run python -m gastos.correo --autorizar` en `servidor\`, el usuario acepta en el navegador
-   (aviso de «app no verificada» → Avanzado → Ir) y se reinicia el servidor. La página de estado
-   (http://127.0.0.1:8766) muestra «Correo del banco» con la última revisión o el error.
-2. **Ver un aviso real de BG:** el filtro por defecto es `from:(bgeneral.com) newer_than:3d`. Si los avisos
-   vienen de otro remitente, cambiar `buscar` en `correo.json`. Ver qué saca de un aviso real
-   (`uv run python -m gastos.correo --probar <archivo.txt>` en `servidor\`) y si la categoría que elige tiene sentido.
+compilación de la app pasan; **nada se vio todavía en pantalla**.
+1. **Gmail conectado el 2/nov** (proyecto «My First Project» de Google Cloud, cliente de escritorio en
+   `datos\client_secret_*.json`, permiso en `datos\gmail-permiso.json`). La primera revisión leyó 1 correo de
+   `banco-general@bgeneral.com` (una promoción) y lo descartó bien. **La app de Google sigue «En prueba»**: el
+   permiso vence a los 7 días (~9/nov) y hay que volver a correr `--autorizar`. Para publicarla, en «Información
+   de la marca»: página principal = el repo, política = `PRIVACIDAD.md` del repo, dominio autorizado `github.com`.
+2. **BG no manda avisos de compras al correo**: en 6 meses, sus 36 correos son promociones, facturas
+   electrónicas y cartas. El usuario tiene que activar en la app o banca en línea de BG las notificaciones
+   **por correo** de compras con tarjeta, retiros, transferencias y Yappy. Si BG solo las da por SMS o push,
+   ir por el Atajo de iPhone con los SMS (`POST /api/entrada`). Cuando llegue el primer aviso real, ver qué
+   saca y si la categoría tiene sentido. Las facturas electrónicas de BG podrían servir para conciliar cargos.
 3. **En la app:** a cada cuenta de BG ponerle «Banco» (tipo de cuenta, tarjeta, membresía, seguro) y los
    **4 últimos dígitos de la tarjeta**; sin eso los avisos quedan en «Por revisar». Revisar a ojo la ficha
    del banco en la hoja de la cuenta, el bloque de interés y cargos en la pantalla de la cuenta (en la web
