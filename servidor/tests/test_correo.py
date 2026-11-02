@@ -1,7 +1,13 @@
-"""Los avisos del banco y las cuentas con banco. Nunca se usa IMAP ni Claude de verdad: el extractor es falso
-y los avisos, inventados."""
+"""Los avisos del banco y las cuentas con banco. Nunca se usa Gmail ni Claude de verdad: el extractor y Google
+son falsos y los avisos, inventados."""
 
+import base64
+import hashlib
+import json
+import threading
 import time
+import urllib.parse
+import urllib.request
 from datetime import date
 
 import pytest
@@ -344,12 +350,177 @@ def test_estado_del_correo_sin_configurar(api, config):
 
 
 def test_estado_del_correo_configurado(api, config):
-    (config.carpeta / "correo.json").write_text('{"usuario": "yo@example.com", "clave_app": "abcd efgh ijkl mnop"}', encoding="utf-8")
+    poner_cliente(config.carpeta)
+    assert api.get("/api/correo").json()["configurado"] is False  # falta el permiso
+    poner_permiso(config.carpeta)
     assert api.get("/api/correo").json()["configurado"] is True
     c = correo.leer_config(config.carpeta)
-    assert (c["buscar"], c["cada_minutos"], c["modelo"], c["clave_app"]) == (correo.BUSCAR, 5, "haiku", "abcdefghijklmnop")
+    assert (c["buscar"], c["cada_minutos"], c["modelo"]) == (correo.BUSCAR, 5, "haiku")
 
 
 def test_la_pagina_de_estado_explica_como_activar_el_correo(anonimo):
     html = anonimo.get("/").text
-    assert "Correo del banco" in html and "apppasswords" in html
+    assert "Correo del banco" in html and "gastos.correo --autorizar" in html and "gmail-cliente.json" in html
+    assert "apppasswords" not in html
+
+
+# --- Gmail por API (sin red) -----------------------------------------------------------------------
+CLIENTE = {"installed": {"client_id": "id-falso.apps.example", "client_secret": "secreto-falso",
+                         "auth_uri": "https://auth.example/o", "token_uri": "https://token.example/t",
+                         "redirect_uris": ["http://localhost"]}}
+
+
+def poner_cliente(carpeta, nombre="gmail-cliente.json"):
+    (carpeta / nombre).write_text(json.dumps(CLIENTE), encoding="utf-8")
+
+
+def poner_permiso(carpeta, **extra):
+    (carpeta / "gmail-permiso.json").write_text(json.dumps({"refresh_token": "r-falso", **extra}), encoding="utf-8")
+
+
+def en_base64url(crudo: bytes) -> str:
+    return base64.urlsafe_b64encode(crudo).decode().rstrip("=")
+
+
+CORREO_FALSO = (b"Message-ID: <real@x>\r\nFrom: avisos@banco.example\r\nSubject: Aviso\r\nDate: Sat, 31 Oct 2026 12:00:00 -0500\r\n"
+                b"Content-Type: text/plain; charset=utf-8\r\n\r\nCompra con su tarjeta terminada en 4821 por USD 23.75 en SUPER 99")
+
+
+class GoogleFalso:
+    """Hace de `pedir_http`: responde según la URL y apunta qué se pidió."""
+
+    def __init__(self, ids=("m1",), token_error=None):
+        self.ids, self.token_error, self.pedidos = list(ids), token_error, []
+
+    def __call__(self, url, datos=None, token=None):
+        self.pedidos.append((url, datos, token))
+        if url == CLIENTE["installed"]["token_uri"]:
+            if self.token_error:
+                raise self.token_error
+            return {"access_token": "acceso-nuevo", "expires_in": 3600}
+        if "/messages?" in url:
+            return {"messages": [{"id": i} for i in self.ids]}
+        if "/messages/" in url:
+            return {"raw": en_base64url(CORREO_FALSO)}
+        raise AssertionError(url)
+
+    def bajados(self):
+        return [u for u, _, _ in self.pedidos if "format=raw" in u]
+
+
+def test_configurado_segun_los_archivos(tmp_path):
+    assert correo.leer_config(tmp_path) is None
+    poner_cliente(tmp_path)
+    assert correo.leer_config(tmp_path) is None  # falta el permiso
+    poner_permiso(tmp_path)
+    assert correo.leer_config(tmp_path) == {"buscar": correo.BUSCAR, "cada_minutos": 5, "modelo": "haiku"}
+
+
+def test_acepta_el_client_secret_de_google(tmp_path):
+    poner_cliente(tmp_path, "client_secret_123-abc.apps.example.json")
+    poner_permiso(tmp_path)
+    assert correo.leer_config(tmp_path) is not None
+    poner_cliente(tmp_path, "client_secret_otro.json")  # con dos ya no se sabe cuál
+    assert correo.leer_config(tmp_path) is None
+    poner_cliente(tmp_path)  # pero gmail-cliente.json manda
+    assert correo.leer_config(tmp_path) is not None
+
+
+def test_correo_json_solo_trae_ajustes(tmp_path):
+    poner_cliente(tmp_path)
+    poner_permiso(tmp_path)
+    (tmp_path / "correo.json").write_text('{"buscar": "label:avisos", "cada_minutos": 10, "modelo": "sonnet"}', encoding="utf-8")
+    assert correo.leer_config(tmp_path) == {"buscar": "label:avisos", "cada_minutos": 10, "modelo": "sonnet"}
+
+
+def test_refresca_el_token_vencido_y_lo_guarda(tmp_path):
+    poner_cliente(tmp_path)
+    poner_permiso(tmp_path, access_token="viejo", vence=1000)
+    google = GoogleFalso()
+    assert correo.obtener_token(tmp_path, google, ahora=lambda: 5000) == "acceso-nuevo"
+    _, datos, _ = google.pedidos[0]
+    assert (datos["grant_type"], datos["refresh_token"]) == ("refresh_token", "r-falso")
+    guardado = json.loads((tmp_path / "gmail-permiso.json").read_text(encoding="utf-8"))
+    assert (guardado["access_token"], guardado["vence"], guardado["refresh_token"]) == ("acceso-nuevo", 8600, "r-falso")
+    # Vigente: no vuelve a pedir.
+    assert correo.obtener_token(tmp_path, google, ahora=lambda: 6000) == "acceso-nuevo"
+    assert len(google.pedidos) == 1
+
+
+def test_invalid_grant_dice_que_hay_que_autorizar_de_nuevo(tmp_path):
+    poner_cliente(tmp_path)
+    poner_permiso(tmp_path)
+    google = GoogleFalso(token_error=correo.ErrorHttp(400, {"error": "invalid_grant"}))
+    with pytest.raises(correo.ErrorDeCorreo, match="Google retiró el permiso: vuelve a autorizar"):
+        correo.obtener_token(tmp_path, google)
+
+
+def test_revisar_guarda_el_error_de_invalid_grant_en_el_estado(config, reloj):
+    poner_cliente(config.carpeta)
+    poner_permiso(config.carpeta)
+    c = db.conectar(config.ruta_db)
+    db.inicializar(c)
+    c.close()
+    google = GoogleFalso(token_error=correo.ErrorHttp(400, {"error": "invalid_grant"}))
+    assert correo.revisar(config.carpeta, config.ruta_db, Falso(), http=google) == 0
+    assert correo.estado["error"].startswith("Google retiró el permiso")
+    correo.estado.update(error=None, ultima_revision=None, leidos=0)
+
+
+def test_lista_baja_y_procesa_con_clave_gmail_sin_repetir(config, reloj):
+    poner_cliente(config.carpeta)
+    poner_permiso(config.carpeta, access_token="vigente", vence=time.time() + 3000)
+    c = db.conectar(config.ruta_db)
+    db.inicializar(c)
+    poner_terminacion(c)
+    c.close()
+    google, falso = GoogleFalso(), Falso()
+    assert correo.revisar(config.carpeta, config.ruta_db, falso, hoy=lambda: HOY, http=google) == 1
+    assert len(google.bajados()) == 1 and google.pedidos[0][2] == "vigente"
+    c = db.conectar(config.ruta_db)
+    try:
+        p = fila(c, "gmail:m1")
+        assert (p["estado"], p["monto"], p["origen"]) == ("agregado", 2375, "correo")
+    finally:
+        c.close()
+    # Segunda pasada: ya estaba leído, no se baja ni se vuelve a leer.
+    assert correo.revisar(config.carpeta, config.ruta_db, falso, hoy=lambda: HOY, http=google) == 0
+    assert len(google.bajados()) == 1 and falso.llamadas == 1
+    correo.estado.update(error=None, ultima_revision=None, leidos=0)
+
+
+def test_la_url_de_autorizacion_pide_solo_lectura_con_pkce():
+    verificador = "v" * 50
+    url = correo.url_autorizacion(CLIENTE["installed"], "http://127.0.0.1:5555", "estado-1", verificador)
+    base, _, consulta = url.partition("?")
+    q = {k: v[0] for k, v in urllib.parse.parse_qs(consulta).items()}
+    assert base == "https://auth.example/o"
+    assert q["scope"] == "https://www.googleapis.com/auth/gmail.readonly"
+    assert (q["access_type"], q["prompt"], q["response_type"], q["state"]) == ("offline", "consent", "code", "estado-1")
+    assert q["code_challenge_method"] == "S256"
+    esperado = base64.urlsafe_b64encode(hashlib.sha256(verificador.encode()).digest()).rstrip(b"=").decode()
+    assert q["code_challenge"] == esperado
+    assert q["redirect_uri"] == "http://127.0.0.1:5555"
+
+
+def test_autorizar_sin_cliente_explica_donde_ponerlo(tmp_path):
+    with pytest.raises(correo.ErrorDeCorreo, match="gmail-cliente.json"):
+        correo.autorizar(tmp_path)
+
+
+def test_autorizar_recibe_el_code_y_guarda_el_permiso(tmp_path):
+    poner_cliente(tmp_path)
+    google = GoogleFalso()
+
+    def navegador(url):
+        q = {k: v[0] for k, v in urllib.parse.parse_qs(urllib.parse.urlparse(url).query).items()}
+        redir = q["redirect_uri"] + "?" + urllib.parse.urlencode({"code": "codigo-falso", "state": q["state"]})
+        threading.Thread(target=lambda: urllib.request.urlopen(redir).read(), daemon=True).start()
+
+    def intercambio(url, datos=None, token=None):
+        assert datos["code"] == "codigo-falso" and datos["code_verifier"] and datos["grant_type"] == "authorization_code"
+        return {"access_token": "a", "refresh_token": "r-nuevo", "expires_in": 3600}
+
+    correo.autorizar(tmp_path, http=intercambio, abrir=navegador, espera=10)
+    assert json.loads((tmp_path / "gmail-permiso.json").read_text(encoding="utf-8"))["refresh_token"] == "r-nuevo"
+    assert google.pedidos == []

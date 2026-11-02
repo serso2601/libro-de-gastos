@@ -105,10 +105,11 @@ def bloque_correo(info: dict) -> str:
     if not info["configurado"]:
         return """<div class="tarjeta"><h1>Correo del banco <span class="mal">● sin configurar</span></h1>
 <p>Para que los avisos del banco entren solos como movimientos:</p>
-<p>1. En tu cuenta de Google activa la <b>verificación en dos pasos</b>.<br>
-2. Crea una <b>contraseña de aplicación</b> en <b>myaccount.google.com/apppasswords</b>.<br>
-3. Escribe <b>datos\\correo.json</b> con <b>usuario</b> (tu Gmail) y <b>clave_app</b> (esa contraseña).<br>
-4. Reinicia el servidor.</p></div>"""
+<p>1. En <b>Google Cloud</b> activa la <b>API de Gmail</b> y crea un <b>ID de cliente de OAuth</b> de tipo
+<b>App de escritorio</b>; guarda el JSON que descargas en <b>datos\\</b> como <b>gmail-cliente.json</b>.<br>
+2. En la carpeta <b>servidor\\</b> corre <b>uv run python -m gastos.correo --autorizar</b> y acepta en el navegador
+(solo lectura, sin contraseña).<br>
+3. Reinicia el servidor.</p></div>"""
     revision = escape(info["ultima_revision"] or "todavía no")
     error = f'<p class="mal">Error: {escape(info["error"])}</p>' if info["error"] else ""
     return f"""<div class="tarjeta"><h1>Correo del banco <span class="ok">● activo</span></h1>
