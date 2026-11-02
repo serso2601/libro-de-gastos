@@ -14,9 +14,10 @@ compilación de la app pasan; **nada se vio todavía en pantalla**.
    hoja de la cuenta). La simulación con los Yappy reales leyó bien los 3 tipos y marcó como duplicados los
    que ya estaban anotados a mano. Ver que los nuevos salgan bien y con buena categoría; si no, corregirlos
    (la app recuerda la categoría por persona o comercio).
-2. **Publicar la app de Google**: ahora importa (Yappy entra por Gmail). Sigue «En prueba» y el permiso vence
-   ~9/nov (entonces: `uv run python -m gastos.correo --autorizar` en `servidor\`). Para publicarla, en
-   «Información de la marca»: página principal = el repo, política = `PRIVACIDAD.md`, dominio `github.com`.
+2. **App de Google publicada «En producción» el 2/nov** (Claude, desde Chrome: página principal = el repo,
+   política = `PRIVACIDAD.md`, dominio `github.com`) y permiso de Gmail renovado ya en producción: no vence a
+   los 7 días. Si algún día Google lo retira, la página de estado lo dice; se arregla con
+   `uv run python -m gastos.correo --autorizar` en `servidor\`.
 3. **Atajo de Apple Pay**: armarlo con Ajustes → «Anotar solo con Apple Pay» y probar un pago. Tailscale con
    «VPN a pedido». Revisar que «Copiar» funcione en la web por http y en el iPhone.
 4. **Cargos del banco**: reglas de membresía ($2.68) y seguro ($1.05) el día 3 en la cuenta de BG. Ver que el
