@@ -395,7 +395,9 @@ export function gastadoEnCorte(d: Datos, cuenta: Cuenta): number {
   const ciclo = cicloTarjeta(cuenta, d.hoy);
   if (!ciclo) return 0;
   const pasan = pasanAlSiguiente(d, cuenta);
-  return d.movimientos.reduce((s, m) => s + (m.cuenta_id === cuenta.id && m.tipo !== 'ingreso'
+  const ini = inicioDeTarjeta(cuenta);
+  const alCrearla = ini && ini.corte === ciclo.corteAnterior ? ini.compras : 0;
+  return alCrearla + d.movimientos.reduce((s, m) => s + (m.cuenta_id === cuenta.id && m.tipo !== 'ingreso'
     && ((m.fecha > ciclo.corteAnterior && m.fecha <= ciclo.proximoCorte) || pasan.has(m.id)) ? m.monto : 0), 0);
 }
 
@@ -406,7 +408,21 @@ export function deudaTarjeta(d: Datos, cuenta: Cuenta): number {
 
 /** Lo que se debía en la tarjeta al cerrar el día `fecha` (0 si estaba a favor). */
 export function deudaAl(d: Datos, cuenta: Cuenta, fecha: string): number {
-  return Math.max(0, -saldo(cuenta, d.movimientos.filter((m) => m.fecha <= fecha)));
+  const ini = inicioDeTarjeta(cuenta);
+  // En el corte con el que se creó la tarjeta, la deuda de partida es la del estado de cuenta, no la de hoy.
+  const desde = ini && fecha === ini.corte ? { ...cuenta, saldo_inicial: -ini.alCorte } : cuenta;
+  return Math.max(0, -saldo(desde, d.movimientos.filter((m) => m.fecha <= fecha)));
+}
+
+/**
+ * Lo que se separó al crear la tarjeta para su último corte: lo que se debía en ese corte (estado de cuenta) y las
+ * compras y pagos que el banco hizo efectivos después y ya venían en «lo que debes hoy». null si no se separó.
+ */
+export function inicioDeTarjeta(cuenta: Cuenta): { corte: string; alCorte: number; compras: number; pagos: number } | null {
+  if (!cuenta.es_credito || !cuenta.corte_inicial || cuenta.deuda_al_corte == null) return null;
+  const pagos = cuenta.pagos_tras_corte ?? 0;
+  const debeHoy = Math.max(0, -cuenta.saldo_inicial);
+  return { corte: cuenta.corte_inicial, alCorte: cuenta.deuda_al_corte, pagos, compras: Math.max(0, debeHoy - cuenta.deuda_al_corte + pagos) };
 }
 
 /** Días antes del corte en que una compra puede no haber entrado todavía: el banco la fecha 2 a 4 días después. */
@@ -545,7 +561,9 @@ export function estadoTarjeta(d: Datos, cuenta: Cuenta): EstadoTarjeta | null {
 
 /** Lo que se le pagó a la tarjeta desde el último corte (transferencias que entraron a ella). */
 export function pagadoDesdeCorte(d: Datos, cuenta: Cuenta, corte: string): number {
-  return d.movimientos.reduce((s, m) => s + (m.tipo === 'transferencia' && m.cuenta_destino_id === cuenta.id && m.fecha > corte ? m.monto : 0), 0);
+  const ini = inicioDeTarjeta(cuenta);
+  const alCrearla = ini && ini.corte === corte ? ini.pagos : 0;
+  return alCrearla + d.movimientos.reduce((s, m) => s + (m.tipo === 'transferencia' && m.cuenta_destino_id === cuenta.id && m.fecha > corte ? m.monto : 0), 0);
 }
 
 export interface PagoSugerido {

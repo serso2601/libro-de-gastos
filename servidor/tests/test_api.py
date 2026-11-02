@@ -196,6 +196,23 @@ def test_tarjeta_de_credito(cliente):
     assert r.json()["limite"] is None
 
 
+def test_tarjeta_con_deuda_al_corte_inicial(cliente):
+    tarjeta = {"nombre": "Visa", "es_credito": True, "dia_corte": 18, "saldo_inicial": -228643,
+               "corte_inicial": "2026-10-18", "deuda_al_corte": 200000, "pagos_tras_corte": 1000}
+    r = cliente.put("/api/cuentas/visa", json=tarjeta)
+    assert r.status_code == 200
+    assert (r.json()["corte_inicial"], r.json()["deuda_al_corte"], r.json()["pagos_tras_corte"]) == ("2026-10-18", 200000, 1000)
+    por_id = {c["id"]: c for c in cliente.get("/api/datos").json()["cuentas"]}
+    assert (por_id["visa"]["corte_inicial"], por_id["visa"]["deuda_al_corte"], por_id["visa"]["pagos_tras_corte"]) == (
+        "2026-10-18", 200000, 1000)
+
+    r = cliente.put("/api/cuentas/visa", json={**tarjeta, "es_credito": False})
+    assert (r.json()["corte_inicial"], r.json()["deuda_al_corte"], r.json()["pagos_tras_corte"]) == (None, None, None)
+
+    assert cliente.put("/api/cuentas/visa", json={**tarjeta, "deuda_al_corte": -1}).status_code == 422
+    assert cliente.put("/api/cuentas/visa", json={**tarjeta, "pagos_tras_corte": -1}).status_code == 422
+
+
 def test_tarjeta_de_credito_pide_dia_de_corte(cliente):
     r = cliente.put("/api/cuentas/visa", json={"nombre": "Visa", "es_credito": True})
     assert r.status_code == 422 and "día de corte" in r.text

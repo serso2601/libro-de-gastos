@@ -70,7 +70,12 @@ def _dinero(centavos: int) -> str:
 
 
 def texto_de_pagos(con: sqlite3.Connection, catalogo: dict, hoy: date) -> str:
-    """Una línea por tarjeta que toca recordar hoy; vacío si ninguna."""
+    """Una línea por tarjeta que toca recordar hoy; vacío si ninguna.
+
+    La deuda al corte parte de lo que se debía al crear la tarjeta (-saldo_inicial) más lo anotado hasta el corte;
+    si el corte es el `corte_inicial` de la tarjeta, parte de `deuda_al_corte` (el estado de cuenta) y a lo pagado
+    se suman los `pagos_tras_corte`, porque el saldo inicial ya traía lo hecho efectivo después del corte.
+    """
     lineas = []
     for c in con.execute("SELECT * FROM cuenta WHERE es_credito = 1 AND dia_corte IS NOT NULL ORDER BY orden, creado"):
         banco = json.loads(c["banco"]) if c["banco"] else None
@@ -81,19 +86,23 @@ def texto_de_pagos(con: sqlite3.Connection, catalogo: dict, hoy: date) -> str:
         faltan = (pago - hoy).days
         if faltan not in AVISAR_A:
             continue
-        # Lo que se debía al cerrar el día del corte: el saldo (en contra) con lo anotado hasta ese día.
-        saldo = c["saldo_inicial"] + con.execute(
+        # Lo que se debía al cerrar el día del corte: la deuda de partida con lo anotado hasta ese día. La deuda de
+        # partida es la de hoy (-saldo_inicial) o, si el corte es el inicial de la tarjeta, la de su estado de cuenta.
+        al_corte_inicial = c["corte_inicial"] == corte.isoformat() and c["deuda_al_corte"] is not None
+        efecto = con.execute(
             """SELECT COALESCE(SUM(CASE WHEN cuenta_id = :id AND tipo = 'ingreso' THEN monto
                                         WHEN cuenta_id = :id THEN -monto ELSE 0 END), 0)
                     + COALESCE(SUM(CASE WHEN cuenta_destino_id = :id THEN monto ELSE 0 END), 0)
                FROM movimiento WHERE fecha <= :corte AND (cuenta_id = :id OR cuenta_destino_id = :id)""",
             {"id": c["id"], "corte": corte.isoformat()}).fetchone()[0]
-        al_corte = max(0, -saldo)
+        al_corte = max(0, (c["deuda_al_corte"] if al_corte_inicial else -c["saldo_inicial"]) - efecto)
         if al_corte <= 0:
             continue
         pagado = con.execute(
             "SELECT COALESCE(SUM(monto), 0) FROM movimiento WHERE tipo = 'transferencia' AND cuenta_destino_id = ? AND fecha > ?",
             (c["id"], corte.isoformat())).fetchone()[0]
+        if al_corte_inicial:
+            pagado += c["pagos_tras_corte"] or 0
         m = minimo(al_corte, c["limite"], reglas, c["pago_minimo"], c["minimo_corte"], corte)
         if (m is not None and pagado >= m) or (m is None and pagado > 0) or pagado >= al_corte:
             continue

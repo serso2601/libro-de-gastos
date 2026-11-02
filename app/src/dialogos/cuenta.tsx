@@ -6,14 +6,17 @@ import { useState } from 'react';
 import { View } from 'react-native';
 import { useAcciones } from '@/lib/acciones';
 import { useDatos } from '@/lib/datos';
-import { aCentavos, aTexto, nuevoId } from '@/lib/formato';
+import { aCentavos, aTexto, MESES_CORTOS, nuevoId } from '@/lib/formato';
 import { versionVigente } from '@/lib/banco';
+import { cicloTarjeta } from '@/lib/calculos';
 import type { Cuenta, VinculoBanco } from '@/lib/tipos';
 import { avisar } from '@/ui/aviso';
 import { BotonBorrar, BotonPrincipal, Campo, CampoMonto, Colores, Etiqueta, Ficha, Hoja, MontoGrande, Segmentos, Texto, TextoError } from '@/ui/componentes';
 import { PALETA } from '@/ui/estilos';
 import { useTema } from '@/ui/tema';
 import { Desplegable } from './piezas';
+
+const fechaCorta = (iso: string) => `${Number(iso.slice(8, 10))} ${MESES_CORTOS[Number(iso.slice(5, 7)) - 1]}`;
 
 /** Los días 1–31 en filas de 7, para elegir uno; tocar el elegido otra vez lo quita. */
 function GrillaDias({ valor, alCambiar }: { valor: number | null; alCambiar: (d: number | null) => void }) {
@@ -50,6 +53,9 @@ export function DialogoCuenta({ inicial, alCerrar }: { inicial?: Cuenta; alCerra
   const [pago, setPago] = useState<number | null>(inicial?.dia_pago ?? null);
   const [minimo, setMinimo] = useState(inicial?.pago_minimo ? aTexto(inicial.pago_minimo) : '');
   const [limite, setLimite] = useState(inicial?.limite ? aTexto(inicial.limite) : '');
+  // Al crear la tarjeta: lo que se debía al último corte y lo pagado después (lo de hoy ya lo trae todo).
+  const [alCorteTxt, setAlCorteTxt] = useState(inicial?.deuda_al_corte != null ? aTexto(inicial.deuda_al_corte) : '');
+  const [pagosTxt, setPagosTxt] = useState(inicial?.pagos_tras_corte ? aTexto(inicial.pagos_tras_corte) : '');
   const v0 = inicial?.banco;
   const [bancoId, setBancoId] = useState<string | null>(v0?.banco ?? null);
   const [productoId, setProductoId] = useState<string | null>(v0?.cuenta ?? null);
@@ -72,6 +78,10 @@ export function DialogoCuenta({ inicial, alCerrar }: { inicial?: Cuenta; alCerra
     if (min !== null && Number.isNaN(min)) return setError('El pago mínimo no es un número');
     const lim = limite.trim() === '' ? null : aCentavos(limite);
     if (lim !== null && (Number.isNaN(lim) || lim <= 0)) return setError('El límite de crédito no es un número mayor que 0');
+    if (resumenInicio && resumenInicio.compras < 0) return setError('El saldo al corte no puede ser mayor que lo que debes hoy más lo que pagaste');
+    if (verInicio && ((alCorteTxt.trim() !== '' && !resumenInicio) || (pagosTxt.trim() !== '' && Number.isNaN(aCentavos(pagosTxt))))) {
+      return setError('El saldo al corte o los pagos no son un número');
+    }
     const final4 = terminacion.trim();
     if (final4 !== '' && !/^\d{4}$/.test(final4)) return setError('Los últimos dígitos de la tarjeta son 4 números');
     const vinculo: VinculoBanco | null = banco ? {
@@ -91,6 +101,10 @@ export function DialogoCuenta({ inicial, alCerrar }: { inicial?: Cuenta; alCerra
       pago_minimo: !esTarjeta ? null : reglas?.pago_minimo ? (inicial?.minimo_corte ? inicial.pago_minimo ?? null : null) : min,
       minimo_corte: esTarjeta && reglas?.pago_minimo ? inicial?.minimo_corte ?? null : null,
       limite: esTarjeta ? lim : null,
+      // Los totales del corte: solo mientras la tarjeta sigue en el corte con el que se creó.
+      ...(!esTarjeta ? { corte_inicial: null, deuda_al_corte: null, pagos_tras_corte: null }
+        : verInicio ? { corte_inicial: resumenInicio ? corteAnt : null, deuda_al_corte: resumenInicio?.alCorte ?? null,
+          pagos_tras_corte: resumenInicio ? resumenInicio.pagos : null } : {}),
       banco: vinculo, terminacion: final4 === '' ? null : final4,
     });
     // El Yappy solo se marca en cuentas que no son de crédito; si cambió, se avisa a la PC.
@@ -119,7 +133,20 @@ export function DialogoCuenta({ inicial, alCerrar }: { inicial?: Cuenta; alCerra
     const fechas = id ? versionVigente(tarjetas.find((t) => t.id === id)!, hoy).fechas : undefined;
     if (fechas && corte === null) setCorte(fechas.corte);
   };
-  const dinero0 = (x: number) => `${moneda}${(x / 100).toFixed(2)}`;
+  const dinero0 = (x: number) => `${moneda}${(x / 100).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
+  // El último corte según el día elegido, y si se pide separar lo de antes y después de él: al crear la tarjeta,
+  // o al editarla mientras siga en ese corte (o si todavía no tiene nada anotado).
+  const corteAnt = esTarjeta && corte !== null ? cicloTarjeta({ ...(inicial ?? { id: '', nombre: '', color: '', saldo_inicial: 0, orden: 0 }), es_credito: true, dia_corte: corte }, hoy)?.corteAnterior ?? null : null;
+  const usada = !!inicial && movimientos.some((m) => m.cuenta_id === inicial.id || m.cuenta_destino_id === inicial.id);
+  const verInicio = esTarjeta && !!corteAnt && (!inicial || !inicial.es_credito || inicial.corte_inicial === corteAnt || (!inicial.corte_inicial && !usada));
+  const resumenInicio = (() => {
+    if (!verInicio || alCorteTxt.trim() === '') return null;
+    const alCorte = aCentavos(alCorteTxt);
+    const pagos = pagosTxt.trim() === '' ? 0 : aCentavos(pagosTxt);
+    const hoyDebe = saldo.trim() === '' ? 0 : aCentavos(saldo);
+    if ([alCorte, pagos, hoyDebe].some(Number.isNaN)) return null;
+    return { alCorte, pagos, compras: hoyDebe - alCorte + pagos };
+  })();
   const comoMinimo = reglas?.pago_minimo
     ? `${reglas.pago_minimo.porcentaje}% de lo que debías al corte, nunca menos de ${dinero0(reglas.pago_minimo.minimo)}` : '';
   const sobregiro = reglas?.sobregiro;
@@ -225,22 +252,48 @@ export function DialogoCuenta({ inicial, alCerrar }: { inicial?: Cuenta; alCerra
           </Desplegable>
         </View>
       )}
+      {esTarjeta && (
+        <View style={{ gap: 8 }}>
+          <Etiqueta>Día de corte</Etiqueta>
+          <GrillaDias valor={corte} alCambiar={setCorte} />
+          {reglas?.fechas && (
+            <Texto tam={13} color={c.tenue}>
+              {banco?.nombre} publica para esta tarjeta el corte el {reglas.fechas.corte} y el pago el {reglas.fechas.pago}. Pon el de tu estado de cuenta: puede ser otro.
+            </Texto>
+          )}
+        </View>
+      )}
       <View style={{ gap: 8 }}>
         <Etiqueta>{esTarjeta ? 'Lo que debes hoy' : 'Saldo con el que empieza'}</Etiqueta>
         <MontoGrande valor={saldo} alCambiar={setSaldo} moneda={moneda} />
+        {esTarjeta && <Texto tam={13} color={c.tenue}>El saldo actual que muestra tu banca, con todo lo de después del corte.</Texto>}
         {!esTarjeta && <Segmentos<'no' | 'si'> opciones={[['no', 'A favor'], ['si', 'En contra (deuda)']]} valor={negativo} alCambiar={setNegativo} />}
       </View>
+      {verInicio && corteAnt && (
+        <View style={{ gap: 10, backgroundColor: c.suave, borderRadius: 14, padding: 14 }}>
+          <Texto tam={15} peso="semi">¿Cuánto era al corte del {fechaCorta(corteAnt)}?</Texto>
+          <Texto tam={13} color={c.tenue} style={{ lineHeight: 18 }}>
+            Lo que el banco hizo efectivo después del corte (aunque lo hayas hecho antes) entra en el corte siguiente. Pon aquí los totales y la app los separa; no hace falta anotarlo uno por uno.
+          </Texto>
+          <View style={{ gap: 6 }}>
+            <Etiqueta derecha={<Texto tam={13} color={c.tenue}>Opcional</Texto>}>Saldo al corte (estado de cuenta)</Etiqueta>
+            <CampoMonto valor={alCorteTxt} alCambiar={(v) => { setAlCorteTxt(v); setError(''); }} moneda={moneda} accessibilityLabel="Saldo al corte" />
+          </View>
+          <View style={{ gap: 6 }}>
+            <Etiqueta derecha={<Texto tam={13} color={c.tenue}>Opcional</Texto>}>Pagos que hiciste después del corte</Etiqueta>
+            <CampoMonto valor={pagosTxt} alCambiar={(v) => { setPagosTxt(v); setError(''); }} moneda={moneda} accessibilityLabel="Pagos después del corte" />
+          </View>
+          {resumenInicio && (
+            <Texto tam={13} style={{ lineHeight: 18 }}>
+              {resumenInicio.compras < 0
+                ? 'No cuadra: el saldo al corte no puede ser mayor que lo que debes hoy más lo que pagaste.'
+                : `Al corte debías ${dinero0(resumenInicio.alCorte)} · después: compras ${dinero0(resumenInicio.compras)}, pagos ${dinero0(resumenInicio.pagos)}. De aquí en adelante, anota cada compra y pago nuevo de la tarjeta.`}
+            </Texto>
+          )}
+        </View>
+      )}
       {esTarjeta && (
         <>
-          <View style={{ gap: 8 }}>
-            <Etiqueta>Día de corte</Etiqueta>
-            <GrillaDias valor={corte} alCambiar={setCorte} />
-            {reglas?.fechas && (
-              <Texto tam={13} color={c.tenue}>
-                {banco?.nombre} publica para esta tarjeta el corte el {reglas.fechas.corte} y el pago el {reglas.fechas.pago}. Pon el de tu estado de cuenta: puede ser otro.
-              </Texto>
-            )}
-          </View>
           <View style={{ gap: 8 }}>
             <Etiqueta derecha={<Texto tam={13} color={c.tenue}>Opcional</Texto>}>Día de pago</Etiqueta>
             <GrillaDias valor={pago} alCambiar={setPago} />

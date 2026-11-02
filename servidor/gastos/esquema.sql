@@ -21,6 +21,10 @@ CREATE TABLE IF NOT EXISTS cuenta (
     pago_minimo     INTEGER CHECK (pago_minimo >= 0),
     limite          INTEGER CHECK (limite > 0),
     minimo_corte    TEXT,  -- con reglas del banco: el corte (fecha) para el que el usuario corrigió el mínimo
+    -- Solo tarjetas: el saldo inicial incluye lo hecho efectivo después del último corte; estos tres datos lo separan.
+    corte_inicial   TEXT,  -- el corte (fecha) al que se refieren los dos montos siguientes
+    deuda_al_corte  INTEGER CHECK (deuda_al_corte >= 0),  -- el saldo del estado de cuenta de ese corte
+    pagos_tras_corte INTEGER CHECK (pagos_tras_corte >= 0),  -- lo pagado después de ese corte y antes de crear la tarjeta
     -- Vínculo con el catálogo de bancos (bancos.json), en JSON, o NULL; y los últimos 4 dígitos de
     -- su tarjeta, con los que se reconoce de qué cuenta es un aviso del banco.
     banco           TEXT,

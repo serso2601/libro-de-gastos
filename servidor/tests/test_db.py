@@ -6,9 +6,14 @@ import pytest
 from gastos import db
 
 
+def esquema_v8() -> str:
+    """El esquema de la versión 8: el actual sin lo que agregó la 9 (la deuda al corte inicial de la tarjeta)."""
+    return re.sub(r"    -- Solo tarjetas: el saldo inicial[^\n]*\n|    (corte_inicial|deuda_al_corte|pagos_tras_corte) [^\n]*\n", "", db.ESQUEMA.read_text(encoding="utf-8"))
+
+
 def esquema_v7() -> str:
-    """El esquema de la versión 7: el actual sin lo que agregó la 8 (el corte del mínimo corregido)."""
-    return re.sub(r"    minimo_corte    TEXT[^\n]*\n", "", db.ESQUEMA.read_text(encoding="utf-8"))
+    """El esquema de la versión 7: el de la 8 sin lo que agregó la 8 (el corte del mínimo corregido)."""
+    return re.sub(r"    minimo_corte    TEXT[^\n]*\n", "", esquema_v8())
 
 
 def esquema_v6() -> str:
@@ -208,5 +213,22 @@ def test_migracion_8_agrega_el_corte_del_minimo_corregido(tmp_path):
 
     db.inicializar(con)
 
-    assert con.execute("PRAGMA user_version").fetchone()[0] == 8
+    assert con.execute("PRAGMA user_version").fetchone()[0] == db.VERSION
     assert tuple(con.execute("SELECT limite, minimo_corte FROM cuenta").fetchone()) == (100000, None)
+
+
+def test_migracion_9_agrega_la_deuda_al_corte_inicial(tmp_path):
+    con = db.conectar(tmp_path / "v8.db")
+    con.executescript(esquema_v8())
+    assert "deuda_al_corte" not in {f["name"] for f in con.execute("PRAGMA table_info(cuenta)")}
+    con.execute("PRAGMA user_version = 8")
+    marca = db.ahora()
+    with con:
+        con.execute("INSERT INTO cuenta (id, nombre, creado, actualizado, es_credito, dia_corte, limite) "
+                    "VALUES ('visa', 'Visa', ?, ?, 1, 18, 100000)", (marca, marca))
+
+    db.inicializar(con)
+
+    assert con.execute("PRAGMA user_version").fetchone()[0] == db.VERSION
+    assert tuple(con.execute("SELECT limite, corte_inicial, deuda_al_corte, pagos_tras_corte FROM cuenta").fetchone()) == (
+        100000, None, None, None)

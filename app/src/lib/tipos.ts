@@ -21,6 +21,14 @@ export interface Cuenta {
   limite?: number | null;
   /** Con reglas del banco: el corte ('YYYY-MM-DD') para el que el usuario corrigió el mínimo (`pago_minimo`). */
   minimo_corte?: string | null;
+  /**
+   * Al crear la tarjeta: `saldo_inicial` es lo que se debe hoy; estos separan lo del último corte (`corte_inicial`):
+   * el saldo del estado de cuenta (`deuda_al_corte`) y lo pagado después (`pagos_tras_corte`). Las compras de
+   * después del corte salen de la diferencia.
+   */
+  corte_inicial?: string | null;
+  deuda_al_corte?: number | null;
+  pagos_tras_corte?: number | null;
   /** Su vínculo con un banco del catálogo (opcional) y los últimos 4 dígitos de su tarjeta. */
   banco?: VinculoBanco | null;
   terminacion?: string | null;

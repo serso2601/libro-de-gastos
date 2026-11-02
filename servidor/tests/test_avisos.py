@@ -32,6 +32,16 @@ def test_avisa_tres_dias_antes_la_vispera_y_el_dia(visa, reloj):
     assert aviso(visa, reloj, date(2026, 11, 16)) == ""
 
 
+def test_deuda_al_corte_inicial_separa_lo_posterior_al_corte(cliente, reloj):
+    tarjeta = {**VISA, "limite": 500000, "saldo_inicial": -228643, "corte_inicial": "2026-10-18", "deuda_al_corte": 200000, "pagos_tras_corte": 0}
+    cliente.put("/api/cuentas/visa", json=tarjeta)
+    assert "(mínimo $60.00, del corte $2,000.00)" in aviso(cliente, reloj, date(2026, 11, 12))
+    cliente.put("/api/cuentas/visa", json={**tarjeta, "pagos_tras_corte": 1000})
+    assert "(mínimo $50.00, del corte $1,990.00)" in aviso(cliente, reloj, date(2026, 11, 12))
+    # El corte siguiente (18 nov, paga el 16 dic) usa la deuda completa.
+    assert "(mínimo $68.59, del corte $2,286.43)" in aviso(cliente, reloj, date(2026, 12, 13))
+
+
 def test_no_avisa_si_ya_pago_el_minimo(visa, reloj):
     visa.put("/api/movimientos/p1", json={"tipo": "transferencia", "monto": 1000, "fecha": "2026-11-01",
                                           "cuenta_id": "efectivo", "cuenta_destino_id": "visa"})

@@ -66,6 +66,9 @@ export function useAcciones() {
               dia_corte: c.es_credito ? c.dia_corte ?? null : null, dia_pago: c.es_credito ? c.dia_pago ?? null : null,
               pago_minimo: c.es_credito ? c.pago_minimo ?? null : null, limite: c.es_credito ? c.limite ?? null : null,
               minimo_corte: c.es_credito ? c.minimo_corte ?? null : null,
+              corte_inicial: c.es_credito ? c.corte_inicial ?? null : null,
+              deuda_al_corte: c.es_credito ? c.deuda_al_corte ?? null : null,
+              pagos_tras_corte: c.es_credito ? c.pagos_tras_corte ?? null : null,
               banco: c.banco ?? null, terminacion: c.terminacion || null } },
           (d) => ({ ...d, cuentas: reemplazar(d.cuentas, c) }),
         );

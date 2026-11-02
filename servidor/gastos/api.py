@@ -101,6 +101,9 @@ class CuentaIn(BaseModel):
     pago_minimo: int | None = Field(default=None, ge=0)  # centavos; lo copia el usuario si su tarjeta no está en el catálogo
     limite: int | None = Field(default=None, gt=0)  # centavos; el límite de crédito de la tarjeta
     minimo_corte: date | None = None  # el corte para el que el usuario corrigió el mínimo (con reglas del banco)
+    corte_inicial: date | None = None  # tarjeta: el corte al que se refieren los dos montos siguientes
+    deuda_al_corte: int | None = Field(default=None, ge=0)  # centavos; el saldo del estado de cuenta de ese corte
+    pagos_tras_corte: int | None = Field(default=None, ge=0)  # centavos; lo pagado después de ese corte y antes de crear la tarjeta
     banco: VinculoBanco | None = None  # vínculo con el catálogo, para calcular intereses y cargos
     terminacion: str | None = Field(default=None, pattern=r"^\d{4}$")  # últimos 4 dígitos de su tarjeta
 
@@ -110,6 +113,7 @@ class CuentaIn(BaseModel):
             raise ValueError("Una tarjeta de crédito necesita su día de corte")
         if not self.es_credito:
             self.dia_corte = self.dia_pago = self.pago_minimo = self.limite = self.minimo_corte = None
+            self.corte_inicial = self.deuda_al_corte = self.pagos_tras_corte = None
         return self
 
 
@@ -488,17 +492,20 @@ def create_app(config: Config | None = None, hoy=date.today, web: Path = WEB, ex
             orden = con.execute("SELECT COALESCE(MAX(orden) + 1, 0) FROM cuenta").fetchone()[0]
             con.execute(
                 """INSERT INTO cuenta (id, nombre, color, saldo_inicial, orden, creado, actualizado,
-                     es_credito, dia_corte, dia_pago, pago_minimo, limite, minimo_corte, banco, terminacion)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     es_credito, dia_corte, dia_pago, pago_minimo, limite, minimo_corte,
+                     corte_inicial, deuda_al_corte, pagos_tras_corte, banco, terminacion)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                    ON CONFLICT (id) DO UPDATE SET nombre = excluded.nombre, color = excluded.color,
                      saldo_inicial = excluded.saldo_inicial, actualizado = excluded.actualizado,
                      es_credito = excluded.es_credito, dia_corte = excluded.dia_corte,
                      dia_pago = excluded.dia_pago, pago_minimo = excluded.pago_minimo, limite = excluded.limite,
-                     minimo_corte = excluded.minimo_corte,
+                     minimo_corte = excluded.minimo_corte, corte_inicial = excluded.corte_inicial,
+                     deuda_al_corte = excluded.deuda_al_corte, pagos_tras_corte = excluded.pagos_tras_corte,
                      banco = excluded.banco, terminacion = excluded.terminacion""",
                 (id_, c.nombre.strip(), c.color, c.saldo_inicial, orden, marca, marca,
                  int(c.es_credito), c.dia_corte, c.dia_pago, c.pago_minimo, c.limite,
                  c.minimo_corte.isoformat() if c.minimo_corte else None,
+                 c.corte_inicial.isoformat() if c.corte_inicial else None, c.deuda_al_corte, c.pagos_tras_corte,
                  json.dumps(c.banco.model_dump(), ensure_ascii=False) if c.banco else None, c.terminacion),
             )
         _sincronizar_cargos(con, id_, c.banco, hoy())

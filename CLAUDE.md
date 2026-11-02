@@ -173,6 +173,12 @@ Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
   Esencial 15/12): `fechas` en el catálogo; en la hoja de la cuenta el banco va **arriba** (justo bajo
   «Es tarjeta de crédito») y al elegir la tarjeta se pone ese corte si no había (el del usuario cae el 18).
   Todo rotulado «aprox.»: sale de lo anotado, no del estado de cuenta.
+  **Al crear la tarjeta** (2/nov, el usuario prefirió totales a anotar uno por uno): «Lo que debes hoy» es el
+  saldo actual de la banca (`saldo_inicial`, con todo lo de después del corte) y un bloque pide «Saldo al corte
+  (estado de cuenta)» y «Pagos después del corte» (`corte_inicial`, `deuda_al_corte`, `pagos_tras_corte`, esquema
+  v9). Las compras de después salen de la diferencia y cuentan en el corte siguiente
+  (`calculos.inicioDeTarjeta`, usado por `deudaAl`, `pagadoDesdeCorte` y `gastadoEnCorte`; igual en `avisos.py`). El
+  bloque solo sale al crearla o mientras siga en ese primer corte; de ahí en adelante se anota cada compra y pago.
   **Pagar** (2/nov): en todas las tarjetas, «Pagar» abre Anotar como transferencia a la tarjeta, sin monto, con
   fichas **Total · Lo del corte · Mínimo · Otro monto** (descuentan lo pagado desde el corte; `pagoSugerido`
   sale solo si al corte se debía algo y no se pagó todo eso). Si se escribe «pago … tarjeta» como gasto, la hoja

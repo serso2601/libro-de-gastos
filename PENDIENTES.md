@@ -27,8 +27,10 @@ compilación de la app pasan; **nada se vio todavía en pantalla**.
 5. **Revisar a ojo**: el «Resumen de <mes>» en la pantalla de cada cuenta (flechas de mes, entró/salió, interés
    y cargos aprox., enlace a la banca), la ficha del banco y «Mi Yappy está en esta cuenta» en la hoja de la
    cuenta, y «Por revisar» arriba de Movimientos.
-6. **La Visa •••7489** (es del usuario, la maneja con dinero de la mamá): ya la creó (2/nov) y dice que no se ve
-   mal. Falta: comparar el **pago mínimo** con el de la banca y, si es otro, corregirlo con «Editar» junto al mínimo
+6. **La VISA ESTRELLA •••7505** (es del usuario, la maneja con dinero de la mamá): ya la creó (2/nov) con $2,286.43
+   (saldo actual, con 4 transacciones que el banco hizo efectivas después del corte del 18/oct). **Falta que la
+   edite** y llene el bloque nuevo «¿Cuánto era al corte del 18 oct?»: el saldo del estado de cuenta y los pagos que
+   hizo después del corte. Así el mínimo sale del saldo al corte y no de todo. Luego, comparar el **pago mínimo** con el de la banca y, si es otro, corregirlo con «Editar» junto al mínimo
    (ver qué compras pasan al corte siguiente); **pagar con las fichas** Total / Lo del corte / Mínimo / Otro monto
    cuando pague antes del 15/nov; ver «paga el 15» en la tarjeta del Inicio la semana del pago.
 6b. **Atajo de avisos de pago** (Ajustes → «Avisos de pago en el iPhone»): armarlo y ver que el 12, 14 y 15/nov
