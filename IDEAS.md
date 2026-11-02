@@ -11,5 +11,6 @@ Cosas que el usuario mencionó y no son urgentes. Cuando se haga una, se borra d
 - Presupuesto: un periodo distinto por categoría (hoy hay uno para todo) y un periodo
   «personalizado» (cada N días).
 - Favoritos o plantillas para anotar en un toque; subcategorías; metas y fondos de ahorro.
-- Gasto por voz y foto del recibo, a una bandeja «Por revisar».
-- Captura automática con Atajos de iPhone (necesita la cuenta de pago de Apple).
+- Gasto por voz y foto del recibo, a la bandeja «Por revisar» (ya existe, la llenan los correos).
+- Captura con Atajos de iPhone: no necesita la cuenta de pago; manda el texto a `POST /api/entrada`
+  (ver «Qué sigue» 5 en CLAUDE.md, con el resto de las fases de bancos).

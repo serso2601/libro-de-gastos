@@ -30,6 +30,7 @@ Documents\PROYECTO APP DE GASTOS\      ← el repo
 │       src\ui\              ← estilo (uno), tema (claro/oscuro/color), componentes, gráficos, marco
 │       public\index.html    ← la página de la web (pantalla completa en el iPad, ícono)
 ├── servidor\                ← FastAPI + SQLite (uv). Paquete `gastos`. `uv run pytest`
+│   └── gastos\bancos.json   ← catálogo de bancos (tasas y cargos, con versiones); correo.py lee los avisos
 ├── scripts\iniciar.ps1      ← arranca el servidor (8766) y Metro (8082) y compila la web si cambió;
 │                                lo corre el inicio de Windows
 ├── scripts\instalar-inicio.ps1 · abrir-firewall.ps1
@@ -41,7 +42,8 @@ sigue activo en el repo, apagarlo en Settings → Pages.
 
 Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
 - **`datos\`** — `gastos.db`, `token.txt`, `respaldos\` (una copia por día, se guardan 30) y
-  `registros\` (servidor, Metro, inicio).
+  `registros\` (servidor, Metro, inicio). También `correo.json` (Gmail y su contraseña de aplicación)
+  y `propuesta-bancos-panama.md` (la propuesta del 1/nov/2026 con las fases y sus fuentes).
 - **`app-iphone\`** — los .ipa compilados (`gastos-dev-N.ipa`), para arrastrar a Sideloadly.
 
 ## Cómo corre
@@ -192,6 +194,24 @@ Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
   (`ui/inclinacion.tsx`, `expo-sensors`). La hoja de Anotar se queda como la de iOS. Lo que espera a
   que baje la hoja usa `vivo.BAJA_LA_HOJA`. En la web no hay ola, ni deslizar, ni giroscopio (Reanimated
   web no los corre); lo demás sí.
+- **Bancos** (2/nov/2026): una cuenta puede vincularse a su banco (opcional; sigue sin haber tipos de
+  cuenta): tipo de cuenta, tarjeta, membresía mensual/anual y seguro, del catálogo
+  `servidor/gastos/bancos.json` (hoy solo Banco General, verificado el 1/nov en su tabla de «Tasas,
+  comisiones y recargos»). Los datos van en el servidor, no en la app: se actualizan sin recompilar.
+  Cada producto guarda `versiones` con `vigente_desde`, fuente y fecha de verificación; un mes se
+  calcula con la versión vigente. Con eso la pantalla de la cuenta muestra, **callado y sin avisos**
+  (el usuario lo pidió así), el interés estimado del mes (saldo de cada día, 0 los días bajo el
+  mínimo), los cargos del mes y el neto al cierre (`lib/banco.ts`). Se asume tramos no combinados y
+  base 365 hasta compararlo con un estado de cuenta real.
+- **Captura desde el correo** (2/nov/2026): el servidor lee los avisos del banco en Gmail por IMAP
+  (`datos\correo.json`, contraseña de aplicación) y `claude -p` con un modelo chico saca monto,
+  comercio, fecha y los 4 dígitos de la tarjeta, y elige una de las categorías que ya existen
+  (primero la que el usuario usó la última vez con ese comercio). **Entra solo** si la cuenta se
+  conoce por su `terminacion`; si no, o si algo no cuadra (el monto no aparece tal cual en el aviso),
+  queda en **«Por revisar»**, arriba de Movimientos, y al aceptarlo la cuenta aprende esos 4 dígitos.
+  Se descartan duplicados (misma cuenta, tipo y monto a ±2 días). `POST /api/entrada` mete un texto
+  por el mismo camino (para un Atajo de iPhone con el SMS del banco). Se descartó Gemini (`agy`):
+  daba más problemas que otra cosa.
 
 ## Estado (20/oct/2026)
 
@@ -218,9 +238,22 @@ Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
    movimiento → bandeja «Por revisar» (nada entra solo).
 3. **Foto del recibo** → monto, comercio y categoría → la misma bandeja.
 4. Resumen semanal/mensual con IA.
-5. **Captura automática** de gastos e ingresos (p. ej. Atajos de iPhone disparados por la
-   notificación del banco, o una extensión nativa). En veremos: necesita la cuenta de pago de
-   Apple (99 USD/año), que el usuario aún no tiene.
+5. **Bancos y captura, siguientes fases** (de `datos\propuesta-bancos-panama.md`; hechos: catálogo de
+   BG, cálculo del mes, lectura de correos y «Por revisar»):
+   - **Saldo real como ancla**: «el banco dice que tengo $X hoy»; la app ajusta desde esa fecha. Sin
+     esto el interés estimado se desvía si falta un movimiento.
+   - **Conciliar el interés**: comparar el estimado con el que acredita el banco (primer caso real: un
+     mes pagó $0.20; sirve para saber si los tramos son combinados).
+   - Sugerir la comisión al anotar un retiro en cajero de otro banco; cargos fijos como reglas.
+   - **Importar estados de cuenta** (CSV/PDF, PDF con `claude -p`) a «Por revisar», con el saldo final
+     como ancla.
+   - **Atajos de iPhone**: no necesitan la cuenta de pago de Apple. Un Atajo con «Obtener contenido de
+     URL» manda el texto a `POST /api/entrada` por Tailscale con el token (automatización «Mensaje» para
+     los SMS del banco, «Transacción» para Apple Pay). Falta armarlo y documentar los pasos.
+   - Más bancos: Banistmo, BAC, Caja de Ahorros, Banco Nacional, Global Bank, Multibank.
+   - Producto público (en veremos): reenvío de correos en vez de IMAP, servidor en la nube, Ley 81 de
+     2019. Nada de entrar a la banca en línea con la clave del usuario ni agregadores de pago.
+   La extensión nativa sí necesita la cuenta de pago de Apple (99 USD/año).
 
 ## Convenciones
 
