@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useAcciones } from '@/lib/acciones';
 import { useDatos } from '@/lib/datos';
-import { aCentavos, aFecha, aTexto, DIAS, nuevoId } from '@/lib/formato';
+import { aCentavos, aFecha, aTexto, DIAS, horaTexto, nuevoId } from '@/lib/formato';
 import { FRECUENCIAS, type Frecuencia, type Movimiento, type Pendiente, type Recurrencia, type TipoMovimiento } from '@/lib/tipos';
 import { avisar } from '@/ui/aviso';
 import { BotonPrincipal, Campo, Ficha, Hoja, MontoGrande, Segmentos, Texto, TextoError } from '@/ui/componentes';
@@ -40,7 +40,9 @@ export function DialogoMovimiento({ inicial, tipoInicial = 'gasto', fechaInicial
     ?? (categorias.some((x) => x.id === pendiente?.categoria_id && x.tipo === tipoPendiente) ? pendiente!.categoria_id! : primeraDe(inicial?.tipo ?? tipoPendiente)));
   const [nota, setNota] = useState(inicial?.nota ?? (pendiente ? pendiente.comercio || pendiente.asunto : notaInicial) ?? '');
   const [fecha, setFecha] = useState(inicial?.fecha ?? pendiente?.fecha ?? fechaInicial ?? hoy);
-  const [hora, setHora] = useState(inicial?.hora ?? pendiente?.hora ?? '');
+  // Lo nuevo sale con la hora en que se anota (se cambia o se quita con la ✕); lo editado conserva la suya
+  // y un aviso del banco trae la de la operación.
+  const [hora, setHora] = useState(() => inicial ? inicial.hora ?? '' : pendiente ? pendiente.hora ?? '' : horaTexto(new Date()));
   const [repetir, setRepetir] = useState<Repetir>('no');
   const [verRepetir, setVerRepetir] = useState(false);
   const [error, setError] = useState('');
