@@ -251,7 +251,7 @@ def test_ajustes_con_cada_periodo_valido(cliente):
             cuerpo["presupuesto_inicio"] = inicio
         r = cliente.put("/api/ajustes", json=cuerpo)
         esperado = {"periodo": periodo, "inicio": guardado}
-        assert r.status_code == 200 and r.json() == {"moneda": "$", "presupuesto": esperado}, (periodo, inicio)
+        assert r.status_code == 200 and r.json() == {"moneda": "$", "presupuesto": esperado, "cuenta_yappy": None}, (periodo, inicio)
         assert cliente.get("/api/datos").json()["presupuesto"] == esperado
         assert cliente.get("/api/exportar").json()["presupuesto"] == esperado
 
@@ -273,12 +273,13 @@ def test_ajustes_rechaza_un_inicio_que_no_corresponde(cliente):
 def test_cambiar_solo_la_moneda_no_borra_el_periodo(cliente):
     cliente.put("/api/ajustes", json={"presupuesto_periodo": "catorcenal", "presupuesto_inicio": "2026-10-05"})
     r = cliente.put("/api/ajustes", json={"moneda": "€"})
-    assert r.json() == {"moneda": "€", "presupuesto": {"periodo": "catorcenal", "inicio": "2026-10-05"}}
+    assert r.json() == {"moneda": "€", "presupuesto": {"periodo": "catorcenal", "inicio": "2026-10-05"},
+                         "cuenta_yappy": None}
     d = cliente.get("/api/datos").json()
     assert d["moneda"] == "€" and d["presupuesto"] == {"periodo": "catorcenal", "inicio": "2026-10-05"}
     # Y al revés: cambiar el periodo no toca la moneda.
     r = cliente.put("/api/ajustes", json={"presupuesto_periodo": "mensual", "presupuesto_inicio": "15"})
-    assert r.json() == {"moneda": "€", "presupuesto": {"periodo": "mensual", "inicio": "15"}}
+    assert r.json() == {"moneda": "€", "presupuesto": {"periodo": "mensual", "inicio": "15"}, "cuenta_yappy": None}
 
 
 def test_categoria_que_pasa_lo_que_sobra(cliente):

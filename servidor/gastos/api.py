@@ -21,14 +21,14 @@ import secrets
 import sqlite3
 import threading
 from collections.abc import Iterator
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from typing import Literal
 
 from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from . import correo, db, importar, pagina, recurrencias
 from .config import Config
@@ -156,8 +156,27 @@ class PendienteIn(BaseModel):
 
 
 class EntradaIn(BaseModel):
-    texto: str = Field(min_length=1, max_length=20000)
-    origen: Literal["atajo", "correo"] = "atajo"
+    """Un aviso: o su `texto` (lo lee Claude), o los campos sueltos de Apple Pay (`monto` y `comercio`)."""
+
+    texto: str | None = Field(default=None, min_length=1, max_length=20000)
+    origen: Literal["atajo", "correo", "wallet"] = "atajo"
+    monto: str | None = Field(default=None, max_length=30)  # «$12.50», tal como lo da el Atajo (un número también vale)
+    comercio: str | None = Field(default=None, min_length=1, max_length=200)
+    terminacion: str | None = Field(default=None, max_length=30)  # los 4 dígitos de la tarjeta (se toman los últimos 4)
+
+    @field_validator("monto", mode="before")
+    @classmethod
+    def _monto_como_texto(cls, v):
+        return str(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else v
+
+    @model_validator(mode="after")
+    def _algo_que_leer(self):
+        sueltos = self.monto is not None and self.comercio is not None
+        if self.texto is None and not sueltos:
+            raise ValueError("Falta el texto del aviso, o el monto y el comercio")
+        if sueltos and (correo.a_centavos(self.monto) or 0) <= 0:
+            raise ValueError("El monto no es un número válido")
+        return self
 
 
 class OrdenIn(BaseModel):
@@ -170,6 +189,7 @@ class AjustesIn(BaseModel):
     moneda: str | None = Field(default=None, min_length=1, max_length=4)
     presupuesto_periodo: Literal["semanal", "catorcenal", "quincenal", "mensual"] | None = None
     presupuesto_inicio: str | None = Field(default=None, max_length=10)
+    cuenta_yappy: str | None = Field(default=None, max_length=100)  # id de la cuenta; "" la quita
 
 
 def _existe(con: sqlite3.Connection, tabla: str, id_: str | None) -> bool:
@@ -263,12 +283,108 @@ def leer_todo(con: sqlite3.Connection, hoy: date) -> dict:
         "proximos": recurrencias.proximas(con, hoy),
         "catalogo": CATALOGO,
         "pendientes": _pendientes(con),
+        "cuenta_yappy": correo.cuenta_yappy(con),
     }
 
 
-def create_app(config: Config | None = None, hoy=date.today, web: Path = WEB, extractor=None) -> FastAPI:
+def _guardar_regla(con: sqlite3.Connection, id_: str, rec: RecurrenciaIn) -> None:
+    """Crea o cambia una regla que se repite. Lo ya creado no se toca: el cambio vale para lo que viene."""
+    _validar(con, rec)
+    if rec.fecha_fin and rec.fecha_fin < rec.fecha_inicio:
+        raise HTTPException(422, "La fecha de fin es anterior a la de inicio")
+    actual = con.execute("SELECT fecha_inicio FROM recurrencia WHERE id = ?", (id_,)).fetchone()
+    if actual and actual["fecha_inicio"] != rec.fecha_inicio.isoformat():
+        raise HTTPException(422, "La fecha de inicio no se cambia: termina esta recurrencia y crea otra")
+    marca = db.ahora()
+    with con:
+        con.execute(
+            """INSERT INTO recurrencia (id, tipo, monto, cuenta_id, cuenta_destino_id, categoria_id, nota, frecuencia,
+                 fecha_inicio, fecha_fin, creado, actualizado)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT (id) DO UPDATE SET tipo = excluded.tipo, monto = excluded.monto,
+                 cuenta_id = excluded.cuenta_id, cuenta_destino_id = excluded.cuenta_destino_id,
+                 categoria_id = excluded.categoria_id, nota = excluded.nota, frecuencia = excluded.frecuencia,
+                 fecha_fin = excluded.fecha_fin, actualizado = excluded.actualizado""",
+            (id_, rec.tipo, rec.monto, rec.cuenta_id, rec.cuenta_destino_id, rec.categoria_id, rec.nota.strip(),
+             rec.frecuencia, rec.fecha_inicio.isoformat(), rec.fecha_fin.isoformat() if rec.fecha_fin else None,
+             marca, marca),
+        )
+
+
+CATEGORIA_CARGOS = "cargos-banco"
+DIA_DE_CARGOS = 3  # el banco cobra la membresía y el seguro el día 3
+
+
+def _version_vigente(producto: dict, hoy: date) -> dict:
+    """La última versión del catálogo ya vigente hoy (antes de la primera, la primera)."""
+    versiones = sorted(producto["versiones"], key=lambda v: v["vigente_desde"])
+    return next((v for v in reversed(versiones) if v["vigente_desde"] <= hoy.isoformat()), versiones[0])
+
+
+def _cargos_deseados(vinculo: VinculoBanco | None, hoy: date) -> dict[str, tuple[int, str]]:
+    """Los cargos fijos mensuales de la cuenta según el catálogo: {«membresia»/«seguro»: (centavos, nota)}."""
+    if vinculo is None or vinculo.tarjeta is None:
+        return {}
+    banco = next(b for b in CATALOGO["bancos"] if b["id"] == vinculo.banco)
+    tarjeta = next(t for t in banco["tarjetas"] if t["id"] == vinculo.tarjeta)
+    if tarjeta.get("clase") != "debito":
+        return {}
+    version = _version_vigente(tarjeta, hoy)
+    deseados = {}
+    mensual = (version.get("membresia") or {}).get("mensual")
+    if vinculo.membresia == "mensual" and mensual:
+        deseados["membresia"] = (mensual, f"Membresía {tarjeta['nombre']}")
+    seguro = next((x for x in version.get("seguros", []) if x["id"] == vinculo.seguro), None)
+    if seguro:
+        deseados["seguro"] = (seguro["mensual"], seguro["nombre"])
+    return deseados
+
+
+def _proximo_dia_de_cargos(hoy: date) -> date:
+    """El próximo día 3 (nunca hoy ni antes): lo que ya pasó no se anota."""
+    if hoy.day < DIA_DE_CARGOS:
+        return hoy.replace(day=DIA_DE_CARGOS)
+    return recurrencias.sumar_meses(hoy.replace(day=DIA_DE_CARGOS), 1)
+
+
+def _sincronizar_cargos(con: sqlite3.Connection, cuenta_id: str, vinculo: VinculoBanco | None, hoy: date) -> None:
+    """Deja las reglas `banco-<cuenta>-membresia` y `-seguro` como pide el vínculo con el banco.
+
+    Las que hacen falta se crean o se ponen al día (monto y nota de hoy, sin fecha de fin); las que ya
+    no corresponden (se quitó la tarjeta, el seguro o el vínculo, o la membresía pasó a anual) terminan hoy.
+    """
+    deseados = _cargos_deseados(vinculo, hoy)
+    for clave in ("membresia", "seguro"):
+        id_ = f"banco-{cuenta_id}-{clave}"
+        existente = con.execute("SELECT * FROM recurrencia WHERE id = ?", (id_,)).fetchone()
+        if clave not in deseados:
+            if existente and (existente["fecha_fin"] is None or existente["fecha_fin"] > hoy.isoformat()):
+                with con:
+                    con.execute("UPDATE recurrencia SET fecha_fin = ?, actualizado = ? WHERE id = ?",
+                                (hoy.isoformat(), db.ahora(), id_))
+            continue
+        if not con.execute("SELECT 1 FROM categoria WHERE id = ?", (CATEGORIA_CARGOS,)).fetchone():
+            marca = db.ahora()
+            with con:
+                orden = con.execute("SELECT COALESCE(MAX(orden) + 1, 0) FROM categoria WHERE tipo = 'gasto'").fetchone()[0]
+                con.execute("INSERT INTO categoria (id, nombre, tipo, color, emoji, presupuesto, orden, creado, actualizado) "
+                            "VALUES (?, 'Cargos del banco', 'gasto', ?, 'i:banco', NULL, ?, ?, ?)",
+                            (CATEGORIA_CARGOS, db.PALETA[9], orden, marca, marca))
+        monto, nota = deseados[clave]
+        reactivada = existente is not None and existente["fecha_fin"] is not None
+        inicio = date.fromisoformat(existente["fecha_inicio"]) if existente else _proximo_dia_de_cargos(hoy)
+        _guardar_regla(con, id_, RecurrenciaIn(tipo="gasto", monto=monto, cuenta_id=cuenta_id, categoria_id=CATEGORIA_CARGOS,
+                                               nota=nota, frecuencia="mensual", fecha_inicio=inicio))
+        if reactivada:  # lo que pasó mientras estuvo terminada no se anota
+            with con:
+                con.execute("UPDATE recurrencia SET generada_hasta = ? WHERE id = ?", (hoy.isoformat(), id_))
+    recurrencias.materializar(con, hoy)
+
+
+def create_app(config: Config | None = None, hoy=date.today, web: Path = WEB, extractor=None, elector=None) -> FastAPI:
     """`hoy` es una función para que las pruebas puedan mover el reloj; `web`, dónde está la app web;
-    `extractor`, la función que lee un aviso del banco (por defecto Claude; las pruebas ponen una falsa)."""
+    `extractor`, la función que lee un aviso del banco (por defecto Claude; las pruebas ponen una falsa);
+    `elector`, la que elige la categoría de un Yappy o un Apple Pay (igual: Claude, o una falsa)."""
     config = config or Config.desde_entorno()
     inicial = db.conectar(config.ruta_db)
     try:
@@ -311,8 +427,10 @@ def create_app(config: Config | None = None, hoy=date.today, web: Path = WEB, ex
         host = request.client.host if request.client else ""
         local = host in ("127.0.0.1", "::1") or host.startswith("::ffff:127.")
         qr = pagina.bloque_qr(config.token, request.url.port or 8766) if local else ""
+        ultimos = {f["origen"]: f["creado"] for f in con.execute(
+            "SELECT origen, MAX(creado) AS creado FROM pendiente WHERE origen IN ('yappy', 'wallet') GROUP BY origen")}
         return pagina.estado(config, conteos, db.ultimo_respaldo(config.respaldos), qr,
-                              correo.estado_actual(config.carpeta))
+                              {**correo.estado_actual(config.carpeta), "ultimos": ultimos})
 
     @app.get("/app", include_in_schema=False)
     def app_web_sin_barra():
@@ -366,6 +484,7 @@ def create_app(config: Config | None = None, hoy=date.today, web: Path = WEB, ex
                  int(c.es_credito), c.dia_corte, c.dia_pago, c.pago_minimo,
                  json.dumps(c.banco.model_dump(), ensure_ascii=False) if c.banco else None, c.terminacion),
             )
+        _sincronizar_cargos(con, id_, c.banco, hoy())
         return _cuenta(con.execute("SELECT * FROM cuenta WHERE id = ?", (id_,)).fetchone())
 
     @r.delete("/cuentas/{id_}")
@@ -468,26 +587,7 @@ def create_app(config: Config | None = None, hoy=date.today, web: Path = WEB, ex
     @r.put("/recurrencias/{id_}")
     def guardar_recurrencia(id_: str, rec: RecurrenciaIn, con: sqlite3.Connection = Depends(conexion)):
         """Crear o cambiar la regla. Lo ya creado no se toca: el cambio vale para lo que viene."""
-        _validar(con, rec)
-        if rec.fecha_fin and rec.fecha_fin < rec.fecha_inicio:
-            raise HTTPException(422, "La fecha de fin es anterior a la de inicio")
-        actual = con.execute("SELECT fecha_inicio FROM recurrencia WHERE id = ?", (id_,)).fetchone()
-        if actual and actual["fecha_inicio"] != rec.fecha_inicio.isoformat():
-            raise HTTPException(422, "La fecha de inicio no se cambia: termina esta recurrencia y crea otra")
-        marca = db.ahora()
-        with con:
-            con.execute(
-                """INSERT INTO recurrencia (id, tipo, monto, cuenta_id, cuenta_destino_id, categoria_id, nota, frecuencia,
-                     fecha_inicio, fecha_fin, creado, actualizado)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                   ON CONFLICT (id) DO UPDATE SET tipo = excluded.tipo, monto = excluded.monto,
-                     cuenta_id = excluded.cuenta_id, cuenta_destino_id = excluded.cuenta_destino_id,
-                     categoria_id = excluded.categoria_id, nota = excluded.nota, frecuencia = excluded.frecuencia,
-                     fecha_fin = excluded.fecha_fin, actualizado = excluded.actualizado""",
-                (id_, rec.tipo, rec.monto, rec.cuenta_id, rec.cuenta_destino_id, rec.categoria_id, rec.nota.strip(),
-                 rec.frecuencia, rec.fecha_inicio.isoformat(), rec.fecha_fin.isoformat() if rec.fecha_fin else None,
-                 marca, marca),
-            )
+        _guardar_regla(con, id_, rec)
         creados = recurrencias.materializar(con, hoy())
         return {"recurrencia": dict(con.execute("SELECT * FROM recurrencia WHERE id = ?", (id_,)).fetchone()), "creados": creados}
 
@@ -505,10 +605,16 @@ def create_app(config: Config | None = None, hoy=date.today, web: Path = WEB, ex
         ajustes = correo.leer_config(config.carpeta)
         return correo.extraer_con_claude(aviso, categorias, cuentas, ajustes["modelo"] if ajustes else correo.MODELO)
 
+    def elegir(datos: dict, categorias: list[dict]) -> str:
+        if elector is not None:
+            return elector(datos, categorias)
+        ajustes = correo.leer_config(config.carpeta)
+        return correo.elegir_categoria(datos, categorias, ajustes["modelo"] if ajustes else correo.MODELO)
+
     def leer_en_hilo(id_: str, entrada: dict) -> None:
         con = db.conectar(config.ruta_db)
         try:
-            correo.resolver(con, id_, entrada, extraer, hoy())
+            correo.resolver(con, id_, entrada, extraer, hoy(), elegir)
         except Exception as e:  # que la fila no se quede «leyendo» para siempre
             correo.recuperar_interrumpidos(con)
             print(f"Entrada: falló ({e.__class__.__name__})", flush=True)
@@ -517,8 +623,13 @@ def create_app(config: Config | None = None, hoy=date.today, web: Path = WEB, ex
 
     @r.post("/entrada")
     def entrada(e: EntradaIn, con: sqlite3.Connection = Depends(conexion)):
-        """Un texto del banco (p. ej. un SMS que manda un Atajo del iPhone): responde ya y lo lee aparte."""
-        aviso = {"texto": e.texto, "origen": e.origen, "fecha": hoy().isoformat()}
+        """Un aviso del banco: un texto (p. ej. un SMS que manda un Atajo del iPhone) o los campos sueltos de
+        Apple Pay (`monto`, `comercio`, `terminacion`). Responde ya y lo lee aparte."""
+        aviso = {"texto": e.texto or "", "origen": e.origen, "fecha": hoy().isoformat()}
+        if e.monto is not None and e.comercio is not None:  # Apple Pay: no hay nada que extraer del texto
+            aviso.update(origen="wallet", remitente="Apple Pay", monto=e.monto, comercio=e.comercio.strip(),
+                         terminacion=e.terminacion, hora=datetime.now().strftime("%H:%M"))
+            aviso["texto"] = aviso["texto"] or f"{aviso['comercio']} · {aviso['monto']}"
         id_ = correo.registrar(con, aviso)
         threading.Thread(target=leer_en_hilo, args=(id_, aviso), daemon=True, name="entrada").start()
         return {"ok": True, "id": id_}
@@ -527,7 +638,8 @@ def create_app(config: Config | None = None, hoy=date.today, web: Path = WEB, ex
     def resolver_pendiente(id_: str, p: PendienteIn, con: sqlite3.Connection = Depends(conexion)):
         """Aceptar (la app ya creó el movimiento) o descartar un aviso. Idempotente.
 
-        Al aceptar, el movimiento queda como `correo`; si el aviso traía los 4 dígitos de una tarjeta y
+        Al aceptar, el movimiento queda con el origen del aviso (`correo`, `yappy` o `wallet`); en un Yappy,
+        si aún no se sabía de qué cuenta sale, esa es la cuenta del movimiento y se anotan solos los otros Yappy; si el aviso traía los 4 dígitos de una tarjeta y
         la cuenta del movimiento no tiene los suyos, los aprende, y entonces anota solos los demás
         avisos que esperaban por esa tarjeta."""
         fila = con.execute("SELECT * FROM pendiente WHERE id = ?", (id_,)).fetchone()
@@ -540,7 +652,11 @@ def create_app(config: Config | None = None, hoy=date.today, web: Path = WEB, ex
                 if mov is None:
                     raise HTTPException(422, "El movimiento no existe")
                 cuenta_id = mov["cuenta_id"]
-                con.execute("UPDATE movimiento SET origen = 'correo' WHERE id = ?", (p.movimiento_id,))
+                con.execute("UPDATE movimiento SET origen = ? WHERE id = ?",
+                            (fila["origen"] if fila["origen"] in ("yappy", "wallet") else "correo", p.movimiento_id))
+                if fila["origen"] == "yappy" and correo.cuenta_yappy(con) is None:  # la primera vez enseña de qué cuenta sale
+                    con.execute("INSERT INTO ajuste VALUES ('cuenta_yappy', ?) ON CONFLICT (clave) DO UPDATE SET valor = excluded.valor",
+                                (cuenta_id,))
                 if fila["terminacion"]:
                     # Solo si ninguna otra cuenta ya la tiene: dos cuentas con la misma terminación confundirían.
                     con.execute("""UPDATE cuenta SET terminacion = ?, actualizado = ?
@@ -551,6 +667,8 @@ def create_app(config: Config | None = None, hoy=date.today, web: Path = WEB, ex
                         (p.estado, p.movimiento_id if p.estado == "aceptado" else None, cuenta_id, db.ahora(), id_))
         if p.estado == "aceptado" and fila["terminacion"]:
             correo.reintentar_por_terminacion(con, fila["terminacion"])
+        if p.estado == "aceptado" and fila["origen"] == "yappy":
+            correo.reintentar_yappy(con)
         return {"ok": True, "estado": p.estado}
 
     @r.post("/correo/revisar")
@@ -572,11 +690,20 @@ def create_app(config: Config | None = None, hoy=date.today, web: Path = WEB, ex
         if a.presupuesto_periodo is not None:
             guardar["presupuesto_periodo"] = a.presupuesto_periodo
             guardar["presupuesto_inicio"] = _inicio_valido(a.presupuesto_periodo, a.presupuesto_inicio)
+        if a.cuenta_yappy:
+            if not _existe(con, "cuenta", a.cuenta_yappy):
+                raise HTTPException(422, "La cuenta de Yappy no existe")
+            guardar["cuenta_yappy"] = a.cuenta_yappy
         with con:
             con.executemany("INSERT INTO ajuste VALUES (?, ?) ON CONFLICT (clave) DO UPDATE SET valor = excluded.valor",
                             list(guardar.items()))
+            if a.cuenta_yappy == "":
+                con.execute("DELETE FROM ajuste WHERE clave = 'cuenta_yappy'")
+        if a.cuenta_yappy:
+            correo.reintentar_yappy(con)
         moneda = con.execute("SELECT valor FROM ajuste WHERE clave = 'moneda'").fetchone()
-        return {"moneda": moneda["valor"] if moneda else "$", "presupuesto": _presupuesto(con)}
+        return {"moneda": moneda["valor"] if moneda else "$", "presupuesto": _presupuesto(con),
+                "cuenta_yappy": correo.cuenta_yappy(con)}
 
     @r.post("/importar")
     async def importar_vieja(request: Request, simular: bool = False, con: sqlite3.Connection = Depends(conexion)):
@@ -597,7 +724,7 @@ def create_app(config: Config | None = None, hoy=date.today, web: Path = WEB, ex
     @r.get("/exportar")
     def exportar(con: sqlite3.Connection = Depends(conexion)):
         todo = leer_todo(con, hoy())
-        for clave in ("proximos", "catalogo", "pendientes"):
+        for clave in ("proximos", "catalogo", "pendientes", "cuenta_yappy"):
             todo.pop(clave)
         return {"app": "libro-de-gastos", "version": db.VERSION, "exportado": db.ahora(), **todo}
 

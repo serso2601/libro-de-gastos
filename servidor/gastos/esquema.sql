@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS movimiento (
     categoria_id        TEXT REFERENCES categoria(id),
     nota                TEXT NOT NULL DEFAULT '',
     recurrencia_id      TEXT REFERENCES recurrencia(id) ON DELETE SET NULL,
-    origen              TEXT NOT NULL DEFAULT 'manual',  -- manual · recurrencia · importado · correo
+    origen              TEXT NOT NULL DEFAULT 'manual',  -- manual · recurrencia · importado · correo · yappy · wallet
     creado              TEXT NOT NULL,
     actualizado         TEXT NOT NULL,
     CHECK ((tipo = 'transferencia') = (cuenta_destino_id IS NOT NULL)),
@@ -93,7 +93,7 @@ CREATE TABLE IF NOT EXISTS ajuste (
 -- (`clave` = Message-ID). `nuevo` = espera que el usuario lo revise en la app; `agregado` = entró solo.
 CREATE TABLE IF NOT EXISTS pendiente (
     id            TEXT PRIMARY KEY,
-    origen        TEXT NOT NULL,                 -- correo · atajo
+    origen        TEXT NOT NULL,                 -- correo · yappy · wallet · atajo
     clave         TEXT UNIQUE,                   -- Message-ID del correo: no se lee dos veces
     recibido      TEXT NOT NULL,                 -- marca de tiempo ISO
     remitente     TEXT NOT NULL DEFAULT '',

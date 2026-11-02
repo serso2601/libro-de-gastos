@@ -119,11 +119,11 @@ def test_duplicado_de_un_movimiento_ya_anotado(con, falso):
     assert con.execute("SELECT COUNT(*) FROM movimiento").fetchone()[0] == 1
 
 
-def test_el_mismo_monto_tres_dias_antes_no_es_duplicado(con, falso):
+def test_el_mismo_monto_cinco_dias_antes_no_es_duplicado(con, falso):
     poner_terminacion(con)
     marca = db.ahora()
     with con:
-        con.execute("""INSERT INTO movimiento VALUES ('viejo', 'gasto', 2375, '2026-10-28', NULL, 'efectivo', NULL, 'comida',
+        con.execute("""INSERT INTO movimiento VALUES ('viejo', 'gasto', 2375, '2026-10-26', NULL, 'efectivo', NULL, 'comida',
                        '', NULL, 'manual', ?, ?)""", (marca, marca))
     assert correo.procesar(con, aviso(), falso, HOY) == "agregado"
 
@@ -360,7 +360,7 @@ def test_estado_del_correo_configurado(api, config):
 
 def test_la_pagina_de_estado_explica_como_activar_el_correo(anonimo):
     html = anonimo.get("/").text
-    assert "Correo del banco" in html and "gastos.correo --autorizar" in html and "gmail-cliente.json" in html
+    assert "Avisos (Yappy y Apple Pay)" in html and "gastos.correo --autorizar" in html and "gmail-cliente.json" in html
     assert "apppasswords" not in html
 
 

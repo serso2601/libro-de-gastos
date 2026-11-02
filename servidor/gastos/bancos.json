@@ -8,6 +8,11 @@
     {
       "id": "bg",
       "nombre": "Banco General",
+      "banca": {
+        "nombre": "Banca en Línea de Banco General",
+        "url": "https://www.bgeneral.com",
+        "pasos": "Cuentas → tu cuenta → Estado de cuenta → Descargar"
+      },
       "cuentas": [
         {
           "id": "bg-ahorros-regular",

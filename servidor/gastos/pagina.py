@@ -8,7 +8,7 @@ el token, a cualquier otro equipo (aunque sea de la tailnet) no se le muestran.
 """
 
 import subprocess
-from datetime import date
+from datetime import date, datetime
 from html import escape
 from pathlib import Path
 from urllib.parse import urlencode
@@ -100,11 +100,35 @@ su código desde esta PC (tarda unos segundos la primera vez).</p>
 <p>O a mano: dirección <b>{escape(ip_tailscale() or '')}:{puerto}</b> y el token de <b>datos\\token.txt</b>.</p></div>"""
 
 
+def hace(marca: str | None, ahora: datetime | None = None) -> str:
+    """«hace 5 min», «hace 3 h», «hace 2 días» o, pasada una semana, la fecha; «todavía nada» si no hay."""
+    if not marca:
+        return "todavía nada"
+    try:
+        t = datetime.fromisoformat(marca)
+    except ValueError:
+        return "todavía nada"
+    seg = int(((ahora or datetime.now()) - t).total_seconds())
+    if seg < 60:
+        return "hace un momento"
+    if seg < 3600:
+        return f"hace {seg // 60} min"
+    if seg < 86400:
+        return f"hace {seg // 3600} h"
+    if seg < 7 * 86400:
+        return f"hace {seg // 86400} días"
+    return t.date().isoformat()
+
+
 def bloque_correo(info: dict) -> str:
-    """La tarjeta «Correo del banco»: si está listo, cuándo revisó y si hubo error; si no, cómo activarlo."""
+    """La tarjeta «Avisos (Yappy y Apple Pay)»: lo último que entró por cada vía (sin montos ni nombres) y,
+    si Gmail está listo, cuándo revisó y si hubo error; si no, cómo activar Gmail."""
+    ultimos = info.get("ultimos") or {}
+    vias = (f"<p>Último Yappy: <b>{escape(hace(ultimos.get('yappy')))}</b> · "
+            f"último Apple Pay: <b>{escape(hace(ultimos.get('wallet')))}</b></p>")
     if not info["configurado"]:
-        return """<div class="tarjeta"><h1>Correo del banco <span class="mal">● sin configurar</span></h1>
-<p>Para que los avisos del banco entren solos como movimientos:</p>
+        return f"""<div class="tarjeta"><h1>Avisos (Yappy y Apple Pay) <span class="mal">● Gmail sin configurar</span></h1>
+{vias}<p>Apple Pay entra por el Atajo del iPhone. Para que los Yappy entren solos desde el correo:</p>
 <p>1. En <b>Google Cloud</b> activa la <b>API de Gmail</b> y crea un <b>ID de cliente de OAuth</b> de tipo
 <b>App de escritorio</b>; guarda el JSON que descargas en <b>datos\\</b> como <b>gmail-cliente.json</b>.<br>
 2. En la carpeta <b>servidor\\</b> corre <b>uv run python -m gastos.correo --autorizar</b> y acepta en el navegador
@@ -112,8 +136,8 @@ def bloque_correo(info: dict) -> str:
 3. Reinicia el servidor.</p></div>"""
     revision = escape(info["ultima_revision"] or "todavía no")
     error = f'<p class="mal">Error: {escape(info["error"])}</p>' if info["error"] else ""
-    return f"""<div class="tarjeta"><h1>Correo del banco <span class="ok">● activo</span></h1>
-<p>Última revisión: <b>{revision}</b> · avisos leídos desde que arrancó: <b>{info["leidos"]}</b></p>{error}</div>"""
+    return f"""<div class="tarjeta"><h1>Avisos (Yappy y Apple Pay) <span class="ok">● Gmail activo</span></h1>
+{vias}<p>Última revisión de Gmail: <b>{revision}</b> · avisos leídos desde que arrancó: <b>{info["leidos"]}</b></p>{error}</div>"""
 
 
 def estado(config, conteos: dict, ultimo_respaldo: str | None, qr: str = "", correo: dict | None = None) -> str:

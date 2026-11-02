@@ -15,10 +15,15 @@ Archivos en `datos/` (git los ignora; sin ellos no se revisa el correo):
   que se descarga de Google Cloud.
 - `gmail-permiso.json`: lo crea `--autorizar` (el permiso de lectura). Nunca se imprime.
 - `correo.json` (opcional, solo ajustes):
-    {"buscar": "from:(bgeneral.com) newer_than:3d", "cada_minutos": 5, "modelo": "haiku"}
+    {"buscar": "from:notificaciones@yappy.com.pa newer_than:3d", "cada_minutos": 5, "modelo": "haiku"}
 
 Autorizar (una sola vez): `uv run python -m gastos.correo --autorizar`.
 Para probar la extracción sin guardar nada: `uv run python -m gastos.correo --probar aviso.txt`.
+Para ver qué haría con los avisos de Gmail sin guardar nada: `uv run python -m gastos.correo --simular`.
+
+Yappy no se lee con Claude: su aviso tiene formato fijo (`leer_yappy`). Claude solo elige la categoría
+cuando no hay una guardada para esa persona o comercio. Apple Pay llega por `POST /api/entrada` con los
+campos sueltos que manda un Atajo del iPhone, y sigue el mismo camino.
 """
 
 import argparse
@@ -50,13 +55,14 @@ from pathlib import Path
 
 from . import db
 
-BUSCAR = "from:(bgeneral.com) newer_than:3d"
+BUSCAR = "from:notificaciones@yappy.com.pa newer_than:3d"
 CADA_MINUTOS = 5
 MODELO = "haiku"
 MAX_TEXTO_GUARDADO = 1500  # lo que se guarda del aviso en la bandeja
 MAX_TEXTO_CLAUDE = 4000  # lo que se le manda a Claude
 TIMEOUT_CLAUDE = 120  # segundos
-DIAS_DUPLICADO = 2
+DIAS_DUPLICADO = {"yappy": 1, "wallet": 1, "correo": 4}  # ventana (±días) para tomar algo por ya anotado a mano
+YAPPY_SIN_CUENTA = "¿De qué cuenta sale tu Yappy?"
 LEYENDO = "Leyendo el aviso…"
 
 # Lo que Claude debe devolver (la salida estructurada de `claude -p --json-schema`).
@@ -82,6 +88,7 @@ SISTEMA = (
 )
 
 Extractor = Callable[[dict, list[dict], list[dict]], dict]
+Elector = Callable[[dict, list[dict]], str]  # (datos del movimiento, categorías posibles) → id de categoría
 
 # Estado para `GET /api/correo` y la página de estado.
 estado = {"configurado": False, "ultima_revision": None, "error": None, "leidos": 0}
@@ -364,8 +371,8 @@ def ejecutable_claude() -> str:
     return str(local) if local.exists() else "claude"
 
 
-def extraer_con_claude(aviso: dict, categorias: list[dict], cuentas: list[dict], modelo: str = MODELO) -> dict:
-    """Corre `claude -p` sobre el aviso y devuelve los campos extraídos.
+def _llamar_claude(prompt: str, esquema: dict, sistema: str, modelo: str) -> dict:
+    """Corre `claude -p` con salida estructurada y devuelve el objeto.
 
     Sin herramientas, sin sesión guardada, sin los ajustes ni el CLAUDE.md del proyecto (el subproceso
     corre en una carpeta vacía fuera de él): solo lee y responde. El prompt va por stdin.
@@ -373,11 +380,11 @@ def extraer_con_claude(aviso: dict, categorias: list[dict], cuentas: list[dict],
     carpeta = Path(tempfile.gettempdir()) / "libro-gastos-ia"
     carpeta.mkdir(exist_ok=True)
     cmd = [ejecutable_claude(), "-p", "--model", modelo, "--output-format", "json",
-           "--json-schema", json.dumps(ESQUEMA_SALIDA), "--system-prompt", SISTEMA,
+           "--json-schema", json.dumps(esquema), "--system-prompt", sistema,
            "--tools", "", "--no-session-persistence", "--disable-slash-commands",
            "--strict-mcp-config", "--setting-sources", "user"]
     try:
-        r = subprocess.run(cmd, input=_prompt(aviso, categorias, cuentas), capture_output=True, text=True,
+        r = subprocess.run(cmd, input=prompt, capture_output=True, text=True,
                            encoding="utf-8", timeout=TIMEOUT_CLAUDE, cwd=carpeta,
                            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     except subprocess.TimeoutExpired:
@@ -398,9 +405,110 @@ def extraer_con_claude(aviso: dict, categorias: list[dict], cuentas: list[dict],
             datos = json.loads(salida.get("result") or "")
         except ValueError:
             raise ErrorDeCorreo("claude no devolvió los campos pedidos")
-    if not isinstance(datos, dict) or "es_movimiento" not in datos:
+    if not isinstance(datos, dict):
         raise ErrorDeCorreo("claude no devolvió los campos pedidos")
     return datos
+
+
+def extraer_con_claude(aviso: dict, categorias: list[dict], cuentas: list[dict], modelo: str = MODELO) -> dict:
+    """Corre `claude -p` sobre el aviso y devuelve los campos extraídos."""
+    datos = _llamar_claude(_prompt(aviso, categorias, cuentas), ESQUEMA_SALIDA, SISTEMA, modelo)
+    if "es_movimiento" not in datos:
+        raise ErrorDeCorreo("claude no devolvió los campos pedidos")
+    return datos
+
+
+ESQUEMA_CATEGORIA = {"type": "object", "properties": {"categoria_id": {"type": "string"}}, "required": ["categoria_id"]}
+SISTEMA_CATEGORIA = "Eres un clasificador de gastos personales. Eliges una categoría de la lista dada y no inventas otra."
+
+
+def elegir_categoria(datos: dict, categorias: list[dict], modelo: str = MODELO) -> str:
+    """Una llamada corta a Claude solo para elegir la categoría de un movimiento (Yappy o Apple Pay)."""
+    cats = "\n".join(f"- {c['id']} · {c['nombre']}" for c in categorias)
+    prompt = f"""Elige la categoría de este movimiento de dinero ({datos.get('tipo')}).
+Persona o comercio: {datos.get('comercio', '')}
+Mensaje: {datos.get('mensaje') or '(sin mensaje)'}
+
+Categorías (id · nombre):
+{cats}
+
+Responde con el id de UNA de ellas."""
+    return str(_llamar_claude(prompt, ESQUEMA_CATEGORIA, SISTEMA_CATEGORIA, modelo).get("categoria_id") or "")
+
+
+# --- Yappy: avisos de formato fijo ---------------------------------------------------------------
+MESES = {"ene": 1, "feb": 2, "mar": 3, "abr": 4, "may": 5, "jun": 6, "jul": 7, "ago": 8, "sep": 9, "set": 9,
+         "oct": 10, "nov": 11, "dic": 12}
+_FECHA_YAPPY = re.compile(r"(\d{1,2})\s+([a-záéíóú]{3,})\.?\s+(\d{4})\s+(\d{1,2}):(\d{2})\s*([ap])\.?\s*m\.?", re.I)
+_FIN_CONTRAPARTE = re.compile(r"\*+.*|\+?[\d\s-]{6,}")  # «****-1234» o un teléfono
+
+
+def es_de_yappy(remitente: str) -> bool:
+    return "yappy.com.pa" in (remitente or "").casefold()
+
+
+def leer_yappy(asunto: str, texto: str) -> dict | None:
+    """Un aviso de Yappy (formato fijo, sin Claude) → tipo, monto, contraparte, mensaje, fecha, hora, código.
+
+    None si algo no cuadra: entonces el aviso sigue el camino de siempre (Claude).
+    """
+    lineas = [l.strip() for l in (texto or "").splitlines() if l.strip()]
+    bajas = [l.casefold() for l in lineas]
+    pistas = f"{asunto} {lineas[0] if lineas else ''}".casefold()
+    if "te enviaron" in pistas:
+        tipo = "ingreso"
+    elif "enviaste" in pistas or "pagaste" in pistas:
+        tipo = "gasto"
+    else:
+        return None
+    monto = next((a_centavos(m.group(1)) for m in re.finditer(r"\$\s*([\d.,]*\d)", texto or "")), None)
+    if not monto:
+        return None
+    # Dónde empieza la contraparte: «Enviado por/a» (en una o dos líneas) o «Pagado a».
+    inicio = None
+    for i, l in enumerate(bajas):
+        if l in ("enviado por", "enviado a", "pagado a"):
+            inicio = i + 1
+        elif l == "enviado" and i + 1 < len(bajas) and bajas[i + 1] in ("por", "a"):
+            inicio = i + 2
+        if inicio:
+            break
+    if inicio is None:
+        return None
+    partes = []
+    for l in lineas[inicio:]:
+        if l.casefold() == "fecha" or _FIN_CONTRAPARTE.fullmatch(l):
+            break
+        partes.append(l)
+    contraparte = " ".join(partes)[:150]
+    if not contraparte or "fecha" not in bajas:
+        return None
+    k = bajas.index("fecha")
+    m = _FECHA_YAPPY.search(" ".join(lineas[k + 1:k + 3]))
+    mes = MESES.get(m.group(2)[:3].casefold()) if m else None
+    if not m or not mes:
+        return None
+    try:
+        fecha = date(int(m.group(3)), mes, int(m.group(1))).isoformat()
+    except ValueError:
+        return None
+    hora = f"{int(m.group(4)) % 12 + (12 if m.group(6).casefold() == 'p' else 0):02d}:{m.group(5)}"
+    if _hora_valida(hora) is None:
+        return None
+    sin_tilde = [l.replace("ó", "o") for l in bajas]
+    mensaje, codigo = "", ""
+    if "mensaje" in bajas:
+        j = bajas.index("mensaje") + 1
+        sigue = []
+        while j < len(lineas) and sin_tilde[j] != "confirmacion":
+            sigue.append(lineas[j])
+            j += 1
+        mensaje = " ".join(sigue)[:100]
+    if "confirmacion" in sin_tilde and sin_tilde.index("confirmacion") + 1 < len(lineas):
+        codigo = lineas[sin_tilde.index("confirmacion") + 1]
+    nota = f"{contraparte} · {mensaje}" if mensaje else contraparte
+    return {"tipo": tipo, "monto": monto, "contraparte": contraparte, "mensaje": mensaje, "comercio": nota[:200],
+            "fecha": fecha, "hora": hora, "confirmacion": codigo}
 
 
 # --- Procesar un aviso -----------------------------------------------------------------------------
@@ -462,32 +570,46 @@ def _categoria_por_memoria(con: sqlite3.Connection, tipo: str, comercio: str) ->
     return None
 
 
-def _duplicado(con: sqlite3.Connection, cuenta_id: str, tipo: str, monto: int, fecha: str) -> str | None:
+def _duplicado(con: sqlite3.Connection, cuenta_id: str, tipo: str, monto: int, fecha: str, dias: int) -> str | None:
+    """Un movimiento anotado a mano (y que ningún aviso haya tomado ya) igual al aviso, en ±`dias` días."""
     dia = date.fromisoformat(fecha)
-    f = con.execute("SELECT id FROM movimiento WHERE cuenta_id = ? AND tipo = ? AND monto = ? AND fecha BETWEEN ? AND ?",
-                    (cuenta_id, tipo, monto, (dia - timedelta(days=DIAS_DUPLICADO)).isoformat(),
-                     (dia + timedelta(days=DIAS_DUPLICADO)).isoformat())).fetchone()
+    f = con.execute("SELECT id FROM movimiento WHERE cuenta_id = ? AND tipo = ? AND monto = ? AND fecha BETWEEN ? AND ? "
+                    "AND origen = 'manual' AND id NOT IN (SELECT movimiento_id FROM pendiente WHERE movimiento_id IS NOT NULL)",
+                    (cuenta_id, tipo, monto, (dia - timedelta(days=dias)).isoformat(),
+                     (dia + timedelta(days=dias)).isoformat())).fetchone()
+    return f["id"] if f else None
+
+
+def cuenta_yappy(con: sqlite3.Connection) -> str | None:
+    """La cuenta de la que sale el Yappy (ajuste `cuenta_yappy`), si existe todavía."""
+    f = con.execute("SELECT c.id FROM ajuste a JOIN cuenta c ON c.id = a.valor WHERE a.clave = 'cuenta_yappy'").fetchone()
     return f["id"] if f else None
 
 
 def _intentar_agregar(con: sqlite3.Connection, p: sqlite3.Row | dict) -> None:
     """Con los datos ya guardados en el pendiente: si se sabe la cuenta, lo anota solo (o lo marca duplicado)."""
-    cuenta = con.execute("SELECT id FROM cuenta WHERE terminacion = ? ORDER BY orden, creado", (p["terminacion"],)).fetchone() \
-        if p["terminacion"] else None
-    if cuenta is None:
-        motivo = (f"No sé de qué cuenta es la tarjeta •••{p['terminacion']}" if p["terminacion"] else "No sé de qué cuenta es")
-        _guardar(con, p["id"], estado="nuevo", motivo=motivo)
+    origen = con.execute("SELECT origen FROM pendiente WHERE id = ?", (p["id"],)).fetchone()["origen"]
+    if origen == "yappy":  # Yappy no trae la tarjeta: sale de la cuenta que el usuario dijo
+        id_cuenta, sin_cuenta = cuenta_yappy(con), YAPPY_SIN_CUENTA
+    else:
+        cuenta = con.execute("SELECT id FROM cuenta WHERE terminacion = ? ORDER BY orden, creado", (p["terminacion"],)).fetchone() \
+            if p["terminacion"] else None
+        id_cuenta = cuenta["id"] if cuenta else None
+        sin_cuenta = f"No sé de qué cuenta es la tarjeta •••{p['terminacion']}" if p["terminacion"] else "No sé de qué cuenta es"
+    if id_cuenta is None:
+        _guardar(con, p["id"], estado="nuevo", motivo=sin_cuenta)
         return
-    if (mov := _duplicado(con, cuenta["id"], p["tipo"], p["monto"], p["fecha"])):
-        _guardar(con, p["id"], estado="duplicado", cuenta_id=cuenta["id"], movimiento_id=mov, motivo="")
+    if (mov := _duplicado(con, id_cuenta, p["tipo"], p["monto"], p["fecha"], DIAS_DUPLICADO.get(origen, DIAS_DUPLICADO["correo"]))):
+        _guardar(con, p["id"], estado="duplicado", cuenta_id=id_cuenta, movimiento_id=mov, motivo="")
         return
     mov, marca = str(uuid.uuid4()), db.ahora()
     with con:
         con.execute(
             """INSERT INTO movimiento (id, tipo, monto, fecha, hora, cuenta_id, cuenta_destino_id, categoria_id, nota,
-                 origen, creado, actualizado) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, 'correo', ?, ?)""",
-            (mov, p["tipo"], p["monto"], p["fecha"], p["hora"], cuenta["id"], p["categoria_id"], p["comercio"][:200], marca, marca))
-    _guardar(con, p["id"], estado="agregado", cuenta_id=cuenta["id"], movimiento_id=mov, motivo="")
+                 origen, creado, actualizado) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)""",
+            (mov, p["tipo"], p["monto"], p["fecha"], p["hora"], id_cuenta, p["categoria_id"], p["comercio"][:200],
+             origen if origen in ("yappy", "wallet") else "correo", marca, marca))
+    _guardar(con, p["id"], estado="agregado", cuenta_id=id_cuenta, movimiento_id=mov, motivo="")
 
 
 def reintentar_por_terminacion(con: sqlite3.Connection, terminacion: str) -> int:
@@ -500,10 +622,62 @@ def reintentar_por_terminacion(con: sqlite3.Connection, terminacion: str) -> int
     return len(filas)
 
 
-def resolver(con: sqlite3.Connection, id_: str, entrada: dict, extraer: Extractor, hoy: date) -> str:
+def reintentar_yappy(con: sqlite3.Connection) -> int:
+    """Tras saber la cuenta de Yappy: agrega solos los Yappy que esperaban por ella."""
+    filas = con.execute("SELECT * FROM pendiente WHERE estado = 'nuevo' AND origen = 'yappy' AND motivo = ? "
+                        "AND tipo IS NOT NULL AND monto IS NOT NULL AND categoria_id IS NOT NULL AND fecha IS NOT NULL",
+                        (YAPPY_SIN_CUENTA,)).fetchall()
+    for f in filas:
+        _intentar_agregar(con, f)
+    return len(filas)
+
+
+def _resolver_directo(con: sqlite3.Connection, id_: str, d: dict, cats: list[dict], elegir: Elector) -> str:
+    """Un aviso ya entendido sin Claude (Yappy, Apple Pay): categoría por memoria o por Claude, y a la cuenta."""
+    tipo = d["tipo"]
+    base = dict(tipo=tipo, monto=d["monto"], fecha=d["fecha"], hora=d.get("hora"), comercio=d["comercio"],
+                terminacion=d.get("terminacion"))
+    categoria = _categoria_por_memoria(con, tipo, d["comercio"]) or _categoria_por_memoria(con, tipo, d["contraparte"])
+    if categoria is None:
+        posibles = [c for c in cats if c["tipo"] == tipo]
+        try:
+            elegida = elegir({"tipo": tipo, "comercio": d["contraparte"], "mensaje": d.get("mensaje", "")}, posibles)
+        except Exception:  # Claude caído o respuesta rara
+            elegida = None
+        categoria = next((c["id"] for c in posibles if c["id"] == elegida), None)
+    if categoria is None:
+        _guardar(con, id_, estado="nuevo", motivo="No pude elegir la categoría", **base)
+        return "nuevo"
+    base["categoria_id"] = categoria
+    _guardar(con, id_, **base)
+    _intentar_agregar(con, {**base, "id": id_})
+    return con.execute("SELECT estado FROM pendiente WHERE id = ?", (id_,)).fetchone()["estado"]
+
+
+def _aviso_directo(entrada: dict) -> dict | None:
+    """Los datos del aviso si no hace falta Claude para leerlo: un Yappy de formato fijo o un Apple Pay con campos sueltos."""
+    origen = entrada.get("origen")
+    if origen == "yappy":
+        return leer_yappy(entrada.get("asunto", ""), entrada.get("texto", ""))
+    if origen == "wallet" and entrada.get("comercio") and entrada.get("monto") is not None:
+        monto = a_centavos(str(entrada["monto"]))
+        comercio = str(entrada["comercio"]).strip()[:200]
+        if not monto or monto <= 0 or not comercio:
+            return None
+        terminacion = re.sub(r"\D", "", str(entrada.get("terminacion") or ""))[-4:]
+        return {"tipo": "gasto", "monto": monto, "contraparte": comercio, "mensaje": "", "comercio": comercio,
+                "fecha": _fecha_valida(entrada.get("fecha")) or date.today().isoformat(), "hora": _hora_valida(entrada.get("hora")),
+                "terminacion": terminacion if len(terminacion) == 4 else None}
+    return None
+
+
+def resolver(con: sqlite3.Connection, id_: str, entrada: dict, extraer: Extractor, hoy: date,
+             elegir: Elector | None = None) -> str:
     """Lee un aviso ya registrado y decide su destino. Devuelve el estado final."""
     cats, ctas = _categorias_y_cuentas(con)
     fecha_aviso = _fecha_valida(entrada.get("fecha")) or hoy.isoformat()
+    if (directo := _aviso_directo({**entrada, "fecha": entrada.get("fecha") or fecha_aviso})) is not None:
+        return _resolver_directo(con, id_, directo, cats, elegir or elegir_categoria)
     aviso = {"remitente": entrada.get("remitente", ""), "asunto": entrada.get("asunto", ""),
              "texto": entrada.get("texto", ""), "fecha": fecha_aviso}
     try:
@@ -543,13 +717,16 @@ def resolver(con: sqlite3.Connection, id_: str, entrada: dict, extraer: Extracto
     return con.execute("SELECT estado FROM pendiente WHERE id = ?", (id_,)).fetchone()["estado"]
 
 
-def procesar(con: sqlite3.Connection, entrada: dict, extraer: Extractor, hoy: date) -> str | None:
+def procesar(con: sqlite3.Connection, entrada: dict, extraer: Extractor, hoy: date, elegir: Elector | None = None) -> str | None:
     """Un aviso (remitente, asunto, texto, fecha, clave, origen) de principio a fin.
 
-    Devuelve el estado en que quedó, o None si ya se había leído (misma `clave`).
+    Devuelve el estado en que quedó, o None si ya se había leído (misma `clave`). Un aviso de Yappy
+    que `leer_yappy` entiende queda con origen `yappy`; si no lo entiende, sigue el camino de Claude.
     """
+    if es_de_yappy(entrada.get("remitente", "")) and leer_yappy(entrada.get("asunto", ""), entrada.get("texto", "")):
+        entrada = {**entrada, "origen": "yappy"}
     id_ = registrar(con, entrada)
-    return None if id_ is None else resolver(con, id_, entrada, extraer, hoy)
+    return None if id_ is None else resolver(con, id_, entrada, extraer, hoy, elegir)
 
 
 # --- Leer el correo --------------------------------------------------------------------------------
@@ -636,12 +813,13 @@ def traer(carpeta: Path, config: dict, ya_leida: Callable[[str], bool], http: Ht
 
 
 def revisar(config_datos: Path, ruta_db: Path, extraer: Extractor | None = None, hoy=date.today,
-            http: Http = pedir_http) -> int:
+            http: Http = pedir_http, elegir: Elector | None = None) -> int:
     """Una pasada: trae los avisos nuevos y los procesa. Devuelve cuántos avisos nuevos leyó."""
     config = leer_config(config_datos)
     if config is None:
         return 0
     extraer = extraer or (lambda a, c, k: extraer_con_claude(a, c, k, config["modelo"]))
+    elegir = elegir or (lambda d, c: elegir_categoria(d, c, config["modelo"]))
     con = db.conectar(ruta_db)
     try:
         leidos = 0
@@ -650,7 +828,7 @@ def revisar(config_datos: Path, ruta_db: Path, extraer: Extractor | None = None,
         try:
             mensajes = traer(config_datos, config, ya_leida, http)
             for aviso in mensajes:
-                if procesar(con, aviso, extraer, hoy()) is not None:
+                if procesar(con, aviso, extraer, hoy(), elegir) is not None:
                     leidos += 1
             estado.update(error=None, ultima_revision=db.ahora())
         except ErrorDeCorreo as e:
@@ -683,6 +861,59 @@ def hilo_de_revision(carpeta: Path, ruta_db: Path, parar: threading.Event) -> No
         pedido.clear()
 
 
+# --- Simular una pasada ----------------------------------------------------------------------------
+def simular(config_datos: Path, ruta_db: Path, extraer: Extractor | None = None, elegir: Elector | None = None,
+            hoy=date.today, http: Http = pedir_http) -> list[dict]:
+    """Lo que haría una pasada de Gmail, sobre una COPIA en memoria de la base: no se guarda nada.
+
+    Devuelve, por aviso nuevo, lo leído y su destino (agregado, nuevo con su motivo, duplicado, ignorado).
+    Lo único que se escribe en disco es el token de acceso renovado de `gmail-permiso.json`.
+    """
+    config = leer_config(config_datos)
+    if config is None:
+        raise ErrorDeCorreo("Gmail no está configurado: falta el cliente de Google o el permiso (--autorizar)")
+    extraer = extraer or (lambda a, c, k: extraer_con_claude(a, c, k, config["modelo"]))
+    elegir = elegir or (lambda d, c: elegir_categoria(d, c, config["modelo"]))
+    origen = db.conectar(ruta_db)
+    copia = sqlite3.connect(":memory:", check_same_thread=False)
+    copia.row_factory = sqlite3.Row
+    try:
+        origen.backup(copia)
+    finally:
+        origen.close()
+    try:
+        nombres = {f["id"]: f["nombre"] for f in copia.execute("SELECT id, nombre FROM categoria")}
+        mensajes = traer(config_datos, config, lambda clave: copia.execute(
+            "SELECT 1 FROM pendiente WHERE clave = ?", (clave,)).fetchone() is not None, http)
+        salida = []
+        for aviso in mensajes:
+            if procesar(copia, aviso, extraer, hoy(), elegir) is None:
+                continue
+            p = fila_de(copia, aviso["clave"])
+            destino = {"agregado": "agregado", "duplicado": "duplicado", "ignorado": "ignorado (no es un movimiento)"}.get(
+                p["estado"], f"nuevo: {p['motivo']}")
+            salida.append({"origen": p["origen"], "tipo": p["tipo"], "monto": p["monto"], "comercio": p["comercio"],
+                           "fecha": p["fecha"], "hora": p["hora"], "categoria": nombres.get(p["categoria_id"]),
+                           "estado": p["estado"], "destino": destino})
+        return salida
+    finally:
+        copia.close()
+
+
+def fila_de(con: sqlite3.Connection, clave: str) -> dict:
+    return dict(con.execute("SELECT * FROM pendiente WHERE clave = ?", (clave,)).fetchone())
+
+
+def _imprimir_simulacion(avisos: list[dict]) -> None:
+    for a in avisos:
+        if a["monto"] is None:
+            print(f"[{a['origen']}] sin leer → {a['destino']}")
+            continue
+        print(f"[{a['origen']}] {a['tipo']} ${a['monto'] / 100:,.2f} · {a['comercio']} · {a['fecha']} {a['hora'] or ''} · "
+              f"categoría: {a['categoria'] or '—'} → {a['destino']}")
+    print(f"\n{len(avisos)} avisos nuevos; no se guardó nada.")
+
+
 # --- Probar la extracción --------------------------------------------------------------------------
 def _probar(archivo: str) -> None:
     texto = Path(archivo).read_text(encoding="utf-8")
@@ -696,15 +927,20 @@ def _probar(archivo: str) -> None:
 
 
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser(description="Gmail del Libro de Gastos: dar el permiso de lectura o probar la extracción")
+    ap = argparse.ArgumentParser(description="Gmail del Libro de Gastos: dar el permiso de lectura, probar la extracción o simular una pasada")
     g = ap.add_mutually_exclusive_group(required=True)
     g.add_argument("--probar", metavar="ARCHIVO.txt", help="prueba la extracción de un aviso con Claude, sin guardar nada")
     g.add_argument("--autorizar", action="store_true", help="da el permiso de solo lectura de Gmail (una sola vez)")
+    g.add_argument("--simular", action="store_true", help="muestra qué haría con los avisos de Gmail, sin guardar nada")
     args = ap.parse_args()
-    if args.autorizar:
+    if args.autorizar or args.simular:
         from .config import Config
+        config = Config.desde_entorno()
         try:
-            autorizar(Config.desde_entorno().carpeta)
+            if args.autorizar:
+                autorizar(config.carpeta)
+            else:
+                _imprimir_simulacion(simular(config.carpeta, config.ruta_db))
         except ErrorDeCorreo as e:
             raise SystemExit(f"Error: {e}")
     else:
