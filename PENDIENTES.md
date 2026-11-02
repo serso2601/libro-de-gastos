@@ -10,9 +10,10 @@ se probó sale; lo que quedó a medias entra.
 
 Hecho el 2/nov (ver «Bancos» y «Captura desde el correo» en `CLAUDE.md`). Pruebas del servidor (89) y
 compilación de la app pasan; **nada se vio todavía en pantalla ni con Gmail de verdad**.
-1. **Conectar Gmail (lo hace el usuario, una vez):** activar la verificación en dos pasos de Google, crear una
-   contraseña de aplicación en myaccount.google.com/apppasswords y escribir `datos\correo.json`:
-   `{"usuario": "<tu gmail>", "clave_app": "<la de 16 letras>"}`. Reiniciar el servidor. La página de estado
+1. **Conectar Gmail (una vez):** el usuario crea en Google Cloud el proyecto con la API de Gmail, la publica
+   «En producción» y baja el ID de cliente de «App de escritorio» a `datos\`. Luego Claude corre
+   `uv run python -m gastos.correo --autorizar` en `servidor\`, el usuario acepta en el navegador
+   (aviso de «app no verificada» → Avanzado → Ir) y se reinicia el servidor. La página de estado
    (http://127.0.0.1:8766) muestra «Correo del banco» con la última revisión o el error.
 2. **Ver un aviso real de BG:** el filtro por defecto es `from:(bgeneral.com) newer_than:3d`. Si los avisos
    vienen de otro remitente, cambiar `buscar` en `correo.json`. Ver qué saca de un aviso real
@@ -23,7 +24,9 @@ compilación de la app pasan; **nada se vio todavía en pantalla ni con Gmail de
    ancha va sobre una tarjeta, no sobre el color de la cuenta) y la lista «Por revisar» arriba de Movimientos.
 4. **Comparar con un estado de cuenta real**: el interés estimado contra el que pagó el banco. Decide si los
    tramos son combinados (`combinado` en `bancos.json`) y si la base es 365 o 360.
-5. Cuando el Gmail funcione: armar el Atajo de iPhone para los SMS del banco (`POST /api/entrada`).
+5. **Hora automática al anotar** (2/nov): lo nuevo sale con la hora del momento; ver que se cambie tocándola
+   y se quite con la ✕ (en la app y en la web).
+6. Cuando el Gmail funcione: armar el Atajo de iPhone para los SMS del banco (`POST /api/entrada`).
 
 ## Por probar: la app nativa en Expo Go (25/oct)
 

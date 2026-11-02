@@ -42,7 +42,8 @@ sigue activo en el repo, apagarlo en Settings → Pages.
 
 Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
 - **`datos\`** — `gastos.db`, `token.txt`, `respaldos\` (una copia por día, se guardan 30) y
-  `registros\` (servidor, Metro, inicio). También `correo.json` (Gmail y su contraseña de aplicación)
+  `registros\` (servidor, Metro, inicio). También `gmail-cliente.json` (el ID de cliente de Google
+  Cloud), `gmail-permiso.json` (el permiso de solo lectura que deja `--autorizar`), `correo.json` (ajustes opcionales)
   y `propuesta-bancos-panama.md` (la propuesta del 1/nov/2026 con las fases y sus fuentes).
 - **`app-iphone\`** — los .ipa compilados (`gastos-dev-N.ipa`), para arrastrar a Sideloadly.
 
@@ -203,8 +204,10 @@ Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
   (el usuario lo pidió así), el interés estimado del mes (saldo de cada día, 0 los días bajo el
   mínimo), los cargos del mes y el neto al cierre (`lib/banco.ts`). Se asume tramos no combinados y
   base 365 hasta compararlo con un estado de cuenta real.
-- **Captura desde el correo** (2/nov/2026): el servidor lee los avisos del banco en Gmail por IMAP
-  (`datos\correo.json`, contraseña de aplicación) y `claude -p` con un modelo chico saca monto,
+- **Captura desde el correo** (2/nov/2026): un script del servidor (sin IA) revisa Gmail cada 5 min con
+  la **API de Gmail y permiso de solo lectura** (OAuth, sin contraseña: se autoriza una vez con
+  `uv run python -m gastos.correo --autorizar`; la app de Google Cloud va «En producción» para que el
+  permiso no venza a los 7 días). Solo por cada aviso nuevo, `claude -p` con un modelo chico saca monto,
   comercio, fecha y los 4 dígitos de la tarjeta, y elige una de las categorías que ya existen
   (primero la que el usuario usó la última vez con ese comercio). **Entra solo** si la cuenta se
   conoce por su `terminacion`; si no, o si algo no cuadra (el monto no aparece tal cual en el aviso),
