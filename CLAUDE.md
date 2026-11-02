@@ -170,8 +170,25 @@ Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
   **disponible** y el **sobregiro** (BG: 5% o 10% sobre el límite sin cargo; si al cierre se pasa de ahí,
   $32.10–$53.50 una vez; tarjetas sin % publicado: «hasta $53.50»). En BG **el corte sí depende del
   producto** (Estrellas y Visa Esencial 17/15, MileagePlus 5/3, ConnectMiles 7/5, CashBack 8/6, MC
-  Esencial 15/12): `fechas` en el catálogo, solo de referencia en la hoja (el del usuario cae el 18).
+  Esencial 15/12): `fechas` en el catálogo; en la hoja de la cuenta el banco va **arriba** (justo bajo
+  «Es tarjeta de crédito») y al elegir la tarjeta se pone ese corte si no había (el del usuario cae el 18).
   Todo rotulado «aprox.»: sale de lo anotado, no del estado de cuenta.
+  **Pagar** (2/nov): en todas las tarjetas, «Pagar» abre Anotar como transferencia a la tarjeta, sin monto, con
+  fichas **Total · Lo del corte · Mínimo · Otro monto** (descuentan lo pagado desde el corte; `pagoSugerido`
+  sale solo si al corte se debía algo y no se pagó todo eso). Si se escribe «pago … tarjeta» como gasto, la hoja
+  sugiere pasarlo a transferencia. **Mínimo del banco**: en la pantalla de la tarjeta, «Editar» junto al mínimo
+  (`dialogos/minimo.tsx`) guarda el del estado de cuenta **solo para ese corte** (`minimo_corte`, esquema v8);
+  con él `calculos.ajusteMinimo` quita, de la más reciente hacia atrás, las compras de los últimos 4 días antes
+  del corte (`DIAS_SIN_ENTRAR`) hasta que el mínimo calculado coincida: esas pasan al corte siguiente. Si el
+  banco dice más, estima cuánto falta por anotar (o intereses/cargos).
+  **Recordar pagos sin llenar de avisos**: nada nuevo encima de las pantallas; la tarjeta del Inicio cambia
+  «corta el 18» por «paga el 15» la última semana, «Por venir» lo lista hasta cubrir el mínimo, y un **Atajo
+  diario opcional** (Ajustes → «Avisos de pago en el iPhone», `GET /api/avisos/pagos`, `gastos/avisos.py`)
+  muestra una notificación 3 días antes, la víspera y el día si falta el mínimo, y recuerda anotarlo.
+- **Total del Inicio**: el usuario elige qué cuentas suman (`fueraDelTotal` en las preferencias del
+  dispositivo; ficha «Sin tarjetas de crédito»), en «Qué saldo ver» y en Ajustes (`ui/cuentasEnTotal.tsx`).
+- **Montos con comas de miles mientras se escriben** (`componentes.conMiles`, `MontoGrande`, `CampoMonto`);
+  el valor sigue siendo crudo («1234.5»).
 - **Borrar una cuenta** siempre se puede (salvo la única): si tiene historia, avisa cuántos
   movimientos y reglas se van con ella (`DELETE ?con_todo=true`).
 - **Categorías con símbolo** (`ui/simbolos.tsx`, ~39 íconos de línea) o emoji; `categoria.emoji` guarda

@@ -14,7 +14,7 @@ import { useTema } from '@/ui/tema';
 import { ElegirCuenta } from './piezas';
 
 /** Un dato para pegar en el Atajo: su nombre, el valor (se puede seleccionar) y el botón «Copiar». */
-function Copiable({ rotulo, valor }: { rotulo: string; valor: string }) {
+export function Copiable({ rotulo, valor }: { rotulo: string; valor: string }) {
   const { c } = useTema();
   const [copiado, setCopiado] = useState(false);
   async function copiar() {
@@ -44,7 +44,7 @@ function Copiable({ rotulo, valor }: { rotulo: string; valor: string }) {
 }
 
 /** Un paso: número, título y lo que hay que hacer (en una tarjeta). */
-function Paso({ n, titulo, children }: { n: number; titulo: string; children: React.ReactNode }) {
+export function Paso({ n, titulo, children }: { n: number; titulo: string; children: React.ReactNode }) {
   const { c } = useTema();
   return (
     <View style={{ gap: 8 }}>
@@ -60,7 +60,7 @@ function Paso({ n, titulo, children }: { n: number; titulo: string; children: Re
 }
 
 /** Una línea de instrucción. */
-function Linea({ children }: { children: React.ReactNode }) {
+export function Linea({ children }: { children: React.ReactNode }) {
   return <Texto tam={14} style={{ lineHeight: 20 }}>{children}</Texto>;
 }
 

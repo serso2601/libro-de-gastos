@@ -8,7 +8,7 @@ import { Linking, Pressable, ScrollView, View } from 'react-native';
 import { useAbrir, useAnotar } from '@/dialogos/abrir';
 import { comprasCercaDelCorte, interesSiNoPagas, resumenBanco, resumenMes, vinculoDe } from '@/lib/banco';
 import {
-  cicloTarjeta, configPresupuesto, deudaTarjeta, estadoTarjeta, flujoCuenta, gastadoEnCorte, montoEnCuenta, pagoSugerido, periodoDe, porDia,
+  cicloTarjeta, configPresupuesto, deudaTarjeta, estadoTarjeta, flujoCuenta, gastadoEnCorte, montoEnCuenta, pagadoDesdeCorte, pagoSugerido, periodoDe, porDia,
   porVenirDelMes, reglasTarjeta,
 } from '@/lib/calculos';
 import { useDatos } from '@/lib/datos';
@@ -220,6 +220,8 @@ function ResumenTarjeta({ cuenta, fondo }: { cuenta: TCuenta; fondo: string }) {
   const banca = vinculo?.banco.banca;
   const sg = estado?.sobregiro ?? null;
   const pasado = estado?.limite ? Math.max(0, deudaTarjeta(d, cuenta) - estado.limite) : 0;
+  const pagado = estado ? pagadoDesdeCorte(d, cuenta, estado.corte) : 0;
+  const abrir = useAbrir();
   return (
     <View style={{ gap: 6 }}>
       <Rotulo>{nombre}</Rotulo>
@@ -231,15 +233,31 @@ function ResumenTarjeta({ cuenta, fondo }: { cuenta: TCuenta; fondo: string }) {
         {estado && estado.alCorte > 0 && (
           <View style={{ borderTopWidth: 1, borderTopColor: c.linea, marginTop: 6, paddingTop: 6, gap: 2 }}>
             <FilaCifra texto={`Debías al corte del ${fechaCorta(estado.corte)}`} valor={neto(estado.alCorte, d.moneda)} />
-            {estado.minimo !== null && estado.minimo > 0 && (
-              <FilaCifra texto={estado.calculado ? 'Pago mínimo (aprox.)' : 'Pago mínimo'} valor={neto(estado.minimo, d.moneda)} />
-            )}
-            {estado.calculado && reglas?.pago_minimo && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 28 }}>
+              <Texto tam={15} style={{ flex: 1, minWidth: 0 }}>
+                {estado.origen === 'regla' ? 'Pago mínimo (aprox.)' : estado.origen === 'banco' ? 'Pago mínimo (de tu banco)' : 'Pago mínimo'}
+              </Texto>
+              <Enlace tam={13} onPress={() => abrir({ tipo: 'minimo', cuenta })}>{estado.minimo ? 'Editar' : 'Poner'}</Enlace>
+              {estado.minimo ? <Texto num tam={15} peso="medio">{neto(estado.minimo, d.moneda)}</Texto> : null}
+            </View>
+            {estado.origen === 'regla' && reglas?.pago_minimo && (
               <Texto tam={13} color={c.tenue}>
                 {reglas.pago_minimo.porcentaje}% de lo que debías, nunca menos de {dineroCorto(reglas.pago_minimo.minimo, d.moneda)}
                 {estado.exceso > 0 ? `, más ${neto(estado.exceso, d.moneda)} que pasaba del límite` : ''}.
               </Texto>
             )}
+            {estado.pasan.length > 0 && (
+              <Texto tam={13} color={c.tenue}>
+                Con ese mínimo, {estado.pasan.length === 1 ? 'esta compra entra' : 'estas compras entran'} en el corte siguiente: {estado.pasan.map((m) =>
+                  `${m.nota || 'compra'} ${neto(m.monto, d.moneda)} (${fechaCorta(m.fecha)})`).join(', ')}.
+              </Texto>
+            )}
+            {estado.faltaAnotar !== null && (
+              <Texto tam={13} color={c.tenue}>
+                Tu banco cuenta unos {neto(estado.faltaAnotar, d.moneda)} más de lo anotado al corte: puede faltar algo por anotar, o intereses o cargos.
+              </Texto>
+            )}
+            {pagado > 0 && <FilaCifra texto="Pagado desde el corte" valor={neto(pagado, d.moneda)} tenue />}
             {fechaPago && <FilaCifra texto="Paga antes del" valor={fechaCorta(fechaPago)} tenue />}
           </View>
         )}
@@ -365,10 +383,11 @@ function CuentaColor({ cuenta }: { cuenta: TCuenta }) {
   const fechas = [cuenta.dia_corte ? `Corta el ${cuenta.dia_corte}` : '',
     cuenta.dia_pago ? `paga el ${cuenta.dia_pago}` : fechaPago ? `paga el ${fechaCorta(fechaPago)}` : ''].filter(Boolean).join(' · ');
   const disponible = esTarjeta && cuenta.limite ? cuenta.limite - deudaTarjeta(d, cuenta) : null;
-  function registrarPago() {
-    if (!pago) return;
+  // Pagar abre la transferencia a la tarjeta sin monto: en la hoja se elige total, lo del corte, el mínimo u otro.
+  const deuda = esTarjeta ? deudaTarjeta(d, cuenta) : 0;
+  function pagar() {
     anotar({ tipoInicial: 'transferencia', cuentaInicial: d.cuentas.find((x) => !x.es_credito)?.id, destinoInicial: cuenta.id,
-      montoInicial: pago.total, notaInicial: `Pago de ${cuenta.nombre}` });
+      notaInicial: `Pago de ${cuenta.nombre}` });
   }
 
   // Arriba (o a la izquierda, en una pantalla ancha) va la cuenta con su color; debajo (o a la derecha), su historia.
@@ -409,11 +428,13 @@ function CuentaColor({ cuenta }: { cuenta: TCuenta }) {
       </Tocable>
     </View>
     {dosColumnas && <BloqueBanco cuenta={cuenta} fondo={c.tarjeta} />}
-    {pago && (
-      <Tocable onPress={registrarPago} accessibilityLabel="Registrar el pago de la tarjeta"
+    {esTarjeta && deuda > 0 && (
+      <Tocable onPress={pagar} accessibilityLabel={`Pagar ${cuenta.nombre}`}
         style={{ height: 46, borderRadius: 23, borderWidth: 1.5, borderColor: tinta, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center' }}>
         <Icono nombre="transferir" tam={18} color={tinta} />
-        <Texto tam={15} peso="semi" color={tinta}>Registrar pago · {neto(pago.total, d.moneda)}</Texto>
+        <Texto tam={15} peso="semi" color={tinta}>
+          Pagar{pago?.fecha && pago.minimo ? ` · mínimo ${neto(pago.minimo, d.moneda)} antes del ${fechaCorta(pago.fecha)}` : ''}
+        </Texto>
       </Tocable>
     )}
     </>

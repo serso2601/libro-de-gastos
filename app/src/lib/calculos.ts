@@ -227,8 +227,10 @@ export interface FormaSaldo {
   tono: 'neutro' | 'ingreso' | 'gasto' | 'signo';
 }
 
-export function saldos(d: Datos): Record<IdSaldo, FormaSaldo> {
-  const total = d.cuentas.reduce((s, x) => s + saldo(x, d.movimientos), 0);
+/** `fuera`: ids de las cuentas que el usuario sacó del total (p. ej. las tarjetas de crédito); no suman al total ni a «libre». */
+export function saldos(d: Datos, fuera: readonly string[] = []): Record<IdSaldo, FormaSaldo> {
+  const enTotal = d.cuentas.filter((x) => !fuera.includes(x.id));
+  const total = enTotal.reduce((s, x) => s + saldo(x, d.movimientos), 0);
   const programado = porVenirDelMes(d).reduce((s, p) => s + (p.tipo === 'gasto' ? p.monto : 0), 0);
   const movs = delMes(d.movimientos, d.hoy.slice(0, 7));
   const entro = sumar(movs, 'ingreso');
@@ -236,9 +238,10 @@ export function saldos(d: Datos): Record<IdSaldo, FormaSaldo> {
   const nGastos = movs.filter((m) => m.tipo === 'gasto').length;
   const nIngresos = movs.filter((m) => m.tipo === 'ingreso').length;
   const mes = MESES[Number(d.hoy.slice(5, 7)) - 1];
-  const n = d.cuentas.length;
+  const n = enTotal.length;
+  const de = n < d.cuentas.length ? ` de ${d.cuentas.length}` : '';
   return {
-    total: { rotulo: 'Tienes en total', valor: total, detalle: `en ${n} ${n === 1 ? 'cuenta' : 'cuentas'}`, tono: 'neutro' },
+    total: { rotulo: 'Tienes en total', valor: total, detalle: `en ${n}${de} ${n === 1 && !de ? 'cuenta' : 'cuentas'}`, tono: 'neutro' },
     libre: { rotulo: 'Libre después de lo que viene', valor: total - programado, detalle: `descontando lo que falta por pagarse en ${mes}`, tono: 'neutro' },
     mes: { rotulo: `Balance de ${mes}`, valor: entro - gastado, detalle: `entró ${dinero(entro, d.moneda)} y salió ${dinero(gastado, d.moneda)}`, tono: 'signo' },
     gastado: { rotulo: `Gastado en ${mes}`, valor: gastado, detalle: `en ${nGastos} ${nGastos === 1 ? 'gasto' : 'gastos'}`, tono: 'gasto' },
@@ -384,12 +387,16 @@ export function cicloTarjeta(cuenta: Cuenta, hoy: string, diasParaPagar?: number
   return { corteAnterior: fechaISO(anterior), proximoCorte: fechaISO(proximo), fechaPago };
 }
 
-/** Lo que se gastó con la tarjeta en el periodo actual (desde el día después del último corte). */
+/**
+ * Lo que se gastó con la tarjeta en el periodo actual (desde el día después del último corte), con las compras de
+ * antes del corte que, según el mínimo que dio el banco, no entraron en ese estado de cuenta.
+ */
 export function gastadoEnCorte(d: Datos, cuenta: Cuenta): number {
   const ciclo = cicloTarjeta(cuenta, d.hoy);
   if (!ciclo) return 0;
-  return d.movimientos.reduce((s, m) => s + (m.cuenta_id === cuenta.id && m.tipo !== 'ingreso' && m.fecha > ciclo.corteAnterior
-    && m.fecha <= ciclo.proximoCorte ? m.monto : 0), 0);
+  const pasan = pasanAlSiguiente(d, cuenta);
+  return d.movimientos.reduce((s, m) => s + (m.cuenta_id === cuenta.id && m.tipo !== 'ingreso'
+    && ((m.fecha > ciclo.corteAnterior && m.fecha <= ciclo.proximoCorte) || pasan.has(m.id)) ? m.monto : 0), 0);
 }
 
 /** Lo que se debe en la tarjeta: su saldo en contra (0 si está a favor). */
@@ -402,13 +409,88 @@ export function deudaAl(d: Datos, cuenta: Cuenta, fecha: string): number {
   return Math.max(0, -saldo(cuenta, d.movimientos.filter((m) => m.fecha <= fecha)));
 }
 
+/** Días antes del corte en que una compra puede no haber entrado todavía: el banco la fecha 2 a 4 días después. */
+export const DIAS_SIN_ENTRAR = 4;
+
+/** El mínimo según la regla del banco para un saldo al corte: el %, nunca menos del piso ni más de lo que se debe, más el exceso del límite. */
+function minimoDeRegla(alCorte: number, limite: number | null, regla: { porcentaje: number; minimo: number }): number {
+  if (alCorte <= 0) return 0;
+  const exceso = limite ? Math.max(0, alCorte - limite) : 0;
+  return Math.min(alCorte, Math.max(Math.round((alCorte * regla.porcentaje) / 100), regla.minimo) + exceso);
+}
+
+/** El mínimo que el usuario corrigió para el último corte (si es para ese corte), o null. */
+export function minimoCorregido(cuenta: Cuenta, corte: string): number | null {
+  return cuenta.pago_minimo && cuenta.minimo_corte === corte ? cuenta.pago_minimo : null;
+}
+
+export interface AjusteMinimo {
+  /** Compras anotadas en los últimos días antes del corte que, según el mínimo del banco, entran en el corte siguiente. */
+  pasan: Movimiento[];
+  /** Lo que se debía al corte sin esas compras. */
+  alCorte: number;
+  /** Si el banco cuenta más de lo anotado (falta algo por anotar, o intereses o cargos): cuánto, aprox.; si no, null. */
+  faltaAnotar: number | null;
+}
+
+/**
+ * Con el mínimo que dice el banco, qué compras de los últimos días antes del corte no entraron en ese estado de
+ * cuenta: se quitan de la más reciente hacia atrás hasta que el mínimo calculado dé igual (o lo más cerca posible).
+ * Si el banco dice más de lo que da lo anotado, no se quita nada y se estima cuánto falta.
+ */
+export function ajusteMinimo(d: Datos, cuenta: Cuenta, minimoBanco: number): AjusteMinimo | null {
+  const ciclo = cicloTarjeta(cuenta, d.hoy);
+  const regla = reglasTarjeta(d, cuenta)?.pago_minimo;
+  if (!ciclo || !regla) return null;
+  const limite = cuenta.limite ?? null;
+  const s0 = deudaAl(d, cuenta, ciclo.corteAnterior);
+  const desde = aFecha(ciclo.corteAnterior);
+  desde.setDate(desde.getDate() - DIAS_SIN_ENTRAR);
+  const desdeISO = fechaISO(desde);
+  const candidatas = d.movimientos
+    .filter((m) => m.cuenta_id === cuenta.id && m.tipo === 'gasto' && m.fecha > desdeISO && m.fecha <= ciclo.corteAnterior)
+    .sort((a, b) => (b.fecha + (b.hora ?? '')).localeCompare(a.fecha + (a.hora ?? '')));
+  let mejor = 0;
+  let mejorDif = Math.abs(minimoDeRegla(s0, limite, regla) - minimoBanco);
+  let s = s0;
+  for (let k = 1; k <= candidatas.length && mejorDif > 0; k++) {
+    s -= candidatas[k - 1].monto;
+    if (s < 0) break;
+    const dif = Math.abs(minimoDeRegla(s, limite, regla) - minimoBanco);
+    if (dif < mejorDif) { mejor = k; mejorDif = dif; }
+  }
+  const pasan = candidatas.slice(0, mejor);
+  const alCorte = s0 - pasan.reduce((x, m) => x + m.monto, 0);
+  // Por encima del piso, el mínimo es el % del saldo: de ahí sale el saldo que vio el banco.
+  let faltaAnotar: number | null = null;
+  if (mejor === 0 && minimoBanco > minimoDeRegla(s0, limite, regla) && minimoBanco > regla.minimo) {
+    const delBanco = Math.round((minimoBanco * 100) / regla.porcentaje);
+    if (delBanco - s0 >= 100) faltaAnotar = delBanco - s0;
+  }
+  return { pasan, alCorte, faltaAnotar };
+}
+
+/** Los ids de las compras que, por el mínimo corregido del último corte, cuentan para el corte siguiente. */
+export function pasanAlSiguiente(d: Datos, cuenta: Cuenta): Set<string> {
+  const ciclo = cicloTarjeta(cuenta, d.hoy);
+  const corregido = ciclo ? minimoCorregido(cuenta, ciclo.corteAnterior) : null;
+  if (!corregido) return new Set();
+  return new Set(ajusteMinimo(d, cuenta, corregido)?.pasan.map((m) => m.id) ?? []);
+}
+
 export interface EstadoTarjeta {
   /** El último corte y lo que se debía ese día: el «saldo pendiente del mes» sobre el que el banco calcula el mínimo. */
   corte: string;
   alCorte: number;
-  /** El pago mínimo de ese corte: con las reglas del banco (`calculado`) o el que copió el usuario; null si no hay. */
+  /**
+   * El pago mínimo de ese corte y de dónde sale: `banco` = el que corrigió el usuario para este corte, `regla` = el
+   * calculado con las reglas de la tarjeta, `copiado` = el que puso el usuario en una tarjeta sin reglas; null si no hay.
+   */
   minimo: number | null;
-  calculado: boolean;
+  origen: 'banco' | 'regla' | 'copiado' | null;
+  /** Con el mínimo del banco: las compras que pasan al corte siguiente y lo que parece faltar por anotar. */
+  pasan: Movimiento[];
+  faltaAnotar: number | null;
   /** Lo que pasaba del límite al corte: el banco pide abonarlo aparte, así que va sumado al mínimo. */
   exceso: number;
   /** El límite de crédito (si el usuario lo puso) y lo que queda hoy (negativo si se pasó). */
@@ -430,17 +512,22 @@ export function estadoTarjeta(d: Datos, cuenta: Cuenta): EstadoTarjeta | null {
   const ciclo = cicloTarjeta(cuenta, d.hoy);
   if (!ciclo) return null;
   const reglas = reglasTarjeta(d, cuenta);
-  const alCorte = deudaAl(d, cuenta, ciclo.corteAnterior);
   const limite = cuenta.limite ?? null;
+  const corregido = minimoCorregido(cuenta, ciclo.corteAnterior);
+  const ajuste = corregido && reglas?.pago_minimo ? ajusteMinimo(d, cuenta, corregido) : null;
+  const alCorte = ajuste ? ajuste.alCorte : deudaAl(d, cuenta, ciclo.corteAnterior);
   const exceso = limite ? Math.max(0, alCorte - limite) : 0;
   let minimo: number | null = null;
-  let calculado = false;
-  if (reglas?.pago_minimo) {
-    const base = Math.max(Math.round((alCorte * reglas.pago_minimo.porcentaje) / 100), reglas.pago_minimo.minimo);
-    minimo = Math.min(alCorte, base + exceso);
-    calculado = true;
+  let origen: EstadoTarjeta['origen'] = null;
+  if (corregido && reglas?.pago_minimo) {
+    minimo = corregido;
+    origen = 'banco';
+  } else if (reglas?.pago_minimo) {
+    minimo = minimoDeRegla(alCorte, limite, reglas.pago_minimo);
+    origen = 'regla';
   } else if (cuenta.pago_minimo) {
     minimo = cuenta.pago_minimo;
+    origen = 'copiado';
   }
   const deuda = deudaTarjeta(d, cuenta);
   let sobregiro: EstadoTarjeta['sobregiro'] = null;
@@ -450,21 +537,43 @@ export function estadoTarjeta(d: Datos, cuenta: Cuenta): EstadoTarjeta | null {
     const estado = deuda <= limite ? 'dentro' : hasta !== null && deuda <= hasta ? 'permitido' : 'cobra';
     sobregiro = { porcentaje: permitido, hasta, cargo, estado };
   }
-  return { corte: ciclo.corteAnterior, alCorte, minimo, calculado, exceso, limite, disponible: limite ? limite - deuda : null, sobregiro };
+  return {
+    corte: ciclo.corteAnterior, alCorte, minimo, origen, pasan: ajuste?.pasan ?? [], faltaAnotar: ajuste?.faltaAnotar ?? null,
+    exceso, limite, disponible: limite ? limite - deuda : null, sobregiro,
+  };
+}
+
+/** Lo que se le pagó a la tarjeta desde el último corte (transferencias que entraron a ella). */
+export function pagadoDesdeCorte(d: Datos, cuenta: Cuenta, corte: string): number {
+  return d.movimientos.reduce((s, m) => s + (m.tipo === 'transferencia' && m.cuenta_destino_id === cuenta.id && m.fecha > corte ? m.monto : 0), 0);
+}
+
+export interface PagoSugerido {
+  /** Todo lo que se debe hoy (con lo gastado después del corte). */
+  total: number;
+  /** Lo que falta del saldo al corte: pagarlo a tiempo evita los intereses. */
+  delCorte: number;
+  /** Lo que falta del mínimo (null si no se sabe o ya se cubrió). */
+  minimo: number | null;
+  minimoCubierto: boolean;
+  pagado: number;
+  fecha: string | null;
 }
 
 /**
- * El pago que la app sugiere (nunca lo anota sola): aparece si se debe algo y desde el último corte
- * no entró ningún pago a la tarjeta. Total = la deuda; mínimo = el de las reglas del banco o el que copió el usuario.
+ * El pago que la app sugiere (nunca lo anota sola): aparece si al último corte se debía algo y todavía no se pagó
+ * todo eso. Descuenta lo que ya se pagó desde el corte. El mínimo es el corregido, el de las reglas o el copiado.
  */
-export function pagoSugerido(d: Datos, cuenta: Cuenta): { total: number; minimo: number | null; fecha: string | null } | null {
+export function pagoSugerido(d: Datos, cuenta: Cuenta): PagoSugerido | null {
   const ciclo = cicloTarjeta(cuenta, d.hoy, reglasTarjeta(d, cuenta)?.dias_para_pagar);
+  const estado = estadoTarjeta(d, cuenta);
   const deuda = deudaTarjeta(d, cuenta);
-  if (!ciclo || deuda <= 0) return null;
-  const pagado = d.movimientos.some((m) => m.tipo === 'transferencia' && m.cuenta_destino_id === cuenta.id && m.fecha > ciclo.corteAnterior);
-  if (pagado) return null;
-  const minimo = estadoTarjeta(d, cuenta)?.minimo ?? null;
-  return { total: deuda, minimo: minimo && minimo > 0 ? minimo : null, fecha: ciclo.fechaPago };
+  if (!ciclo || !estado || deuda <= 0 || estado.alCorte <= 0) return null;
+  const pagado = pagadoDesdeCorte(d, cuenta, ciclo.corteAnterior);
+  const delCorte = Math.min(deuda, estado.alCorte - pagado);
+  if (delCorte <= 0) return null;
+  const falta = estado.minimo !== null ? Math.min(deuda, Math.max(0, estado.minimo - pagado)) : null;
+  return { total: deuda, delCorte, minimo: falta && falta > 0 ? falta : null, minimoCubierto: estado.minimo !== null && pagado >= estado.minimo, pagado, fecha: ciclo.fechaPago };
 }
 
 /** La categoría que se les pone a los Yappy de ese tipo: la elegida, o la automática (Compras / la primera del tipo). */

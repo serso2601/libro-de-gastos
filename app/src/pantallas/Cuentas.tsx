@@ -16,7 +16,7 @@ import { BotonRedondo, colorDeSaldo, Num, Rotulo, Tarjeta, Texto } from '@/ui/co
 import { columnasPara, useDisposicion } from '@/ui/disposicion';
 import { abrirCuenta, Marco } from '@/ui/pantalla';
 import { SimboloCategoria } from '@/ui/simbolos';
-import { mezclar, useTema } from '@/ui/tema';
+import { mezclar, usePreferencias, useTema } from '@/ui/tema';
 import { Tocable } from '@/ui/tocable';
 
 // --- Cuentas de apoyo -----------------------------------------------------------------------------
@@ -59,7 +59,8 @@ function TarjetaSaldo({ id, grande, llena, children }: { id: IdSaldo; grande?: b
 }) {
   const d = useDatos();
   const { c, estilo } = useTema();
-  const forma = saldos(d)[id];
+  const { fueraDelTotal } = usePreferencias();
+  const forma = saldos(d, fueraDelTotal)[id];
   const valor = neto(forma.valor, d.moneda);
   return (
     <Tarjeta style={{ padding: 14, paddingHorizontal: 16, gap: 12, flex: llena ? 1 : undefined }}>
@@ -115,7 +116,8 @@ function CategoriaPrincipal({ tipo, movs, verbo }: { tipo: 'gasto' | 'ingreso'; 
 function EstadisticaTotal() {
   const d = useDatos();
   const { c, colorCuenta } = useTema();
-  const partes = d.cuentas.filter((x) => !x.es_credito).map((x) => ({ cuenta: x, valor: saldo(x, d.movimientos) }))
+  const { fueraDelTotal } = usePreferencias();
+  const partes = d.cuentas.filter((x) => !x.es_credito && !fueraDelTotal.includes(x.id)).map((x) => ({ cuenta: x, valor: saldo(x, d.movimientos) }))
     .filter((p) => p.valor > 0).sort((a, b) => b.valor - a.valor);
   const suma = partes.reduce((s, p) => s + p.valor, 0);
   const deuda = d.cuentas.reduce((s, x) => s + (x.es_credito ? deudaTarjeta(d, x) : 0), 0);

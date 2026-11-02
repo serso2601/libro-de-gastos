@@ -197,13 +197,53 @@ export function limpiarMonto(t: string): string {
   return i < 0 ? s : s.slice(0, i + 1) + s.slice(i + 1).replace(/\./g, '').slice(0, 2);
 }
 
+/** Agrupa con comas la parte entera de un monto crudo («1234.5» → «1,234.5»); los decimales quedan como se escribieron. */
+export function conMiles(crudo: string): string {
+  const i = crudo.indexOf('.');
+  const entera = i < 0 ? crudo : crudo.slice(0, i);
+  const resto = i < 0 ? '' : crudo.slice(i);
+  return entera.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + resto;
+}
+
+/**
+ * Lo que el usuario dejó en un campo de monto con formato → texto crudo («1234.5»). `anterior` es lo que
+ * se mostraba. Si se agregó UN carácter y es una coma, es el separador decimal de un teclado de otra
+ * región; en cualquier otro caso (borrar, pegar) las comas son de agrupación y se quitan.
+ */
+export function crudoDeEscrito(escrito: string, anterior: string, moneda = ''): string {
+  const sinMoneda = moneda ? escrito.split(moneda).join('') : escrito;
+  const antes = moneda ? anterior.split(moneda).join('') : anterior;
+  let s = sinMoneda;
+  if (sinMoneda.length === antes.length + 1) {
+    // Posición donde difieren: el carácter insertado.
+    let k = 0;
+    while (k < antes.length && antes[k] === sinMoneda[k]) k++;
+    if (sinMoneda[k] === ',') s = sinMoneda.slice(0, k) + '.' + sinMoneda.slice(k + 1);
+  }
+  s = s.replace(/[^\d.]/g, '');
+  const i = s.indexOf('.');
+  return i < 0 ? s : s.slice(0, i + 1) + s.slice(i + 1).replace(/\./g, '').slice(0, 2);
+}
+
+/** Campo de texto para un monto: se ve «$12,345.67» mientras se escribe, pero `valor` y `alCambiar` son crudos («12345.67»). */
+export function CampoMonto({ valor, alCambiar, moneda, placeholder, autoFocus, accessibilityLabel, style }: {
+  valor: string; alCambiar: (v: string) => void; moneda: string; placeholder?: string; autoFocus?: boolean; accessibilityLabel?: string; style?: TextInputProps['style'];
+}) {
+  const mostrado = valor ? moneda + conMiles(valor) : '';
+  return (
+    <Campo value={mostrado} onChangeText={(t) => alCambiar(crudoDeEscrito(t, mostrado, moneda))} placeholder={placeholder ?? `${moneda}0.00`}
+      keyboardType="decimal-pad" autoFocus={autoFocus} accessibilityLabel={accessibilityLabel} style={style} />
+  );
+}
+
 /** El monto grande y centrado de las hojas de anotar. */
 export function MontoGrande({ valor, alCambiar, moneda, autoFocus, color }: { valor: string; alCambiar: (v: string) => void; moneda: string; autoFocus?: boolean; color?: string }) {
   const { c, estilo, oscuro } = useTema();
+  const mostrado = valor ? moneda + conMiles(valor) : '';
   return (
-    <TextInput value={valor ? moneda + valor : ''} placeholder={`${moneda}0.00`} placeholderTextColor={c.tenue} keyboardType="decimal-pad"
+    <TextInput value={mostrado} placeholder={`${moneda}0.00`} placeholderTextColor={c.tenue} keyboardType="decimal-pad"
       keyboardAppearance={oscuro ? 'dark' : 'light'} autoFocus={autoFocus} accessibilityLabel="Monto"
-      onChangeText={(t) => alCambiar(limpiarMonto(t.split(moneda).join('')))}
+      onChangeText={(t) => alCambiar(crudoDeEscrito(t, mostrado, moneda))}
       style={{ fontFamily: familia(estilo.m.pesoCifraGrande), fontSize: 52, letterSpacing: -2, color: color ?? c.tinta,
         textAlign: 'center', paddingVertical: 0, fontVariant: ['tabular-nums'] }} />
   );

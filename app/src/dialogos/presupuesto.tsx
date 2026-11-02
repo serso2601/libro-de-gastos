@@ -7,7 +7,7 @@ import { configPresupuesto, gastadoEn, NOMBRES_PERIODO, periodoDe, POR_PERIODO }
 import { useDatos } from '@/lib/datos';
 import { aCentavos, aTexto, dinero } from '@/lib/formato';
 import type { Categoria } from '@/lib/tipos';
-import { BotonBorrar, BotonPrincipal, Etiqueta, Hoja, MontoGrande, Segmentos, Texto, TextoError, familia } from '@/ui/componentes';
+import { BotonBorrar, BotonPrincipal, Etiqueta, Hoja, MontoGrande, Segmentos, Texto, TextoError, conMiles, crudoDeEscrito, familia } from '@/ui/componentes';
 import { SimboloCategoria } from '@/ui/simbolos';
 import { useTema } from '@/ui/tema';
 
@@ -88,9 +88,9 @@ export function DialogoTopes({ alCerrar }: { alCerrar: () => void }) {
             <SimboloCategoria categoria={cat} tam={30} />
             <Texto tam={15} style={{ flex: 1 }} lineas={1}>{cat.nombre}</Texto>
             <Texto num tam={15} color={c.tenue}>{d.moneda}</Texto>
-            <TextInput value={valores[cat.id]} onChangeText={(t) => setValores((v) => ({ ...v, [cat.id]: t }))} placeholder="sin tope" placeholderTextColor={c.tenue}
+            <TextInput value={conMiles(valores[cat.id] ?? '')} onChangeText={(t) => setValores((v) => ({ ...v, [cat.id]: crudoDeEscrito(t, conMiles(v[cat.id] ?? '')) }))} placeholder="sin tope" placeholderTextColor={c.tenue}
               keyboardType="decimal-pad" keyboardAppearance={oscuro ? 'dark' : 'light'} accessibilityLabel={`Tope de ${cat.nombre}`}
-              style={{ width: 96, height: 40, paddingVertical: 0, textAlign: 'right', fontSize: 16, color: c.tinta, fontFamily: familia('medio'), fontVariant: ['tabular-nums'] }} />
+              style={{ width: 112, height: 40, paddingVertical: 0, textAlign: 'right', fontSize: 16, color: c.tinta, fontFamily: familia('medio'), fontVariant: ['tabular-nums'] }} />
           </View>
         ))}
       </View>

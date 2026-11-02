@@ -9,7 +9,7 @@ from datetime import date, datetime
 from pathlib import Path
 
 ESQUEMA = Path(__file__).with_name("esquema.sql")
-VERSION = 7
+VERSION = 8
 
 # {versión a la que lleva: sql}. Cada paso corre con las claves foráneas apagadas: rehacer una
 # tabla no debe tocar las filas que la apuntan (movimiento.recurrencia_id es ON DELETE SET NULL).
@@ -115,6 +115,12 @@ MIGRACIONES: dict[int, str] = {
     7: """
     BEGIN;
     ALTER TABLE cuenta ADD COLUMN limite INTEGER CHECK (limite > 0);
+    COMMIT;
+    """,
+    # El pago mínimo que el usuario corrigió vale para un corte (el de su estado de cuenta), no para siempre.
+    8: """
+    BEGIN;
+    ALTER TABLE cuenta ADD COLUMN minimo_corte TEXT;
     COMMIT;
     """,
 }

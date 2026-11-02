@@ -6,9 +6,14 @@ import pytest
 from gastos import db
 
 
+def esquema_v7() -> str:
+    """El esquema de la versión 7: el actual sin lo que agregó la 8 (el corte del mínimo corregido)."""
+    return re.sub(r"    minimo_corte    TEXT[^\n]*\n", "", db.ESQUEMA.read_text(encoding="utf-8"))
+
+
 def esquema_v6() -> str:
-    """El esquema de la versión 6: el actual sin lo que agregó la 7 (el límite de la tarjeta)."""
-    return re.sub(r"    limite          INTEGER[^\n]*\n", "", db.ESQUEMA.read_text(encoding="utf-8"))
+    """El esquema de la versión 6: el de la 7 sin lo que agregó la 7 (el límite de la tarjeta)."""
+    return re.sub(r"    limite          INTEGER[^\n]*\n", "", esquema_v7())
 
 
 def esquema_v5() -> str:
@@ -187,5 +192,21 @@ def test_migracion_7_agrega_el_limite_de_la_tarjeta(tmp_path):
 
     db.inicializar(con)
 
-    assert con.execute("PRAGMA user_version").fetchone()[0] == 7
+    assert con.execute("PRAGMA user_version").fetchone()[0] == db.VERSION
     assert tuple(con.execute("SELECT dia_corte, limite FROM cuenta").fetchone()) == (18, None)
+
+
+def test_migracion_8_agrega_el_corte_del_minimo_corregido(tmp_path):
+    con = db.conectar(tmp_path / "v7.db")
+    con.executescript(esquema_v7())
+    assert "minimo_corte" not in {f["name"] for f in con.execute("PRAGMA table_info(cuenta)")}
+    con.execute("PRAGMA user_version = 7")
+    marca = db.ahora()
+    with con:
+        con.execute("INSERT INTO cuenta (id, nombre, creado, actualizado, es_credito, dia_corte, limite) "
+                    "VALUES ('visa', 'Visa', ?, ?, 1, 18, 100000)", (marca, marca))
+
+    db.inicializar(con)
+
+    assert con.execute("PRAGMA user_version").fetchone()[0] == 8
+    assert tuple(con.execute("SELECT limite, minimo_corte FROM cuenta").fetchone()) == (100000, None)

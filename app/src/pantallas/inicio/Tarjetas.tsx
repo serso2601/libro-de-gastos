@@ -281,6 +281,10 @@ const Contenido = memo(function Contenido({ cuenta, tinta }: { cuenta: Cuenta; t
   const mes = flujoCuenta(d.movimientos, cuenta.id, d.hoy.slice(0, 7));
   // Con tres botones («Transferir» incluido) en una pantalla angosta, el último queda solo con el ícono.
   const compacto = !!sugerido;
+  // Cuando falta una semana o menos para pagar (y falta el mínimo), arriba dice «paga el 15» en vez de «corta el 18».
+  const faltan = sugerido?.fecha && !sugerido.minimoCubierto ? Math.round((Date.parse(sugerido.fecha) - Date.parse(d.hoy)) / 864e5) : null;
+  const aviso = faltan === null || faltan > 7 || faltan < 0 ? null
+    : faltan === 0 ? 'paga hoy' : faltan === 1 ? 'paga mañana' : `paga el ${Number(sugerido!.fecha!.slice(8, 10))}`;
 
   return (
     <View style={{ flex: 1, paddingVertical: 18, paddingHorizontal: 20, justifyContent: 'space-between', gap: 14 }}>
@@ -304,7 +308,7 @@ const Contenido = memo(function Contenido({ cuenta, tinta }: { cuenta: Cuenta; t
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           {ciclo && (
             <Texto tam={13} peso="medio" color={tinta} style={{ opacity: 0.85 }}>
-              {ciclo.proximoCorte === d.hoy ? 'corta hoy' : `corta el ${Number(ciclo.proximoCorte.slice(8, 10))}`}
+              {aviso ?? (ciclo.proximoCorte === d.hoy ? 'corta hoy' : `corta el ${Number(ciclo.proximoCorte.slice(8, 10))}`)}
             </Texto>
           )}
           <Icono nombre="adelante" tam={18} color={tinta} grosor={2} />
@@ -338,9 +342,9 @@ const Contenido = memo(function Contenido({ cuenta, tinta }: { cuenta: Cuenta; t
       <View style={{ flexDirection: 'row', gap: 8 }}>
         <Accion icono="mas" texto="Anotar" tinta={tinta} onPress={() => anotar({ cuentaInicial: cuenta.id })} />
         {sugerido && (
-          <Accion texto="Pagar" tinta={tinta} etiqueta={`Pagar ${dinero(sugerido.total, d.moneda)} de ${cuenta.nombre}`}
+          <Accion texto="Pagar" tinta={tinta} etiqueta={`Pagar ${cuenta.nombre}`}
             onPress={() => anotar({ tipoInicial: 'transferencia', cuentaInicial: origenPago, destinoInicial: cuenta.id,
-              montoInicial: sugerido.total, notaInicial: `Pago de ${cuenta.nombre}` })} />
+              notaInicial: `Pago de ${cuenta.nombre}` })} />
         )}
         <Accion icono="transferir" texto="Transferir" soloIcono={compacto} tinta={tinta} onPress={() => anotar({ tipoInicial: 'transferencia', cuentaInicial: cuenta.id })} />
       </View>

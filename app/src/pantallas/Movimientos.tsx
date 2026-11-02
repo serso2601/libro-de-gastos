@@ -85,12 +85,14 @@ export function Movimientos() {
     const q = busqueda.trim().toLowerCase();
     return d.cuentas.flatMap((cuenta) => {
       const pago = cuenta.es_credito ? pagoSugerido(d, cuenta) : null;
-      return pago && (!q || `pago de ${cuenta.nombre}`.toLowerCase().includes(q)) ? [{ cuenta, pago }] : [];
+      // Con el mínimo ya pagado deja de salir aquí (sigue en la pantalla de la tarjeta).
+      return pago && !pago.minimoCubierto && (!q || `pago de ${cuenta.nombre}`.toLowerCase().includes(q)) ? [{ cuenta, pago }] : [];
     }).sort((a, b) => (a.pago.fecha ?? '9').localeCompare(b.pago.fecha ?? '9'));
   }, [d, filtro, busqueda]);
-  function registrarPago(tarjeta: string, total: number) {
+  // Abre la transferencia a la tarjeta sin monto: en la hoja se elige total, lo del corte, el mínimo u otro.
+  function registrarPago(tarjeta: string) {
     anotar({ tipoInicial: 'transferencia', cuentaInicial: d.cuentas.find((x) => !x.es_credito)?.id, destinoInicial: tarjeta,
-      montoInicial: total, notaInicial: `Pago de ${d.cuentas.find((x) => x.id === tarjeta)?.nombre ?? ''}` });
+      notaInicial: `Pago de ${d.cuentas.find((x) => x.id === tarjeta)?.nombre ?? ''}` });
   }
   const nombreCuenta = (id: string) => d.cuentas.find((x) => x.id === id)?.nombre ?? '';
 
@@ -180,7 +182,7 @@ export function Movimientos() {
               const delMesPago = pago.fecha && pago.fecha.slice(0, 7) === mesActual ? pago.fecha : null;
               const cuando = delMesPago ? (delMesPago < d.hoy ? `venció el ${Number(delMesPago.slice(8))}` : `paga ${cuandoViene(delMesPago, d.hoy)}`) : '';
               return (
-                <Pressable key={`pago@${cuenta.id}`} onPress={() => registrarPago(cuenta.id, pago.total)}
+                <Pressable key={`pago@${cuenta.id}`} onPress={() => registrarPago(cuenta.id)}
                   style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 54, paddingVertical: 6,
                     borderTopWidth: porVenir.length + i === 0 ? 0 : 1, borderTopColor: c.linea, opacity: pressed ? 0.6 : 1 })}>
                   <View style={{ width: 6, height: 28, borderRadius: 3, backgroundColor: colorCuenta(cuenta.color) }} />
@@ -190,7 +192,7 @@ export function Movimientos() {
                       <Icono nombre="transferir" tam={12} color={c.tenue} />
                     </View>
                     <Texto tam={13} color={c.tenue} lineas={2}>
-                      Sugerido · Total {neto(pago.total, d.moneda)}{pago.minimo ? ` · Mínimo ${neto(pago.minimo, d.moneda)}` : ''}{cuando ? ` · ${cuando}` : ''}
+                      Sugerido · Del corte {neto(pago.delCorte, d.moneda)}{pago.minimo ? ` · Mínimo ${neto(pago.minimo, d.moneda)}` : ''}{cuando ? ` · ${cuando}` : ''}
                     </Texto>
                   </View>
                   <Texto tam={13} peso="semi" color={c.acento}>Registrar</Texto>

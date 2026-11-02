@@ -27,10 +27,10 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from . import correo, db, importar, pagina, recurrencias
+from . import avisos, correo, db, importar, pagina, recurrencias
 from .config import Config
 
 SIN_ENTRADA = "Falta el token o no es el de este servidor"
@@ -100,6 +100,7 @@ class CuentaIn(BaseModel):
     dia_pago: int | None = Field(default=None, ge=1, le=31)
     pago_minimo: int | None = Field(default=None, ge=0)  # centavos; lo copia el usuario si su tarjeta no está en el catálogo
     limite: int | None = Field(default=None, gt=0)  # centavos; el límite de crédito de la tarjeta
+    minimo_corte: date | None = None  # el corte para el que el usuario corrigió el mínimo (con reglas del banco)
     banco: VinculoBanco | None = None  # vínculo con el catálogo, para calcular intereses y cargos
     terminacion: str | None = Field(default=None, pattern=r"^\d{4}$")  # últimos 4 dígitos de su tarjeta
 
@@ -108,7 +109,7 @@ class CuentaIn(BaseModel):
         if self.es_credito and self.dia_corte is None:
             raise ValueError("Una tarjeta de crédito necesita su día de corte")
         if not self.es_credito:
-            self.dia_corte = self.dia_pago = self.pago_minimo = self.limite = None
+            self.dia_corte = self.dia_pago = self.pago_minimo = self.limite = self.minimo_corte = None
         return self
 
 
@@ -487,15 +488,17 @@ def create_app(config: Config | None = None, hoy=date.today, web: Path = WEB, ex
             orden = con.execute("SELECT COALESCE(MAX(orden) + 1, 0) FROM cuenta").fetchone()[0]
             con.execute(
                 """INSERT INTO cuenta (id, nombre, color, saldo_inicial, orden, creado, actualizado,
-                     es_credito, dia_corte, dia_pago, pago_minimo, limite, banco, terminacion)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     es_credito, dia_corte, dia_pago, pago_minimo, limite, minimo_corte, banco, terminacion)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                    ON CONFLICT (id) DO UPDATE SET nombre = excluded.nombre, color = excluded.color,
                      saldo_inicial = excluded.saldo_inicial, actualizado = excluded.actualizado,
                      es_credito = excluded.es_credito, dia_corte = excluded.dia_corte,
                      dia_pago = excluded.dia_pago, pago_minimo = excluded.pago_minimo, limite = excluded.limite,
+                     minimo_corte = excluded.minimo_corte,
                      banco = excluded.banco, terminacion = excluded.terminacion""",
                 (id_, c.nombre.strip(), c.color, c.saldo_inicial, orden, marca, marca,
                  int(c.es_credito), c.dia_corte, c.dia_pago, c.pago_minimo, c.limite,
+                 c.minimo_corte.isoformat() if c.minimo_corte else None,
                  json.dumps(c.banco.model_dump(), ensure_ascii=False) if c.banco else None, c.terminacion),
             )
         _sincronizar_cargos(con, id_, c.banco, hoy())
@@ -634,6 +637,11 @@ def create_app(config: Config | None = None, hoy=date.today, web: Path = WEB, ex
             print(f"Entrada: falló ({e.__class__.__name__})", flush=True)
         finally:
             con.close()
+
+    @r.get("/avisos/pagos", response_class=PlainTextResponse)
+    def avisos_de_pago(con: sqlite3.Connection = Depends(conexion)):
+        """Para el Atajo diario del iPhone: qué tarjeta toca pagar (3 días antes, la víspera y el día), o vacío."""
+        return avisos.texto_de_pagos(con, CATALOGO, hoy())
 
     @r.post("/entrada")
     def entrada(e: EntradaIn, con: sqlite3.Connection = Depends(conexion)):

@@ -19,6 +19,8 @@ export interface Preferencias {
   saldo: IdSaldo;
   vistaInicio: VistaInicio;
   tutorialVisto: boolean;
+  /** Ids de las cuentas que no suman al saldo «Tienes en total» del Inicio. */
+  fueraDelTotal: string[];
 }
 
 export interface Colores extends Paleta {
@@ -45,7 +47,7 @@ export interface Tema {
 }
 
 const CLAVE = 'gastos:apariencia';
-const INICIALES: Preferencias = { modo: 'sistema', acento: null, saldo: 'total', vistaInicio: 'tarjetas', tutorialVisto: false };
+const INICIALES: Preferencias = { modo: 'sistema', acento: null, saldo: 'total', vistaInicio: 'tarjetas', tutorialVisto: false, fueraDelTotal: [] };
 
 /** Lee lo guardado; lo que falte o venga de la versión vieja (estilo, tutoriales) toma el valor de siempre. */
 function leer(): Preferencias {
@@ -59,6 +61,7 @@ function leer(): Preferencias {
       saldo: ORDEN_SALDOS.includes(p.saldo as IdSaldo) ? (p.saldo as IdSaldo) : 'total',
       vistaInicio: p.vistaInicio === 'calendario' ? 'calendario' : 'tarjetas',
       tutorialVisto: p.tutorialVisto === true,
+      fueraDelTotal: Array.isArray(p.fueraDelTotal) ? p.fueraDelTotal.filter((x): x is string => typeof x === 'string') : [],
     };
   } catch {
     return INICIALES;

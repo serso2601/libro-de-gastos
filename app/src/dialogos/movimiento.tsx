@@ -2,8 +2,9 @@ import * as Haptics from 'expo-haptics';
 import { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useAcciones } from '@/lib/acciones';
+import { deudaTarjeta, pagoSugerido } from '@/lib/calculos';
 import { useDatos } from '@/lib/datos';
-import { aCentavos, aFecha, aTexto, DIAS, horaTexto, nuevoId } from '@/lib/formato';
+import { aCentavos, aFecha, aTexto, DIAS, horaTexto, MESES_CORTOS, neto, nuevoId } from '@/lib/formato';
 import { FRECUENCIAS, type Frecuencia, type Movimiento, type Pendiente, type Recurrencia, type TipoMovimiento } from '@/lib/tipos';
 import { avisar } from '@/ui/aviso';
 import { BotonPrincipal, Campo, Ficha, Hoja, MontoGrande, Segmentos, Texto, TextoError } from '@/ui/componentes';
@@ -26,7 +27,8 @@ export function DialogoMovimiento({ inicial, tipoInicial = 'gasto', fechaInicial
   pendiente?: Pendiente;
   alCerrar: () => void; alEditarRegla: (r: Recurrencia) => void;
 }) {
-  const { cuentas, categorias, moneda, hoy, recurrencias } = useDatos();
+  const datos = useDatos();
+  const { cuentas, categorias, moneda, hoy, recurrencias } = datos;
   const { c } = useTema();
   const acciones = useAcciones();
   const editando = !!inicial;
@@ -108,6 +110,40 @@ export function DialogoMovimiento({ inicial, tipoInicial = 'gasto', fechaInicial
     }
   }
 
+  // Pagar una tarjeta de crédito: fichas con el total, lo del corte y el mínimo (descontando lo ya pagado).
+  const tarjetaDestino = tipo === 'transferencia' ? cuentas.find((x) => x.id === destino && x.es_credito) : undefined;
+  const deudaDestino = tarjetaDestino ? deudaTarjeta(datos, tarjetaDestino) : 0;
+  const sugerido = tarjetaDestino ? pagoSugerido(datos, tarjetaDestino) : null;
+  const opcionesPago: [string, number][] = !tarjetaDestino || editando || deudaDestino <= 0 ? [] : [
+    ['Total', deudaDestino] as [string, number],
+    ...(sugerido && sugerido.delCorte !== deudaDestino ? [['Lo del corte', sugerido.delCorte] as [string, number]] : []),
+    ...(sugerido?.minimo ? [['Mínimo', sugerido.minimo] as [string, number]] : []),
+  ];
+  const elegido = aCentavos(monto);
+  function elegirPago(centavos: number | null) {
+    Haptics.selectionAsync();
+    setMonto(centavos === null ? '' : aTexto(centavos));
+    setError('');
+    if (!nota.trim() && tarjetaDestino) setNota(`Pago de ${tarjetaDestino.nombre}`);
+  }
+  // Un gasto que dice «pago … tarjeta» casi siempre es el pago de la tarjeta: va como transferencia, no como gasto.
+  const pareceTarjeta = (() => {
+    if (tipo !== 'gasto' || editando || pendiente) return undefined;
+    const t = nota.toLowerCase();
+    if (!/(pago|pagu[eé]|abono)/.test(t)) return undefined;
+    const credito = cuentas.filter((x) => x.es_credito);
+    return credito.find((x) => t.includes(x.nombre.toLowerCase()))
+      ?? (/(tarjeta|visa|master|cr[eé]dito)/.test(t) ? credito[0] : undefined);
+  })();
+  function comoPagoDeTarjeta() {
+    if (!pareceTarjeta) return;
+    Haptics.selectionAsync();
+    setTipo('transferencia');
+    setDestino(pareceTarjeta.id);
+    if (cuenta === pareceTarjeta.id) setCuenta(cuentas.find((x) => !x.es_credito)?.id ?? cuenta);
+  }
+  const destinoInicialTarjeta = cuentas.some((x) => x.id === destinoInicial && x.es_credito);
+
   // Si no es hoy, el botón dice qué día se va a guardar: «Guardar el martes 14».
   const d = aFecha(fecha);
   const textoGuardar = editando ? 'Guardar cambios' : fecha === hoy ? 'Guardar' : `Guardar el ${DIAS[d.getDay()]} ${d.getDate()}`;
@@ -119,11 +155,35 @@ export function DialogoMovimiento({ inicial, tipoInicial = 'gasto', fechaInicial
       pie={<><TextoError texto={error} /><BotonPrincipal onPress={guardar}>{textoGuardar}</BotonPrincipal></>}>
       <Segmentos opciones={TIPOS} valor={tipo} alCambiar={cambiarTipo} />
 
+      {opcionesPago.length > 0 && (
+        <View style={{ gap: 6 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+            {opcionesPago.map(([t, v]) => (
+              <Ficha key={t} texto={`${t} ${neto(v, moneda)}`} activa={elegido === v} alto={36} onPress={() => elegirPago(v)} />
+            ))}
+            <Ficha texto="Otro monto" activa={!opcionesPago.some(([, v]) => v === elegido)} alto={36} onPress={() => elegirPago(null)} />
+          </View>
+          {sugerido?.fecha && (
+            <Texto tam={13} color={c.tenue}>
+              Pagar lo del corte antes del {Number(sugerido.fecha.slice(8, 10))} {MESES_CORTOS[Number(sugerido.fecha.slice(5, 7)) - 1]} evita los intereses.
+            </Texto>
+          )}
+        </View>
+      )}
+
       <View style={{ alignItems: 'stretch' }}>
-        <MontoGrande valor={monto} alCambiar={(v) => { setMonto(v); setError(''); }} moneda={moneda} autoFocus={!editando && !montoInicial && !pendiente} />
+        <MontoGrande valor={monto} alCambiar={(v) => { setMonto(v); setError(''); }} moneda={moneda} autoFocus={!editando && !montoInicial && !pendiente && !destinoInicialTarjeta} />
         <Campo value={nota} onChangeText={setNota} placeholder="¿De qué se trata?" accessibilityLabel="Descripción" returnKeyType="done"
           style={{ height: 40, backgroundColor: 'transparent', textAlign: 'center' }} />
       </View>
+
+      {pareceTarjeta && (
+        <Tocable onPress={comoPagoDeTarjeta} accessibilityLabel={`Anotarlo como pago de ${pareceTarjeta.nombre}`}
+          style={{ borderRadius: 14, backgroundColor: c.suave, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <Icono nombre="transferir" tam={18} color={c.tinta} />
+          <Texto tam={13} style={{ flex: 1 }}>¿Es el pago de {pareceTarjeta.nombre}? Anótalo como transferencia a la tarjeta, así no cuenta como gasto dos veces.</Texto>
+        </Tocable>
+      )}
 
       <ElegirFecha fecha={fecha} alCambiar={setFecha} rotulo={repetir === 'no' ? 'Fecha' : 'Primera vez'}
         hora={repetir === 'no' ? hora : undefined} alCambiarHora={repetir === 'no' ? setHora : undefined} />

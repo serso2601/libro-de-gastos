@@ -65,6 +65,7 @@ export function useAcciones() {
             cuerpo: { nombre: c.nombre, color: c.color, saldo_inicial: c.saldo_inicial, es_credito: !!c.es_credito,
               dia_corte: c.es_credito ? c.dia_corte ?? null : null, dia_pago: c.es_credito ? c.dia_pago ?? null : null,
               pago_minimo: c.es_credito ? c.pago_minimo ?? null : null, limite: c.es_credito ? c.limite ?? null : null,
+              minimo_corte: c.es_credito ? c.minimo_corte ?? null : null,
               banco: c.banco ?? null, terminacion: c.terminacion || null } },
           (d) => ({ ...d, cuentas: reemplazar(d.cuentas, c) }),
         );

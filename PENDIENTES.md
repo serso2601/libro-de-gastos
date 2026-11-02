@@ -27,12 +27,14 @@ compilación de la app pasan; **nada se vio todavía en pantalla**.
 5. **Revisar a ojo**: el «Resumen de <mes>» en la pantalla de cada cuenta (flechas de mes, entró/salió, interés
    y cargos aprox., enlace a la banca), la ficha del banco y «Mi Yappy está en esta cuenta» en la hoja de la
    cuenta, y «Por revisar» arriba de Movimientos.
-6. **La Visa •••7489** (es del usuario, la maneja con dinero de la mamá): el usuario la crea como tarjeta de
-   crédito para probar este mes: corte el **18** (su banca: último corte 18/oct, pagar antes del 15/nov), día de
-   pago vacío (la app toma 28 días: da el 15/nov), **límite**, banco BG, su producto exacto (el pago del 15 apunta a
-   Estrellas o Visa Esencial) y los 4 dígitos. Comparar con la banca: el **pago mínimo** que calcula la app
-   (3% de lo que debía al corte, mínimo $20 o $25), lo disponible y «Al corte (aprox.)». En «Lo que debes hoy» va
-   lo que debía al 18/oct si quiere que el mínimo cuadre (las compras posteriores se anotan aparte).
+6. **La Visa •••7489** (es del usuario, la maneja con dinero de la mamá): ya la creó (2/nov) y dice que no se ve
+   mal. Falta: comparar el **pago mínimo** con el de la banca y, si es otro, corregirlo con «Editar» junto al mínimo
+   (ver qué compras pasan al corte siguiente); **pagar con las fichas** Total / Lo del corte / Mínimo / Otro monto
+   cuando pague antes del 15/nov; ver «paga el 15» en la tarjeta del Inicio la semana del pago.
+6b. **Atajo de avisos de pago** (Ajustes → «Avisos de pago en el iPhone»): armarlo y ver que el 12, 14 y 15/nov
+   llegue la notificación (el botón «Probar ahora» de la hoja dice qué contestaría la PC hoy).
+6c. **Total sin tarjetas** («Qué saldo ver» → «Sin tarjetas de crédito») y **montos con comas** al escribir: probar en
+   el iPhone que el teclado y la coma decimal funcionen bien.
 7. **Hora automática al anotar**: ver que se cambie tocándola y se quite con la ✕ (en la app y en la web).
 8. Interés: con el estado de cuenta de noviembre, comparar otra vez ($0.17 estimado contra $0.20 real en
    octubre; `datos\estado-bg-ahorros-2026-10.xlsx`).

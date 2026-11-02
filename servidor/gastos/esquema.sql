@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS cuenta (
     dia_pago        INTEGER CHECK (dia_pago BETWEEN 1 AND 31),
     pago_minimo     INTEGER CHECK (pago_minimo >= 0),
     limite          INTEGER CHECK (limite > 0),
+    minimo_corte    TEXT,  -- con reglas del banco: el corte (fecha) para el que el usuario corrigió el mínimo
     -- Vínculo con el catálogo de bancos (bancos.json), en JSON, o NULL; y los últimos 4 dígitos de
     -- su tarjeta, con los que se reconoce de qué cuenta es un aviso del banco.
     banco           TEXT,

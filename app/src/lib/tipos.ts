@@ -19,6 +19,8 @@ export interface Cuenta {
   dia_pago?: number | null;
   pago_minimo?: number | null;
   limite?: number | null;
+  /** Con reglas del banco: el corte ('YYYY-MM-DD') para el que el usuario corrigió el mínimo (`pago_minimo`). */
+  minimo_corte?: string | null;
   /** Su vínculo con un banco del catálogo (opcional) y los últimos 4 dígitos de su tarjeta. */
   banco?: VinculoBanco | null;
   terminacion?: string | null;

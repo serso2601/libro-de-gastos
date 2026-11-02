@@ -10,6 +10,7 @@ import { ORDEN_SALDOS, saldos } from '@/lib/calculos';
 import { useDatos } from '@/lib/datos';
 import { neto } from '@/lib/formato';
 import { BotonRedondo, colorDeSaldo, Hoja, Num, Segmentos, Texto } from '@/ui/componentes';
+import { CuentasEnElTotal } from '@/ui/cuentasEnTotal';
 import { useDisposicion } from '@/ui/disposicion';
 import { Icono } from '@/ui/iconos';
 import { ALTO_CABECERA, Marco } from '@/ui/pantalla';
@@ -22,10 +23,10 @@ import { Tocable } from '@/ui/tocable';
 export function InicioPrincipal() {
   const d = useDatos();
   const { c, estilo } = useTema();
-  const { saldo, vistaInicio, cambiar } = usePreferencias();
+  const { saldo, vistaInicio, fueraDelTotal, cambiar } = usePreferencias();
   const { lateral, columnaInicio } = useDisposicion();
   const [eligiendo, setEligiendo] = useState(false);
-  const formas = saldos(d);
+  const formas = saldos(d, fueraDelTotal);
   const forma = formas[saldo];
   // Cuando el saldo cambia, late y sale la diferencia: verde si es para bien (en «gastado», que baje).
   const cambio = useCambio(saldo, forma.valor);
@@ -85,6 +86,7 @@ export function InicioPrincipal() {
               </Tocable>
             );
           })}
+          <CuentasEnElTotal />
         </Hoja>
       )}
     </>

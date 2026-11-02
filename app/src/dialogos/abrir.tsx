@@ -5,6 +5,8 @@ import { createContext, useContext, useState, type ReactNode } from 'react';
 import type { Categoria, Cuenta, Movimiento, Pendiente, Recurrencia, TipoCategoria, TipoMovimiento } from '@/lib/tipos';
 import { DialogoCategoria } from './categoria';
 import { DialogoApplePay } from './applePay';
+import { DialogoAvisoPagos } from './avisoPagos';
+import { DialogoMinimo } from './minimo';
 import { DialogoCuenta } from './cuenta';
 import { DialogoDetalleCategoria } from './detalleCategoria';
 import { DialogoMovimiento } from './movimiento';
@@ -36,7 +38,11 @@ export type Dialogo =
   /** Cómo anotar solo los pagos con Apple Pay (un Atajo del iPhone). */
   | { tipo: 'applePay' }
   /** La categoría por defecto de los Yappy que entran solos. */
-  | { tipo: 'yappy' };
+  | { tipo: 'yappy' }
+  /** Cómo armar el Atajo diario que avisa los pagos de tarjeta con una notificación. */
+  | { tipo: 'avisoPagos' }
+  /** Corregir el pago mínimo de una tarjeta para su último corte (si el banco dice otro). */
+  | { tipo: 'minimo'; cuenta: Cuenta };
 
 const Contexto = createContext<((d: Dialogo) => void) | null>(null);
 
@@ -77,6 +83,8 @@ export function AnfitrionDialogos({ children }: { children: ReactNode }) {
       {d?.tipo === 'periodo' && <DialogoPeriodo alCerrar={cerrar} />}
       {d?.tipo === 'applePay' && <DialogoApplePay alCerrar={cerrar} />}
       {d?.tipo === 'yappy' && <DialogoYappy alCerrar={cerrar} />}
+      {d?.tipo === 'avisoPagos' && <DialogoAvisoPagos alCerrar={cerrar} />}
+      {d?.tipo === 'minimo' && <DialogoMinimo cuenta={d.cuenta} alCerrar={cerrar} />}
     </Contexto.Provider>
   );
 }
