@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { useAlmacen } from './datos';
-import type { Categoria, ConfigPresupuesto, Cuenta, Datos, Movimiento, Recurrencia } from './tipos';
+import type { Categoria, ConfigPresupuesto, Cuenta, Datos, Movimiento, Pendiente, Recurrencia } from './tipos';
 
 function reemplazar<T extends { id: string }>(lista: T[], item: T): T[] {
   return lista.some((x) => x.id === item.id) ? lista.map((x) => (x.id === item.id ? item : x)) : [...lista, item];
@@ -64,8 +64,40 @@ export function useAcciones() {
           { metodo: 'PUT', ruta: `/api/cuentas/${enc(c.id)}`, descripcion: 'Guardar la cuenta',
             cuerpo: { nombre: c.nombre, color: c.color, saldo_inicial: c.saldo_inicial, es_credito: !!c.es_credito,
               dia_corte: c.es_credito ? c.dia_corte ?? null : null, dia_pago: c.es_credito ? c.dia_pago ?? null : null,
-              pago_minimo: c.es_credito ? c.pago_minimo ?? null : null } },
+              pago_minimo: c.es_credito ? c.pago_minimo ?? null : null,
+              banco: c.banco ?? null, terminacion: c.terminacion || null } },
           (d) => ({ ...d, cuentas: reemplazar(d.cuentas, c) }),
+        );
+      },
+
+      /** El usuario revisó un aviso del banco y lo anotó: se guarda el movimiento y se cierra el pendiente. */
+      aceptarPendiente(p: Pendiente, m: Movimiento) {
+        const { tipo, monto, fecha, hora, cuenta_id, cuenta_destino_id, categoria_id, nota } = m;
+        const nuevo: Movimiento = { ...m, origen: 'correo' };
+        cambiar(
+          { metodo: 'PUT', ruta: `/api/movimientos/${enc(m.id)}`, descripcion: 'Guardar el movimiento',
+            cuerpo: { tipo, monto, fecha, hora, cuenta_id, cuenta_destino_id, categoria_id, nota } },
+          (d) => ({
+            ...d,
+            movimientos: reemplazar(d.movimientos, nuevo),
+            pendientes: (d.pendientes ?? []).filter((x) => x.id !== p.id),
+            // El servidor le guarda a la cuenta los 4 dígitos del aviso si no los tenía; aquí se ve igual.
+            cuentas: p.terminacion
+              ? d.cuentas.map((x) => (x.id === cuenta_id && !x.terminacion ? { ...x, terminacion: p.terminacion } : x))
+              : d.cuentas,
+          }),
+        );
+        cambiar(
+          { metodo: 'PUT', ruta: `/api/pendientes/${enc(p.id)}`, descripcion: 'Cerrar el aviso',
+            cuerpo: { estado: 'aceptado', movimiento_id: m.id } },
+        );
+      },
+
+      descartarPendiente(p: Pendiente) {
+        cambiar(
+          { metodo: 'PUT', ruta: `/api/pendientes/${enc(p.id)}`, descripcion: 'Descartar el aviso',
+            cuerpo: { estado: 'descartado', movimiento_id: null } },
+          (d) => ({ ...d, pendientes: (d.pendientes ?? []).filter((x) => x.id !== p.id) }),
         );
       },
 

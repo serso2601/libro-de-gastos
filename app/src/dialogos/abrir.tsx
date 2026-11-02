@@ -2,7 +2,7 @@
 // en mano: `useAbrir()(...)`. La hoja abierta vive en <AnfitrionDialogos> y hay una sola a la vez.
 
 import { createContext, useContext, useState, type ReactNode } from 'react';
-import type { Categoria, Cuenta, Movimiento, Recurrencia, TipoCategoria, TipoMovimiento } from '@/lib/tipos';
+import type { Categoria, Cuenta, Movimiento, Pendiente, Recurrencia, TipoCategoria, TipoMovimiento } from '@/lib/tipos';
 import { DialogoCategoria } from './categoria';
 import { DialogoCuenta } from './cuenta';
 import { DialogoDetalleCategoria } from './detalleCategoria';
@@ -16,6 +16,8 @@ import { DialogoRecurrencia } from './recurrencia';
 export interface OpcionesAnotar {
   tipoInicial?: TipoMovimiento; fechaInicial?: string; cuentaInicial?: string;
   destinoInicial?: string; montoInicial?: number; notaInicial?: string;
+  /** Un aviso del banco por revisar: la hoja sale prellenada y al guardar se cierra el aviso. */
+  pendiente?: Pendiente;
 }
 
 export type Dialogo =
@@ -45,8 +47,8 @@ export function AnfitrionDialogos({ children }: { children: ReactNode }) {
     <Contexto.Provider value={setD}>
       {children}
       {d?.tipo === 'movimiento' && (
-        <DialogoMovimiento key={d.inicial?.id ?? 'nuevo'} inicial={d.inicial} tipoInicial={d.tipoInicial} fechaInicial={d.fechaInicial}
-          cuentaInicial={d.cuentaInicial} destinoInicial={d.destinoInicial} montoInicial={d.montoInicial} notaInicial={d.notaInicial} alCerrar={cerrar}
+        <DialogoMovimiento key={d.inicial?.id ?? d.pendiente?.id ?? 'nuevo'} inicial={d.inicial} tipoInicial={d.tipoInicial} fechaInicial={d.fechaInicial}
+          cuentaInicial={d.cuentaInicial} destinoInicial={d.destinoInicial} montoInicial={d.montoInicial} notaInicial={d.notaInicial} pendiente={d.pendiente} alCerrar={cerrar}
           alEditarRegla={(regla) => {
             // iOS no deja presentar una hoja mientras otra se está cerrando: se espera a que baje.
             setD(null);

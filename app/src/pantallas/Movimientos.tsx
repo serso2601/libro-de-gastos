@@ -2,9 +2,10 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useAbrir, useAnotar } from '@/dialogos/abrir';
+import { useAcciones } from '@/lib/acciones';
 import { delMes, netoDe, pagoSugerido, porDia, porVenirDelMes, sumar } from '@/lib/calculos';
 import { useDatos } from '@/lib/datos';
-import { MESES, mayuscula, neto, ordenarPorFecha, tituloDia } from '@/lib/formato';
+import { etiquetaCorta, MESES, mayuscula, neto, ordenarPorFecha, tituloDia } from '@/lib/formato';
 import type { Movimiento, Proximo } from '@/lib/tipos';
 import { Buscador, CabeceraDia, Enlace, FilaMovimiento, Lista, Num, Rotulo, Segmentos, Tarjeta, Texto, Vacio } from '@/ui/componentes';
 import { useVez } from '@/ui/animar';
@@ -12,6 +13,7 @@ import { useDisposicion } from '@/ui/disposicion';
 import { FilaViva, GrupoVivo, ListaViva } from '@/ui/filaViva';
 import { Icono } from '@/ui/iconos';
 import { Marco } from '@/ui/pantalla';
+import { Tocable } from '@/ui/tocable';
 import { alfa, useTema } from '@/ui/tema';
 import { ContenidoGraficos } from './Graficos';
 import { cuandoViene } from './Proximos';
@@ -32,6 +34,7 @@ export function Movimientos() {
   const [vista, setVista] = useState<Vista>('lista');
   const abrir = useAbrir();
   const anotar = useAnotar();
+  const acciones = useAcciones();
   const { c, colorCuenta } = useTema();
   const { dosColumnas, margen } = useDisposicion();
   const [filtro, setFiltro] = useState<Filtro>('todos');
@@ -67,6 +70,11 @@ export function Movimientos() {
   const antes: number[] = [];
   grupos.lista.reduce((n, [, items]) => { antes.push(n); return n + items.length; }, 0);
 
+  // Avisos del banco (llegan al correo) que esperan que el usuario los revise.
+  const porRevisar = (d.pendientes ?? []).filter((p) => {
+    const q = busqueda.trim().toLowerCase();
+    return (filtro === 'todos' || p.tipo === filtro) && (!q || `${p.comercio} ${p.asunto}`.toLowerCase().includes(q));
+  });
   const porVenir = porVenirDelMes(d).filter(coincide);
   const vaASalir = porVenir.reduce((s, p) => s + (p.tipo === 'gasto' ? p.monto : 0), 0);
   const vaAEntrar = porVenir.reduce((s, p) => s + (p.tipo === 'ingreso' ? p.monto : 0), 0);
@@ -116,6 +124,36 @@ export function Movimientos() {
           );
         })}
       </ScrollView>
+
+      {porRevisar.length > 0 && (
+        <View style={{ gap: 6 }}>
+          <Rotulo>Por revisar · {porRevisar.length}</Rotulo>
+          <Lista style={{ borderWidth: 1.5, borderStyle: 'dashed', borderColor: alfa(c.tenue, 0.35) }}>
+            {porRevisar.map((p, i) => {
+              const color = p.tipo === 'ingreso' ? c.ingreso : p.tipo === 'gasto' ? c.gasto : undefined;
+              const sub = [p.fecha ? etiquetaCorta(p.fecha) : '', p.terminacion ? `•••${p.terminacion}` : ''].filter(Boolean).join(' · ');
+              return (
+                <View key={p.id} style={{ flexDirection: 'row', alignItems: 'center', borderTopWidth: i === 0 ? 0 : 1, borderTopColor: c.linea }}>
+                  <Pressable onPress={() => abrir({ tipo: 'movimiento', pendiente: p })} accessibilityLabel={`Revisar ${p.comercio || p.asunto}`}
+                    style={({ pressed }) => ({ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 58, paddingVertical: 8, opacity: pressed ? 0.6 : 1 })}>
+                    <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                      <Texto tam={15} peso="medio" lineas={1}>{p.comercio || p.asunto || 'Aviso del banco'}</Texto>
+                      {sub !== '' && <Texto tam={13} color={c.tenue} lineas={1}>{sub}</Texto>}
+                      {p.motivo !== '' && <Texto tam={12} color={c.tenue} lineas={2}>{p.motivo}</Texto>}
+                    </View>
+                    <Texto num tam={15} peso="medio" color={color}>
+                      {p.monto === null ? '—' : p.tipo === 'gasto' ? `−${neto(p.monto, d.moneda)}` : p.tipo === 'ingreso' ? `+${neto(p.monto, d.moneda)}` : neto(p.monto, d.moneda)}
+                    </Texto>
+                  </Pressable>
+                  <Tocable onPress={() => acciones.descartarPendiente(p)} accessibilityLabel="Descartar este aviso" style={{ padding: 10 }}>
+                    <Icono nombre="cerrar" tam={16} color={c.tenue} />
+                  </Tocable>
+                </View>
+              );
+            })}
+          </Lista>
+        </View>
+      )}
 
       {(porVenir.length > 0 || sugeridos.length > 0) && (
         <View style={{ gap: 6 }}>

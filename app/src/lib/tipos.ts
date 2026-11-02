@@ -17,6 +17,66 @@ export interface Cuenta {
   /** Opcionales: el usuario los copia de su estado de cuenta; la app no los calcula. */
   dia_pago?: number | null;
   pago_minimo?: number | null;
+  /** Su vínculo con un banco del catálogo (opcional) y los últimos 4 dígitos de su tarjeta. */
+  banco?: VinculoBanco | null;
+  terminacion?: string | null;
+}
+
+/** Con qué productos del catálogo está vinculada una cuenta. */
+export interface VinculoBanco {
+  banco: string;
+  cuenta: string | null;
+  tarjeta: string | null;
+  membresia: 'mensual' | 'anual';
+  seguro: string | null;
+}
+
+// --- El catálogo de bancos (servidor/gastos/bancos.json) ---
+
+export interface TramoInteres { desde: number; tasa: number }
+export interface InteresCuenta { tramos: TramoInteres[]; minimo_diario: number; base_dias: number; combinado: boolean }
+export interface CargoCuenta { id: string; nombre: string; tipo: string; menor_que: number; monto: number }
+export interface VersionCuenta {
+  vigente_desde: string; verificado?: string; fuente?: string;
+  interes: InteresCuenta | null; cargos: CargoCuenta[];
+}
+export interface ProductoCuenta { id: string; nombre: string; clase: 'ahorros' | 'corriente'; nota?: string; versiones: VersionCuenta[] }
+
+export interface SeguroTarjeta { id: string; nombre: string; mensual: number }
+export interface CargoPorUso { id: string; nombre: string; monto?: number; porcentaje?: number; minimo?: number }
+export interface VersionTarjeta {
+  vigente_desde: string; verificado?: string; fuente?: string;
+  /** Débito. */
+  membresia?: { mensual: number; anual: number };
+  seguros?: SeguroTarjeta[];
+  por_uso?: CargoPorUso[];
+  /** Crédito. */
+  tasa_anual?: number;
+  pago_atrasado?: number;
+  adelanto_efectivo?: { porcentaje: number; minimo: number };
+}
+export interface Tarjeta { id: string; nombre: string; clase: 'debito' | 'credito'; versiones: VersionTarjeta[] }
+
+export interface Banco { id: string; nombre: string; cuentas: ProductoCuenta[]; tarjetas: Tarjeta[] }
+export interface Catalogo { acerca?: string; notas?: string[]; bancos: Banco[] }
+
+/** Un aviso del banco (llegó al correo) que espera que el usuario lo revise. */
+export interface Pendiente {
+  id: string;
+  origen: string;
+  recibido: string;
+  remitente: string;
+  asunto: string;
+  texto: string;
+  tipo: 'gasto' | 'ingreso' | null;
+  monto: number | null;
+  fecha: string | null;
+  hora: string | null;
+  comercio: string;
+  categoria_id: string | null;
+  cuenta_id: string | null;
+  terminacion: string | null;
+  motivo: string;
 }
 
 export interface Categoria {
@@ -96,6 +156,9 @@ export interface Datos {
   movimientos: Movimiento[];
   recurrencias: Recurrencia[];
   proximos: Proximo[];
+  /** Faltan en datos viejos guardados en el teléfono. */
+  catalogo?: Catalogo;
+  pendientes?: Pendiente[];
 }
 
 export const FRECUENCIAS: [Frecuencia, string][] = [

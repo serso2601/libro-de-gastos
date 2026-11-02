@@ -5,9 +5,10 @@ import { StatusBar } from 'expo-status-bar';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useAbrir, useAnotar } from '@/dialogos/abrir';
+import { interesSiNoPagas, resumenBanco } from '@/lib/banco';
 import { configPresupuesto, deudaTarjeta, flujoCuenta, gastadoEnCorte, montoEnCuenta, pagoSugerido, periodoDe, porDia, porVenirDelMes } from '@/lib/calculos';
 import { useDatos } from '@/lib/datos';
-import { conSigno, MESES, neto, ordenarPorFecha, saldo, tituloDia } from '@/lib/formato';
+import { conSigno, dineroCorto, MESES, neto, ordenarPorFecha, saldo, tituloDia } from '@/lib/formato';
 import type { Cuenta as TCuenta } from '@/lib/tipos';
 import { BotonRedondo, Buscador, CabeceraDia, FilaMovimiento, Lista, Num, Rotulo, Tarjeta, Texto, Vacio } from '@/ui/componentes';
 import { useVez } from '@/ui/animar';
@@ -90,6 +91,59 @@ function LoQueViene({ cuenta }: { cuenta: TCuenta }) {
           );
         })}
       </Lista>
+    </View>
+  );
+}
+
+/** Lo que el banco le da o cobra a esta cuenta este mes, calculado con el catálogo. Callado: sin avisos ni colores de alerta. */
+function BloqueBanco({ cuenta, fondo }: { cuenta: TCuenta; fondo: string }) {
+  const d = useDatos();
+  const { c } = useTema();
+  const mes = d.hoy.slice(0, 7);
+  const res = useMemo(() => resumenBanco(d, cuenta, mes), [d, cuenta, mes]);
+  if (!res) return null;
+  const { vinculo, interes, cargos, credito } = res;
+  const nombre = [vinculo.banco.nombre, cuenta.es_credito ? vinculo.tarjeta?.nombre : vinculo.producto?.nombre, !cuenta.es_credito ? vinculo.tarjeta?.nombre : null]
+    .filter(Boolean).join(' · ');
+  const fila = (clave: string, texto: string, valor: string, color?: string, tenue = false) => (
+    <View key={clave} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, minHeight: 28 }}>
+      <Texto tam={tenue ? 13 : 15} color={tenue ? c.tenue : undefined} style={{ flex: 1, minWidth: 0 }}>{texto}</Texto>
+      <Texto num tam={tenue ? 13 : 15} peso={tenue ? 'normal' : 'medio'} color={color ?? (tenue ? c.tenue : undefined)}>{valor}</Texto>
+    </View>
+  );
+  const hayAlgo = !!interes || cargos.cargos.length > 0 || !!cargos.anual || !!credito;
+  return (
+    <View style={{ gap: 6 }}>
+      <Rotulo>{nombre}</Rotulo>
+      <Tarjeta color={fondo} style={{ paddingHorizontal: 16, paddingVertical: 10, gap: 2 }}>
+        {interes && (
+          <>
+            {fila('interes', 'Interés de este mes', `+${neto(interes.alCierre, d.moneda)}`, c.ingreso)}
+            {fila('hasta', 'hasta hoy', `+${neto(interes.hastaHoy, d.moneda)}`, undefined, true)}
+            {interes.diasBajoMinimo > 0 && (
+              <Texto tam={13} color={c.tenue}>
+                {interes.diasBajoMinimo} {interes.diasBajoMinimo === 1 ? 'día bajo' : 'días bajo'} {dineroCorto(vinculo.producto ? (vinculo.producto.versiones[vinculo.producto.versiones.length - 1].interes?.minimo_diario ?? 0) : 0, d.moneda)} no {interes.diasBajoMinimo === 1 ? 'ganó' : 'ganaron'} interés
+              </Texto>
+            )}
+          </>
+        )}
+        {cargos.cargos.map((x, i) => fila(`cargo${i}`, x.nombre, `−${neto(x.monto, d.moneda)}`, c.gasto))}
+        {cargos.anual && fila('anual', `${cargos.anual.nombre} (se cobra una vez al año)`, neto(cargos.anual.monto, d.moneda), undefined, true)}
+        {!credito && (interes || cargos.cargos.length > 0) && (
+          <View style={{ borderTopWidth: 1, borderTopColor: c.linea, marginTop: 6, paddingTop: 6 }}>
+            {fila('neto', 'Neto al cierre', neto(res.neto, d.moneda, true))}
+          </View>
+        )}
+        {credito && (
+          <>
+            {fila('tasa', 'Tasa anual', `${credito.tasa}%`)}
+            <Texto tam={13} color={c.tenue}>Si no pagas el total: unos {neto(interesSiNoPagas(deudaTarjeta(d, cuenta), credito.tasa), d.moneda)} de interés al mes</Texto>
+            {credito.pagoAtrasado > 0 && fila('atraso', 'Pago atrasado', neto(credito.pagoAtrasado, d.moneda), undefined, true)}
+          </>
+        )}
+        {!hayAlgo && <Texto tam={13} color={c.tenue}>Sin cargos este mes.</Texto>}
+        {!credito && <Texto tam={12} color={c.tenue} style={{ marginTop: 6 }}>Estimado con el saldo de cada día. El banco lo acredita al cierre del mes.</Texto>}
+      </Tarjeta>
     </View>
   );
 }
@@ -212,6 +266,7 @@ function CuentaColor({ cuenta }: { cuenta: TCuenta }) {
         <Texto tam={15} peso="medio" color={tinta}>Editar cuenta</Texto>
       </Tocable>
     </View>
+    {dosColumnas && <BloqueBanco cuenta={cuenta} fondo={c.tarjeta} />}
     {pago && (
       <Tocable onPress={registrarPago} accessibilityLabel="Registrar el pago de la tarjeta"
         style={{ height: 46, borderRadius: 23, borderWidth: 1.5, borderColor: tinta, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center' }}>
@@ -226,6 +281,7 @@ function CuentaColor({ cuenta }: { cuenta: TCuenta }) {
     {/* Lo que no se ve en el Inicio: qué viene y en qué se gastó en ESTA cuenta. Al buscar se esconden. */}
     {!buscando && (
       <View style={{ gap: 18, paddingBottom: 10 }}>
+        {!dosColumnas && <BloqueBanco cuenta={cuenta} fondo={c.suave} />}
         <LoQueViene cuenta={cuenta} />
         <EnQueSeGasto cuenta={cuenta} mes={mes} />
       </View>
