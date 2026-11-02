@@ -158,11 +158,20 @@ Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
   por cuenta, qué se descuenta, 6 meses de balance, promedio por día, de dónde entró) y las cuentas
   en cuadros. NO se elige ahí el saldo del Inicio (el usuario lo vio como desperdicio).
 - **Tarjeta de crédito** = interruptor «Es tarjeta de crédito» en la cuenta (no hay tipos de cuenta):
-  día de corte obligatorio; día de pago y pago mínimo opcionales (el usuario los copia, no se
-  calculan). Su saldo es deuda. Se ve «Debes», «Gastado en este corte» (`calculos.cicloTarjeta`,
-  `gastadoEnCorte`, `deudaTarjeta`). El pago es una transferencia que la app **sugiere**
-  (`pagoSugerido`: en la tarjeta, su pantalla y «Por venir» de Movimientos) y el usuario confirma;
-  nunca se anota sola.
+  día de corte obligatorio; día de pago, límite y pago mínimo opcionales. Su saldo es deuda. Se ve
+  «Debes», «Gastado en este corte» (`calculos.cicloTarjeta`, `gastadoEnCorte`, `deudaTarjeta`). El pago
+  es una transferencia que la app **sugiere** (`pagoSugerido`: en la tarjeta, su pantalla y «Por venir»
+  de Movimientos) y el usuario confirma; nunca se anota sola.
+  **Reglas del banco** (2/nov/2026, lo pidió el usuario): si la tarjeta está vinculada a una del catálogo,
+  la app **calcula el pago mínimo** (`calculos.estadoTarjeta`: % del saldo al último corte, nunca menos
+  del piso ni más de lo que se debe, más lo que pase del límite; el campo para copiarlo solo sale si la
+  tarjeta no trae reglas), la **fecha de pago** si el usuario no puso día (`dias_para_pagar`: en BG, 28
+  días después del corte, como dice su tabla) y, con el **límite** (columna `limite`, esquema v7), lo
+  **disponible** y el **sobregiro** (BG: 5% o 10% sobre el límite sin cargo; si al cierre se pasa de ahí,
+  $32.10–$53.50 una vez; tarjetas sin % publicado: «hasta $53.50»). En BG **el corte sí depende del
+  producto** (Estrellas y Visa Esencial 17/15, MileagePlus 5/3, ConnectMiles 7/5, CashBack 8/6, MC
+  Esencial 15/12): `fechas` en el catálogo, solo de referencia en la hoja (el del usuario cae el 18).
+  Todo rotulado «aprox.»: sale de lo anotado, no del estado de cuenta.
 - **Borrar una cuenta** siempre se puede (salvo la única): si tiene historia, avisa cuántos
   movimientos y reglas se van con ella (`DELETE ?con_todo=true`).
 - **Categorías con símbolo** (`ui/simbolos.tsx`, ~39 íconos de línea) o emoji; `categoria.emoji` guarda

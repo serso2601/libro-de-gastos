@@ -6,9 +6,14 @@ import pytest
 from gastos import db
 
 
+def esquema_v6() -> str:
+    """El esquema de la versión 6: el actual sin lo que agregó la 7 (el límite de la tarjeta)."""
+    return re.sub(r"    limite          INTEGER[^\n]*\n", "", db.ESQUEMA.read_text(encoding="utf-8"))
+
+
 def esquema_v5() -> str:
-    """El esquema de la versión 5: el actual sin lo que agregó la 6 (contraparte y referencia de la bandeja)."""
-    s = db.ESQUEMA.read_text(encoding="utf-8")
+    """El esquema de la versión 5: el de la 6 sin lo que agregó la 6 (contraparte y referencia de la bandeja)."""
+    s = esquema_v6()
     s = re.sub(r"    contraparte   TEXT,[^\n]*\n    referencia    TEXT,[^\n]*\n", "", s)
     return re.sub(r"\nCREATE UNIQUE INDEX IF NOT EXISTS pendiente_referencia[^\n]*", "", s)
 
@@ -152,7 +157,7 @@ def test_migracion_6_agrega_contraparte_y_referencia_unica(tmp_path):
 
     db.inicializar(con)
 
-    assert con.execute("PRAGMA user_version").fetchone()[0] == 6
+    assert con.execute("PRAGMA user_version").fetchone()[0] == db.VERSION
     assert tuple(con.execute("SELECT contraparte, referencia FROM pendiente").fetchone()) == (None, None)
     with con:
         con.execute("UPDATE pendiente SET referencia = 'X-1'")
@@ -168,3 +173,19 @@ def test_base_nueva_trae_simbolos_y_la_version_actual(tmp_path):
     db.inicializar(con)
     assert con.execute("PRAGMA user_version").fetchone()[0] == db.VERSION
     assert {f[0] for f in con.execute("SELECT emoji FROM categoria")} >= {"i:comida", "i:casa", "i:trabajo", "i:regalo"}
+
+
+def test_migracion_7_agrega_el_limite_de_la_tarjeta(tmp_path):
+    con = db.conectar(tmp_path / "v6.db")
+    con.executescript(esquema_v6())
+    assert "limite" not in {f["name"] for f in con.execute("PRAGMA table_info(cuenta)")}
+    con.execute("PRAGMA user_version = 6")
+    marca = db.ahora()
+    with con:
+        con.execute("INSERT INTO cuenta (id, nombre, creado, actualizado, es_credito, dia_corte) VALUES ('visa', 'Visa', ?, ?, 1, 18)",
+                    (marca, marca))
+
+    db.inicializar(con)
+
+    assert con.execute("PRAGMA user_version").fetchone()[0] == 7
+    assert tuple(con.execute("SELECT dia_corte, limite FROM cuenta").fetchone()) == (18, None)

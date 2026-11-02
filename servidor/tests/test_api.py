@@ -178,10 +178,11 @@ def test_solo_atiende_a_la_pc_y_a_la_tailnet(config, reloj):
 
 
 def test_tarjeta_de_credito(cliente):
-    tarjeta = {"nombre": "Visa", "es_credito": True, "dia_corte": 15, "dia_pago": 5, "pago_minimo": 45000}
+    tarjeta = {"nombre": "Visa", "es_credito": True, "dia_corte": 15, "dia_pago": 5, "pago_minimo": 45000, "limite": 150000}
     r = cliente.put("/api/cuentas/visa", json=tarjeta)
     assert r.status_code == 200
     assert r.json()["es_credito"] is True and (r.json()["dia_corte"], r.json()["dia_pago"], r.json()["pago_minimo"]) == (15, 5, 45000)
+    assert r.json()["limite"] == 150000
 
     por_id = {c["id"]: c for c in cliente.get("/api/datos").json()["cuentas"]}
     assert por_id["visa"]["es_credito"] is True and por_id["visa"]["dia_corte"] == 15
@@ -189,9 +190,10 @@ def test_tarjeta_de_credito(cliente):
     exportada = {c["id"]: c for c in cliente.get("/api/exportar").json()["cuentas"]}
     assert exportada["visa"]["es_credito"] is True and exportada["efectivo"]["es_credito"] is False
 
-    # Si deja de ser tarjeta, los tres datos se limpian.
+    # Si deja de ser tarjeta, sus datos se limpian.
     r = cliente.put("/api/cuentas/visa", json={**tarjeta, "es_credito": False})
     assert r.json()["es_credito"] is False and (r.json()["dia_corte"], r.json()["dia_pago"], r.json()["pago_minimo"]) == (None, None, None)
+    assert r.json()["limite"] is None
 
 
 def test_tarjeta_de_credito_pide_dia_de_corte(cliente):
@@ -199,6 +201,7 @@ def test_tarjeta_de_credito_pide_dia_de_corte(cliente):
     assert r.status_code == 422 and "día de corte" in r.text
     assert cliente.put("/api/cuentas/visa", json={"nombre": "Visa", "es_credito": True, "dia_corte": 32}).status_code == 422
     assert cliente.put("/api/cuentas/visa", json={"nombre": "Visa", "es_credito": True, "dia_corte": 10, "pago_minimo": -1}).status_code == 422
+    assert cliente.put("/api/cuentas/visa", json={"nombre": "Visa", "es_credito": True, "dia_corte": 10, "limite": 0}).status_code == 422
     assert [c["id"] for c in cliente.get("/api/datos").json()["cuentas"]] == ["efectivo"]
 
 
@@ -302,3 +305,17 @@ def test_categoria_que_pasa_lo_que_sobra(cliente):
     assert cliente.put("/api/categorias/nueva", json={"nombre": "Nueva", "tipo": "gasto"}).json()["acumula"] is False
     por_id = {c["id"]: c for c in cliente.get("/api/datos").json()["categorias"]}
     assert por_id["comida"]["acumula"] is False and por_id["comida"]["acumula_desde"] is None
+
+
+def test_el_catalogo_trae_las_reglas_de_cada_tarjeta_de_credito():
+    """Cada tarjeta de crédito del catálogo dice cómo sale su pago mínimo, su sobregiro y cuándo se paga."""
+    from gastos.api import CATALOGO
+    for banco in CATALOGO["bancos"]:
+        for t in banco["tarjetas"]:
+            if t["clase"] != "credito":
+                continue
+            for v in t["versiones"]:
+                assert v["pago_minimo"]["porcentaje"] > 0 and v["pago_minimo"]["minimo"] > 0, t["id"]
+                assert v["sobregiro"]["cargo"] > 0 and v["sobregiro"]["permitido"] in (None, 5, 10), t["id"]
+                assert v["dias_para_pagar"] == 28, t["id"]
+                assert "fechas" not in v or (1 <= v["fechas"]["corte"] <= 31 and 1 <= v["fechas"]["pago"] <= 31), t["id"]

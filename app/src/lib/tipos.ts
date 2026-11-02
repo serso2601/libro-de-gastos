@@ -14,9 +14,11 @@ export interface Cuenta {
   /** Tarjeta de crédito: su saldo es deuda y tiene día de corte. Lo de abajo solo vale si es true. */
   es_credito?: boolean;
   dia_corte?: number | null;
-  /** Opcionales: el usuario los copia de su estado de cuenta; la app no los calcula. */
+  /** Opcionales. Si la tarjeta está vinculada a una del catálogo con sus reglas, la app calcula el mínimo y la
+   *  fecha de pago; el mínimo copiado sirve para las que no. El límite (centavos) da lo disponible y el sobregiro. */
   dia_pago?: number | null;
   pago_minimo?: number | null;
+  limite?: number | null;
   /** Su vínculo con un banco del catálogo (opcional) y los últimos 4 dígitos de su tarjeta. */
   banco?: VinculoBanco | null;
   terminacion?: string | null;
@@ -54,6 +56,14 @@ export interface VersionTarjeta {
   tasa_anual?: number;
   pago_atrasado?: number;
   adelanto_efectivo?: { porcentaje: number; minimo: number };
+  /** Pago mínimo: `porcentaje` del saldo al corte, nunca menos de `minimo` (centavos). */
+  pago_minimo?: { porcentaje: number; minimo: number };
+  /** `permitido`: % sobre el límite que se puede pasar sin cargo (null si el banco no lo publica); `cargo`: lo que cobra al corte si te pasas de ahí. */
+  sobregiro?: { permitido: number | null; cargo: number };
+  /** El corte y el pago que publica el banco para este producto (de referencia: el del cliente puede ser otro). */
+  fechas?: { corte: number; pago: number };
+  /** Días entre el corte y la fecha de pago. */
+  dias_para_pagar?: number;
 }
 export interface Tarjeta { id: string; nombre: string; clase: 'debito' | 'credito'; versiones: VersionTarjeta[] }
 

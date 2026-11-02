@@ -2,7 +2,7 @@
 // de ver el saldo y las próximas veces de una regla. Todo en centavos.
 
 import { aFecha, dinero, fechaISO, MESES, MESES_CORTOS, saldo } from './formato';
-import type { Categoria, ConfigPresupuesto, Cuenta, Datos, Frecuencia, Movimiento, PeriodoPresupuesto, Proximo, Recurrencia } from './tipos';
+import type { Categoria, ConfigPresupuesto, Cuenta, Datos, Frecuencia, Movimiento, PeriodoPresupuesto, Proximo, Recurrencia, VersionTarjeta } from './tipos';
 
 export const claveMes = (anio: number, mes: number) => `${anio}-${String(mes).padStart(2, '0')}`;
 
@@ -338,17 +338,36 @@ function diaDelMes(anio: number, mes0: number, dia: number): Date {
   return new Date(primero.getFullYear(), primero.getMonth(), Math.min(dia, diasDelMes(primero.getFullYear(), primero.getMonth() + 1)));
 }
 
+/** La versión del producto con mayor `vigente_desde` que no pase de la fecha; si la fecha es anterior a todas, la primera. */
+export function versionVigente<V extends { vigente_desde: string }>(producto: { versiones: V[] }, fechaISO: string): V {
+  const orden = [...producto.versiones].sort((a, b) => a.vigente_desde.localeCompare(b.vigente_desde));
+  let elegida = orden[0];
+  for (const v of orden) if (v.vigente_desde <= fechaISO) elegida = v;
+  return elegida;
+}
+
+/** Las reglas que da el banco para la tarjeta de crédito (catálogo), si está vinculada a una que las trae. */
+export function reglasTarjeta(d: Pick<Datos, 'catalogo' | 'hoy'>, cuenta: Cuenta): VersionTarjeta | null {
+  const v = cuenta.banco;
+  if (!cuenta.es_credito || !v?.tarjeta || !d.catalogo) return null;
+  const tarjeta = d.catalogo.bancos.find((b) => b.id === v.banco)?.tarjetas.find((t) => t.id === v.tarjeta);
+  return tarjeta ? versionVigente(tarjeta, d.hoy) : null;
+}
+
 export interface CicloTarjeta {
   /** El último corte que ya pasó (el periodo actual empieza el día siguiente). */
   corteAnterior: string;
   /** El próximo corte (hoy, si hoy es día de corte): ahí se cierra el periodo actual. */
   proximoCorte: string;
-  /** La fecha de pago que sigue al último corte, si el usuario puso día de pago. */
+  /** La fecha de pago que sigue al último corte: la del día que puso el usuario o, si no puso, la que dice el banco. */
   fechaPago: string | null;
 }
 
-/** El periodo de la tarjeta en el que cae `hoy`: (corteAnterior, proximoCorte]. */
-export function cicloTarjeta(cuenta: Cuenta, hoy: string): CicloTarjeta | null {
+/**
+ * El periodo de la tarjeta en el que cae `hoy`: (corteAnterior, proximoCorte]. Sin día de pago, si el banco dice
+ * cuántos días da para pagar (`diasParaPagar`, 28 en Banco General), la fecha de pago sale de ahí.
+ */
+export function cicloTarjeta(cuenta: Cuenta, hoy: string, diasParaPagar?: number | null): CicloTarjeta | null {
   if (!cuenta.es_credito || !cuenta.dia_corte) return null;
   const h = aFecha(hoy);
   let proximo = diaDelMes(h.getFullYear(), h.getMonth(), cuenta.dia_corte);
@@ -359,6 +378,8 @@ export function cicloTarjeta(cuenta: Cuenta, hoy: string): CicloTarjeta | null {
     let pago = diaDelMes(anterior.getFullYear(), anterior.getMonth(), cuenta.dia_pago);
     if (pago <= anterior) pago = diaDelMes(anterior.getFullYear(), anterior.getMonth() + 1, cuenta.dia_pago);
     fechaPago = fechaISO(pago);
+  } else if (diasParaPagar) {
+    fechaPago = fechaISO(new Date(anterior.getFullYear(), anterior.getMonth(), anterior.getDate() + diasParaPagar));
   }
   return { corteAnterior: fechaISO(anterior), proximoCorte: fechaISO(proximo), fechaPago };
 }
@@ -376,17 +397,74 @@ export function deudaTarjeta(d: Datos, cuenta: Cuenta): number {
   return Math.max(0, -saldo(cuenta, d.movimientos));
 }
 
+/** Lo que se debía en la tarjeta al cerrar el día `fecha` (0 si estaba a favor). */
+export function deudaAl(d: Datos, cuenta: Cuenta, fecha: string): number {
+  return Math.max(0, -saldo(cuenta, d.movimientos.filter((m) => m.fecha <= fecha)));
+}
+
+export interface EstadoTarjeta {
+  /** El último corte y lo que se debía ese día: el «saldo pendiente del mes» sobre el que el banco calcula el mínimo. */
+  corte: string;
+  alCorte: number;
+  /** El pago mínimo de ese corte: con las reglas del banco (`calculado`) o el que copió el usuario; null si no hay. */
+  minimo: number | null;
+  calculado: boolean;
+  /** Lo que pasaba del límite al corte: el banco pide abonarlo aparte, así que va sumado al mínimo. */
+  exceso: number;
+  /** El límite de crédito (si el usuario lo puso) y lo que queda hoy (negativo si se pasó). */
+  limite: number | null;
+  disponible: number | null;
+  /**
+   * El sobregiro según el banco: `hasta` = límite + el % que deja pasarse sin cargo (null si no lo publica);
+   * `cargo` = lo que cobra al corte si te pasas de ahí. `estado` es el de hoy.
+   */
+  sobregiro: { porcentaje: number | null; hasta: number | null; cargo: number; estado: 'dentro' | 'permitido' | 'cobra' } | null;
+}
+
+/**
+ * Cómo está la tarjeta frente al banco: lo que se debía al corte, el pago mínimo, lo disponible y el sobregiro.
+ * Pago mínimo (Banco General): el % del saldo al corte, nunca menos del piso ni más de lo que se debe, más lo que
+ * pase del límite. Todo es aproximado: sale de lo anotado, no del estado de cuenta.
+ */
+export function estadoTarjeta(d: Datos, cuenta: Cuenta): EstadoTarjeta | null {
+  const ciclo = cicloTarjeta(cuenta, d.hoy);
+  if (!ciclo) return null;
+  const reglas = reglasTarjeta(d, cuenta);
+  const alCorte = deudaAl(d, cuenta, ciclo.corteAnterior);
+  const limite = cuenta.limite ?? null;
+  const exceso = limite ? Math.max(0, alCorte - limite) : 0;
+  let minimo: number | null = null;
+  let calculado = false;
+  if (reglas?.pago_minimo) {
+    const base = Math.max(Math.round((alCorte * reglas.pago_minimo.porcentaje) / 100), reglas.pago_minimo.minimo);
+    minimo = Math.min(alCorte, base + exceso);
+    calculado = true;
+  } else if (cuenta.pago_minimo) {
+    minimo = cuenta.pago_minimo;
+  }
+  const deuda = deudaTarjeta(d, cuenta);
+  let sobregiro: EstadoTarjeta['sobregiro'] = null;
+  if (limite && reglas?.sobregiro) {
+    const { permitido, cargo } = reglas.sobregiro;
+    const hasta = permitido !== null ? Math.round(limite * (1 + permitido / 100)) : null;
+    const estado = deuda <= limite ? 'dentro' : hasta !== null && deuda <= hasta ? 'permitido' : 'cobra';
+    sobregiro = { porcentaje: permitido, hasta, cargo, estado };
+  }
+  return { corte: ciclo.corteAnterior, alCorte, minimo, calculado, exceso, limite, disponible: limite ? limite - deuda : null, sobregiro };
+}
+
 /**
  * El pago que la app sugiere (nunca lo anota sola): aparece si se debe algo y desde el último corte
- * no entró ningún pago a la tarjeta. Total = la deuda; mínimo = el que copió el usuario, si lo puso.
+ * no entró ningún pago a la tarjeta. Total = la deuda; mínimo = el de las reglas del banco o el que copió el usuario.
  */
 export function pagoSugerido(d: Datos, cuenta: Cuenta): { total: number; minimo: number | null; fecha: string | null } | null {
-  const ciclo = cicloTarjeta(cuenta, d.hoy);
+  const ciclo = cicloTarjeta(cuenta, d.hoy, reglasTarjeta(d, cuenta)?.dias_para_pagar);
   const deuda = deudaTarjeta(d, cuenta);
   if (!ciclo || deuda <= 0) return null;
   const pagado = d.movimientos.some((m) => m.tipo === 'transferencia' && m.cuenta_destino_id === cuenta.id && m.fecha > ciclo.corteAnterior);
   if (pagado) return null;
-  return { total: deuda, minimo: cuenta.pago_minimo ?? null, fecha: ciclo.fechaPago };
+  const minimo = estadoTarjeta(d, cuenta)?.minimo ?? null;
+  return { total: deuda, minimo: minimo && minimo > 0 ? minimo : null, fecha: ciclo.fechaPago };
 }
 
 /** La categoría que se les pone a los Yappy de ese tipo: la elegida, o la automática (Compras / la primera del tipo). */

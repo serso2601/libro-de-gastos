@@ -12,12 +12,14 @@ CREATE TABLE IF NOT EXISTS cuenta (
     orden           INTEGER NOT NULL DEFAULT 0,
     creado          TEXT NOT NULL,
     actualizado     TEXT NOT NULL,
-    -- Tarjeta de crédito: el día de corte es obligatorio; el día de pago y el pago mínimo (centavos)
-    -- los copia el usuario de su estado de cuenta, la app no los calcula.
+    -- Tarjeta de crédito: el día de corte es obligatorio; el día de pago, el pago mínimo y el límite
+    -- (centavos) son opcionales. Si la tarjeta está en el catálogo, la app calcula el mínimo y la fecha
+    -- de pago con sus reglas; el mínimo copiado sirve para las que no.
     es_credito      INTEGER NOT NULL DEFAULT 0 CHECK (es_credito IN (0, 1)),
     dia_corte       INTEGER CHECK (dia_corte BETWEEN 1 AND 31),
     dia_pago        INTEGER CHECK (dia_pago BETWEEN 1 AND 31),
     pago_minimo     INTEGER CHECK (pago_minimo >= 0),
+    limite          INTEGER CHECK (limite > 0),
     -- Vínculo con el catálogo de bancos (bancos.json), en JSON, o NULL; y los últimos 4 dígitos de
     -- su tarjeta, con los que se reconoce de qué cuenta es un aviso del banco.
     banco           TEXT,

@@ -28,7 +28,11 @@ compilación de la app pasan; **nada se vio todavía en pantalla**.
    y cargos aprox., enlace a la banca), la ficha del banco y «Mi Yappy está en esta cuenta» en la hoja de la
    cuenta, y «Por revisar» arriba de Movimientos.
 6. **La Visa •••7489** (es del usuario, la maneja con dinero de la mamá): el usuario la crea como tarjeta de
-   crédito para probar este mes (corte, banco BG, producto, 4 dígitos); ver «Al corte (aprox.)».
+   crédito para probar este mes: corte el **18** (su banca: último corte 18/oct, pagar antes del 15/nov), día de
+   pago vacío (la app toma 28 días: da el 15/nov), **límite**, banco BG, su producto exacto (el pago del 15 apunta a
+   Estrellas o Visa Esencial) y los 4 dígitos. Comparar con la banca: el **pago mínimo** que calcula la app
+   (3% de lo que debía al corte, mínimo $20 o $25), lo disponible y «Al corte (aprox.)». En «Lo que debes hoy» va
+   lo que debía al 18/oct si quiere que el mínimo cuadre (las compras posteriores se anotan aparte).
 7. **Hora automática al anotar**: ver que se cambie tocándola y se quite con la ✕ (en la app y en la web).
 8. Interés: con el estado de cuenta de noviembre, comparar otra vez ($0.17 estimado contra $0.20 real en
    octubre; `datos\estado-bg-ahorros-2026-10.xlsx`).

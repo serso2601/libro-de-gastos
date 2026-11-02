@@ -1,5 +1,6 @@
 // La hoja de una cuenta: crearla, editarla o borrarla. Una cuenta puede ser tarjeta de crédito (día de
-// corte, y de pago y mínimo si el usuario quiere): su saldo es deuda y la pantalla de la cuenta lo muestra así.
+// corte; día de pago, límite y mínimo si el usuario quiere): su saldo es deuda y la pantalla de la cuenta lo
+// muestra así. Si la tarjeta es una del catálogo con sus reglas, el mínimo y la fecha de pago los calcula la app.
 
 import { useState } from 'react';
 import { View } from 'react-native';
@@ -48,6 +49,7 @@ export function DialogoCuenta({ inicial, alCerrar }: { inicial?: Cuenta; alCerra
   const [corte, setCorte] = useState<number | null>(inicial?.dia_corte ?? null);
   const [pago, setPago] = useState<number | null>(inicial?.dia_pago ?? null);
   const [minimo, setMinimo] = useState(inicial?.pago_minimo ? aTexto(inicial.pago_minimo) : '');
+  const [limite, setLimite] = useState(inicial?.limite ? aTexto(inicial.limite) : '');
   const v0 = inicial?.banco;
   const [bancoId, setBancoId] = useState<string | null>(v0?.banco ?? null);
   const [productoId, setProductoId] = useState<string | null>(v0?.cuenta ?? null);
@@ -68,6 +70,8 @@ export function DialogoCuenta({ inicial, alCerrar }: { inicial?: Cuenta; alCerra
     if (esTarjeta && corte === null) return setError('Elige el día de corte de la tarjeta');
     const min = minimo.trim() === '' ? null : aCentavos(minimo);
     if (min !== null && Number.isNaN(min)) return setError('El pago mínimo no es un número');
+    const lim = limite.trim() === '' ? null : aCentavos(limite);
+    if (lim !== null && (Number.isNaN(lim) || lim <= 0)) return setError('El límite de crédito no es un número mayor que 0');
     const final4 = terminacion.trim();
     if (final4 !== '' && !/^\d{4}$/.test(final4)) return setError('Los últimos dígitos de la tarjeta son 4 números');
     const vinculo: VinculoBanco | null = banco ? {
@@ -81,7 +85,9 @@ export function DialogoCuenta({ inicial, alCerrar }: { inicial?: Cuenta; alCerra
     acciones.guardarCuenta({
       ...inicial, id, nombre: nombre.trim(), color, orden: inicial?.orden ?? 999,
       saldo_inicial: esTarjeta || negativo === 'si' ? -abs : abs,
-      es_credito: esTarjeta, dia_corte: esTarjeta ? corte : null, dia_pago: esTarjeta ? pago : null, pago_minimo: esTarjeta ? min : null,
+      es_credito: esTarjeta, dia_corte: esTarjeta ? corte : null, dia_pago: esTarjeta ? pago : null,
+      // Con las reglas del banco el mínimo se calcula: uno copiado quedaría viejo al mes siguiente.
+      pago_minimo: esTarjeta && !reglas?.pago_minimo ? min : null, limite: esTarjeta ? lim : null,
       banco: vinculo, terminacion: final4 === '' ? null : final4,
     });
     // El Yappy solo se marca en cuentas que no son de crédito; si cambió, se avisa a la PC.
@@ -99,10 +105,18 @@ export function DialogoCuenta({ inicial, alCerrar }: { inicial?: Cuenta; alCerra
   const debito = !esTarjeta && !!tarjeta;
   const segurosDe = tarjeta ? versionVigente(tarjeta, hoy).seguros ?? [] : [];
   const membresiaDe = tarjeta ? versionVigente(tarjeta, hoy).membresia : undefined;
+  // Las reglas de la tarjeta de crédito elegida: mínimo, sobregiro y fechas que publica el banco.
+  const reglas = esTarjeta && tarjeta ? versionVigente(tarjeta, hoy) : null;
   const nombreBanco = banco ? [banco.nombre, esTarjeta ? tarjeta?.nombre : productos.find((p) => p.id === productoId)?.nombre].filter(Boolean).join(' · ') : 'Ninguno';
   const elegirBanco = (id: string | null) => { setBancoId(id); setProductoId(null); setTarjetaId(null); setSeguroId(null); };
   const elegirTarjeta = (id: string | null) => { setTarjetaId(id); setSeguroId(null); };
   const dinero0 = (x: number) => `${moneda}${(x / 100).toFixed(2)}`;
+  const comoMinimo = reglas?.pago_minimo
+    ? `${reglas.pago_minimo.porcentaje}% de lo que debías al corte, nunca menos de ${dinero0(reglas.pago_minimo.minimo)}` : '';
+  const sobregiro = reglas?.sobregiro;
+  const comoSobregiro = !sobregiro ? '' : sobregiro.permitido !== null
+    ? `Puedes pasarte ${sobregiro.permitido}% del límite sin cargo; más de eso, ${dinero0(sobregiro.cargo)} al corte.`
+    : `Si pasas el límite, hasta ${dinero0(sobregiro.cargo)} al corte.`;
 
   // Borrar: con confirmación simple si la cuenta está vacía; si tiene historia, se avisa de todo lo que se va con ella.
   function borrar() {
@@ -158,16 +172,36 @@ export function DialogoCuenta({ inicial, alCerrar }: { inicial?: Cuenta; alCerra
           <View style={{ gap: 8 }}>
             <Etiqueta>Día de corte</Etiqueta>
             <GrillaDias valor={corte} alCambiar={setCorte} />
+            {reglas?.fechas && (
+              <Texto tam={13} color={c.tenue}>
+                {banco?.nombre} publica para esta tarjeta el corte el {reglas.fechas.corte} y el pago el {reglas.fechas.pago}. Pon el de tu estado de cuenta: puede ser otro.
+              </Texto>
+            )}
           </View>
           <View style={{ gap: 8 }}>
             <Etiqueta derecha={<Texto tam={13} color={c.tenue}>Opcional</Texto>}>Día de pago</Etiqueta>
             <GrillaDias valor={pago} alCambiar={setPago} />
+            {reglas?.dias_para_pagar && pago === null && (
+              <Texto tam={13} color={c.tenue}>Sin elegirlo, la app toma {reglas.dias_para_pagar} días después del corte, como dice el banco.</Texto>
+            )}
           </View>
           <View style={{ gap: 8 }}>
-            <Etiqueta derecha={<Texto tam={13} color={c.tenue}>Opcional</Texto>}>Pago mínimo</Etiqueta>
-            <Campo value={minimo} onChangeText={(t) => setMinimo(limpiarMonto(t))} placeholder={`${moneda}0.00`} keyboardType="decimal-pad" />
-            <Texto tam={13} color={c.tenue}>Cópialo de tu estado de cuenta: la app no lo calcula.</Texto>
+            <Etiqueta derecha={<Texto tam={13} color={c.tenue}>Opcional</Texto>}>Límite de crédito</Etiqueta>
+            <Campo value={limite} onChangeText={(t) => setLimite(limpiarMonto(t))} placeholder={`${moneda}0.00`} keyboardType="decimal-pad" />
+            <Texto tam={13} color={c.tenue}>{comoSobregiro ? `Para ver lo disponible. ${comoSobregiro}` : 'Para ver cuánto te queda disponible.'}</Texto>
           </View>
+          {reglas?.pago_minimo ? (
+            <View style={{ gap: 8 }}>
+              <Etiqueta>Pago mínimo</Etiqueta>
+              <Texto tam={13} color={c.tenue}>Lo calcula la app con las reglas de la tarjeta: {comoMinimo}, más lo que pase del límite.</Texto>
+            </View>
+          ) : (
+            <View style={{ gap: 8 }}>
+              <Etiqueta derecha={<Texto tam={13} color={c.tenue}>Opcional</Texto>}>Pago mínimo</Etiqueta>
+              <Campo value={minimo} onChangeText={(t) => setMinimo(limpiarMonto(t))} placeholder={`${moneda}0.00`} keyboardType="decimal-pad" />
+              <Texto tam={13} color={c.tenue}>Cópialo de tu estado de cuenta. Si eliges abajo el banco y la tarjeta, la app lo calcula.</Texto>
+            </View>
+          )}
         </>
       )}
       {catalogo && catalogo.bancos.length > 0 && (

@@ -9,7 +9,7 @@ from datetime import date, datetime
 from pathlib import Path
 
 ESQUEMA = Path(__file__).with_name("esquema.sql")
-VERSION = 6
+VERSION = 7
 
 # {versión a la que lleva: sql}. Cada paso corre con las claves foráneas apagadas: rehacer una
 # tabla no debe tocar las filas que la apuntan (movimiento.recurrencia_id es ON DELETE SET NULL).
@@ -109,6 +109,12 @@ MIGRACIONES: dict[int, str] = {
     ALTER TABLE pendiente ADD COLUMN contraparte TEXT;
     ALTER TABLE pendiente ADD COLUMN referencia TEXT;
     CREATE UNIQUE INDEX IF NOT EXISTS pendiente_referencia ON pendiente (origen, referencia) WHERE referencia IS NOT NULL;
+    COMMIT;
+    """,
+    # El límite de crédito de la tarjeta (centavos): con él se ve lo disponible y el sobregiro.
+    7: """
+    BEGIN;
+    ALTER TABLE cuenta ADD COLUMN limite INTEGER CHECK (limite > 0);
     COMMIT;
     """,
 }

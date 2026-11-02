@@ -7,9 +7,12 @@ import { useMemo, useState } from 'react';
 import { Linking, Pressable, ScrollView, View } from 'react-native';
 import { useAbrir, useAnotar } from '@/dialogos/abrir';
 import { comprasCercaDelCorte, interesSiNoPagas, resumenBanco, resumenMes, vinculoDe } from '@/lib/banco';
-import { configPresupuesto, deudaTarjeta, flujoCuenta, gastadoEnCorte, montoEnCuenta, pagoSugerido, periodoDe, porDia, porVenirDelMes } from '@/lib/calculos';
+import {
+  cicloTarjeta, configPresupuesto, deudaTarjeta, estadoTarjeta, flujoCuenta, gastadoEnCorte, montoEnCuenta, pagoSugerido, periodoDe, porDia,
+  porVenirDelMes, reglasTarjeta,
+} from '@/lib/calculos';
 import { useDatos } from '@/lib/datos';
-import { conSigno, dineroCorto, MESES, neto, ordenarPorFecha, saldo, tituloDia } from '@/lib/formato';
+import { conSigno, dineroCorto, MESES, MESES_CORTOS, neto, ordenarPorFecha, saldo, tituloDia } from '@/lib/formato';
 import type { Cuenta as TCuenta } from '@/lib/tipos';
 import { BotonRedondo, Buscador, CabeceraDia, Enlace, FilaMovimiento, Lista, Num, Rotulo, Tarjeta, Texto, Vacio } from '@/ui/componentes';
 import { useVez } from '@/ui/animar';
@@ -109,6 +112,11 @@ function FilaCifra({ texto, valor, color, tenue = false }: { texto: string; valo
   );
 }
 
+/** '2026-10-18' → '18 oct'. */
+function fechaCorta(iso: string): string {
+  return `${Number(iso.slice(8, 10))} ${MESES_CORTOS[Number(iso.slice(5, 7)) - 1]}`;
+}
+
 /** El mes anterior o siguiente de una clave 'YYYY-MM'. */
 function moverMes(clave: string, delta: number): string {
   const [y, m] = clave.split('-').map(Number);
@@ -194,16 +202,24 @@ function ResumenDelMes({ cuenta, fondo }: { cuenta: TCuenta; fondo: string }) {
   );
 }
 
-/** Tarjeta de crédito: lo que va del corte y lo que dice el banco (tasa, interés si no pagas el total, pago atrasado). */
+/**
+ * Tarjeta de crédito: lo que va del corte, lo que se debía al último corte con su pago mínimo, el límite y el
+ * sobregiro, y lo que dice el banco (tasa, interés si no pagas el total, pago atrasado).
+ */
 function ResumenTarjeta({ cuenta, fondo }: { cuenta: TCuenta; fondo: string }) {
   const d = useDatos();
   const { c } = useTema();
   const res = useMemo(() => resumenBanco(d, cuenta, d.hoy.slice(0, 7)), [d, cuenta]);
+  const estado = useMemo(() => estadoTarjeta(d, cuenta), [d, cuenta]);
+  const reglas = reglasTarjeta(d, cuenta);
+  const fechaPago = cicloTarjeta(cuenta, d.hoy, reglas?.dias_para_pagar)?.fechaPago ?? null;
   const vinculo = vinculoDe(d.catalogo, cuenta);
   const credito = res?.credito ?? null;
   const cerca = comprasCercaDelCorte(d, cuenta);
   const nombre = vinculo ? [vinculo.banco.nombre, vinculo.tarjeta?.nombre].filter(Boolean).join(' · ') : 'Tarjeta de crédito';
   const banca = vinculo?.banco.banca;
+  const sg = estado?.sobregiro ?? null;
+  const pasado = estado?.limite ? Math.max(0, deudaTarjeta(d, cuenta) - estado.limite) : 0;
   return (
     <View style={{ gap: 6 }}>
       <Rotulo>{nombre}</Rotulo>
@@ -212,12 +228,50 @@ function ResumenTarjeta({ cuenta, fondo }: { cuenta: TCuenta; fondo: string }) {
         {cerca > 0 && (
           <Texto tam={13} color={c.tenue}>Las compras de los últimos días antes del corte pueden pasar al siguiente: {neto(cerca, d.moneda)}</Texto>
         )}
+        {estado && estado.alCorte > 0 && (
+          <View style={{ borderTopWidth: 1, borderTopColor: c.linea, marginTop: 6, paddingTop: 6, gap: 2 }}>
+            <FilaCifra texto={`Debías al corte del ${fechaCorta(estado.corte)}`} valor={neto(estado.alCorte, d.moneda)} />
+            {estado.minimo !== null && estado.minimo > 0 && (
+              <FilaCifra texto={estado.calculado ? 'Pago mínimo (aprox.)' : 'Pago mínimo'} valor={neto(estado.minimo, d.moneda)} />
+            )}
+            {estado.calculado && reglas?.pago_minimo && (
+              <Texto tam={13} color={c.tenue}>
+                {reglas.pago_minimo.porcentaje}% de lo que debías, nunca menos de {dineroCorto(reglas.pago_minimo.minimo, d.moneda)}
+                {estado.exceso > 0 ? `, más ${neto(estado.exceso, d.moneda)} que pasaba del límite` : ''}.
+              </Texto>
+            )}
+            {fechaPago && <FilaCifra texto="Paga antes del" valor={fechaCorta(fechaPago)} tenue />}
+          </View>
+        )}
+        {estado?.limite && (
+          <View style={{ borderTopWidth: 1, borderTopColor: c.linea, marginTop: 6, paddingTop: 6, gap: 2 }}>
+            <FilaCifra texto="Límite" valor={neto(estado.limite, d.moneda)} tenue />
+            <FilaCifra texto="Disponible" valor={neto(estado.disponible ?? 0, d.moneda)} color={(estado.disponible ?? 0) < 0 ? c.alerta : undefined} />
+            {sg && sg.estado === 'dentro' && (
+              <Texto tam={13} color={c.tenue}>
+                {sg.hasta !== null
+                  ? `Puedes pasarte hasta ${neto(sg.hasta, d.moneda)} (${sg.porcentaje}% más) sin cargo; más de eso, ${neto(sg.cargo, d.moneda)} al corte.`
+                  : `Si pasas el límite, el banco cobra hasta ${neto(sg.cargo, d.moneda)} al corte.`}
+              </Texto>
+            )}
+            {sg && sg.estado === 'permitido' && (
+              <Texto tam={13} color={c.tenue}>
+                Vas {neto(pasado, d.moneda)} sobre el límite, dentro del {sg.porcentaje}% que no cobra. El banco pide abonar lo que pasa del límite.
+              </Texto>
+            )}
+            {sg && sg.estado === 'cobra' && (
+              <Texto tam={13} color={c.alerta}>
+                Vas {neto(pasado, d.moneda)} sobre el límite{sg.hasta !== null ? `, más del ${sg.porcentaje}% permitido` : ''}: si sigue así al corte, el banco cobra {sg.hasta !== null ? '' : 'hasta '}{neto(sg.cargo, d.moneda)}.
+              </Texto>
+            )}
+          </View>
+        )}
         {credito && (
-          <>
+          <View style={{ borderTopWidth: 1, borderTopColor: c.linea, marginTop: 6, paddingTop: 6, gap: 2 }}>
             <FilaCifra texto="Tasa anual" valor={`${credito.tasa}%`} />
             <Texto tam={13} color={c.tenue}>Si no pagas el total: unos {neto(interesSiNoPagas(deudaTarjeta(d, cuenta), credito.tasa), d.moneda)} de interés al mes</Texto>
             {credito.pagoAtrasado > 0 && <FilaCifra texto="Pago atrasado" valor={neto(credito.pagoAtrasado, d.moneda)} tenue />}
-          </>
+          </View>
         )}
         <Texto tam={12} color={c.tenue} style={{ marginTop: 6 }}>Solo lo que anotaste. El corte real lo da tu banco.</Texto>
         {banca && <PieBanca banca={banca} />}
@@ -306,7 +360,11 @@ function CuentaColor({ cuenta }: { cuenta: TCuenta }) {
   // Tarjeta de crédito: arriba va lo que se debe y lo del corte, y el pago es una sugerencia que el usuario confirma.
   const esTarjeta = !!cuenta.es_credito;
   const pago = esTarjeta ? pagoSugerido(d, cuenta) : null;
-  const fechas = [cuenta.dia_corte ? `Corta el ${cuenta.dia_corte}` : '', cuenta.dia_pago ? `paga el ${cuenta.dia_pago}` : ''].filter(Boolean).join(' · ');
+  // El día de pago que puso el usuario o, si no puso, la fecha que da el banco (28 días después del corte en BG).
+  const fechaPago = esTarjeta ? cicloTarjeta(cuenta, d.hoy, reglasTarjeta(d, cuenta)?.dias_para_pagar)?.fechaPago ?? null : null;
+  const fechas = [cuenta.dia_corte ? `Corta el ${cuenta.dia_corte}` : '',
+    cuenta.dia_pago ? `paga el ${cuenta.dia_pago}` : fechaPago ? `paga el ${fechaCorta(fechaPago)}` : ''].filter(Boolean).join(' · ');
+  const disponible = esTarjeta && cuenta.limite ? cuenta.limite - deudaTarjeta(d, cuenta) : null;
   function registrarPago() {
     if (!pago) return;
     anotar({ tipoInicial: 'transferencia', cuentaInicial: d.cuentas.find((x) => !x.es_credito)?.id, destinoInicial: cuenta.id,
@@ -328,7 +386,8 @@ function CuentaColor({ cuenta }: { cuenta: TCuenta }) {
           <Num tam={38} color={tinta}>Debes {neto(deudaTarjeta(d, cuenta), d.moneda)}</Num>
           <Texto tam={14} color={tinta} style={{ marginTop: 4 }}>Gastado en este corte <Texto num tam={14} color={tinta}>{neto(gastadoEnCorte(d, cuenta), d.moneda)}</Texto></Texto>
           {fechas !== '' && <Texto tam={14} color={tinta}>{fechas}</Texto>}
-          {!!cuenta.pago_minimo && <Texto tam={14} color={tinta}>Pago mínimo <Texto num tam={14} color={tinta}>{neto(cuenta.pago_minimo, d.moneda)}</Texto></Texto>}
+          {!!pago?.minimo && <Texto tam={14} color={tinta}>Pago mínimo <Texto num tam={14} color={tinta}>{neto(pago.minimo, d.moneda)}</Texto></Texto>}
+          {disponible !== null && <Texto tam={14} color={tinta}>Disponible <Texto num tam={14} color={tinta}>{neto(disponible, d.moneda)}</Texto></Texto>}
         </>
       ) : (
         <>

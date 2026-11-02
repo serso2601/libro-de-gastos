@@ -1,17 +1,12 @@
 // Lo que el banco le va a dar o cobrar a una cuenta vinculada, calculado con el catálogo (bancos.json) y los
 // saldos de cada día del mes. Funciones puras, sin React. Montos en centavos; el redondeo va solo al final.
 
-import { cicloTarjeta, diasDelMes } from './calculos';
+import { cicloTarjeta, diasDelMes, versionVigente } from './calculos';
 import { aFecha, fechaISO } from './formato';
 import type { Banco, Catalogo, Cuenta, Datos, InteresCuenta, ProductoCuenta, SeguroTarjeta, Tarjeta, VersionCuenta, VersionTarjeta } from './tipos';
 
-/** La versión del producto con mayor `vigente_desde` que no pase de la fecha; si la fecha es anterior a todas, la primera. */
-export function versionVigente<V extends { vigente_desde: string }>(producto: { versiones: V[] }, fechaISO: string): V {
-  const orden = [...producto.versiones].sort((a, b) => a.vigente_desde.localeCompare(b.vigente_desde));
-  let elegida = orden[0];
-  for (const v of orden) if (v.vigente_desde <= fechaISO) elegida = v;
-  return elegida;
-}
+// Vive en calculos (el pago sugerido de la tarjeta la usa); se vuelve a exportar aquí, donde está todo lo del catálogo.
+export { versionVigente };
 
 export interface VinculoResuelto {
   banco: Banco;

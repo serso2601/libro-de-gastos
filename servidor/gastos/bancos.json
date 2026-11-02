@@ -2,7 +2,8 @@
   "acerca": "Catálogo de productos bancarios de Panamá. Montos en centavos con ITBMS incluido; tasas en % anual. Cada producto guarda versiones con la fecha desde la que valen: un mes se calcula con la versión vigente en él (antes de la primera versión, con la primera). Las tarifas cambian: volver a verificarlas en la fuente.",
   "notas": [
     "SBP, Acuerdo 7-2026 (desde el 4/ene/2027): limita algunas comisiones (depósitos y retiros en sucursal, entre otras). Según la nota de prensa no toca la membresía de la tarjeta de débito. Revisarlo cuando entre en vigor.",
-    "Banco General: el contrato no dice si los tramos de interés se aplican combinados o no, ni si la base es 365 o 360 días. Se asume no combinado y 365 hasta comparar con un estado de cuenta."
+    "Banco General: el contrato no dice si los tramos de interés se aplican combinados o no, ni si la base es 365 o 360 días. Se asume no combinado y 365 hasta comparar con un estado de cuenta.",
+    "Banco General, tarjetas de crédito (tabla de octubre de 2025, revisada el 2/nov/2026): pago mínimo = 3% del saldo del estado de cuenta, nunca menos de US$20 (Classic/Gold/Standard) o US$25 (Platinum y más); el contrato de 2019 decía «más ITBMS» y la tabla no: se usa la tabla. Sobregiro permitido = % sobre el límite que se puede pasar dentro del ciclo sin cargo; si al cierre se pasa de ahí, cobran el cargo una vez (las tarjetas sin % publicado solo dicen «hasta US$53.50»). Lo que pase del límite se debe abonar de inmediato (contrato, cláusula 7e). La fecha de pago es 28 días después del corte; si el corte cae en día inhábil, se corre al día hábil anterior. `fechas` es el corte y el pago que publica la tabla para ese producto: de referencia, el del cliente puede ser otro."
   ],
   "bancos": [
     {
@@ -436,14 +437,27 @@
           "versiones": [
             {
               "vigente_desde": "2025-10-01",
-              "verificado": "2026-11-01",
+              "verificado": "2026-11-02",
               "fuente": "https://www.bgeneral.com/tasas-comisiones-recargos/",
               "tasa_anual": 21.99,
               "pago_atrasado": 5350,
               "adelanto_efectivo": {
                 "porcentaje": 5,
                 "minimo": 749
-              }
+              },
+              "pago_minimo": {
+                "porcentaje": 3,
+                "minimo": 2000
+              },
+              "sobregiro": {
+                "permitido": 5,
+                "cargo": 3210
+              },
+              "fechas": {
+                "corte": 17,
+                "pago": 15
+              },
+              "dias_para_pagar": 28
             }
           ]
         },
@@ -454,14 +468,27 @@
           "versiones": [
             {
               "vigente_desde": "2025-10-01",
-              "verificado": "2026-11-01",
+              "verificado": "2026-11-02",
               "fuente": "https://www.bgeneral.com/tasas-comisiones-recargos/",
               "tasa_anual": 19.99,
               "pago_atrasado": 5350,
               "adelanto_efectivo": {
                 "porcentaje": 5,
                 "minimo": 749
-              }
+              },
+              "pago_minimo": {
+                "porcentaje": 3,
+                "minimo": 2500
+              },
+              "sobregiro": {
+                "permitido": 5,
+                "cargo": 5350
+              },
+              "fechas": {
+                "corte": 17,
+                "pago": 15
+              },
+              "dias_para_pagar": 28
             }
           ]
         },
@@ -472,14 +499,27 @@
           "versiones": [
             {
               "vigente_desde": "2025-10-01",
-              "verificado": "2026-11-01",
+              "verificado": "2026-11-02",
               "fuente": "https://www.bgeneral.com/tasas-comisiones-recargos/",
               "tasa_anual": 15.0,
               "pago_atrasado": 5350,
               "adelanto_efectivo": {
                 "porcentaje": 5,
                 "minimo": 749
-              }
+              },
+              "pago_minimo": {
+                "porcentaje": 3,
+                "minimo": 2500
+              },
+              "sobregiro": {
+                "permitido": 10,
+                "cargo": 5350
+              },
+              "fechas": {
+                "corte": 17,
+                "pago": 15
+              },
+              "dias_para_pagar": 28
             }
           ]
         },
@@ -490,14 +530,27 @@
           "versiones": [
             {
               "vigente_desde": "2025-10-01",
-              "verificado": "2026-11-01",
+              "verificado": "2026-11-02",
               "fuente": "https://www.bgeneral.com/tasas-comisiones-recargos/",
               "tasa_anual": 14.0,
               "pago_atrasado": 5350,
               "adelanto_efectivo": {
                 "porcentaje": 5,
                 "minimo": 749
-              }
+              },
+              "pago_minimo": {
+                "porcentaje": 3,
+                "minimo": 2500
+              },
+              "sobregiro": {
+                "permitido": 10,
+                "cargo": 5350
+              },
+              "fechas": {
+                "corte": 17,
+                "pago": 15
+              },
+              "dias_para_pagar": 28
             }
           ]
         },
@@ -508,14 +561,27 @@
           "versiones": [
             {
               "vigente_desde": "2025-10-01",
-              "verificado": "2026-11-01",
+              "verificado": "2026-11-02",
               "fuente": "https://www.bgeneral.com/tasas-comisiones-recargos/",
               "tasa_anual": 22.99,
               "pago_atrasado": 5350,
               "adelanto_efectivo": {
                 "porcentaje": 5,
                 "minimo": 749
-              }
+              },
+              "pago_minimo": {
+                "porcentaje": 3,
+                "minimo": 2000
+              },
+              "sobregiro": {
+                "permitido": 5,
+                "cargo": 4280
+              },
+              "fechas": {
+                "corte": 5,
+                "pago": 3
+              },
+              "dias_para_pagar": 28
             }
           ]
         },
@@ -526,14 +592,89 @@
           "versiones": [
             {
               "vigente_desde": "2025-10-01",
-              "verificado": "2026-11-01",
+              "verificado": "2026-11-02",
               "fuente": "https://www.bgeneral.com/tasas-comisiones-recargos/",
               "tasa_anual": 19.99,
               "pago_atrasado": 5350,
               "adelanto_efectivo": {
                 "porcentaje": 5,
                 "minimo": 749
-              }
+              },
+              "pago_minimo": {
+                "porcentaje": 3,
+                "minimo": 2500
+              },
+              "sobregiro": {
+                "permitido": 5,
+                "cargo": 5350
+              },
+              "fechas": {
+                "corte": 5,
+                "pago": 3
+              },
+              "dias_para_pagar": 28
+            }
+          ]
+        },
+        {
+          "id": "bg-credito-mileageplus-signature",
+          "nombre": "Crédito MileagePlus Signature",
+          "clase": "credito",
+          "versiones": [
+            {
+              "vigente_desde": "2025-10-01",
+              "verificado": "2026-11-02",
+              "fuente": "https://www.bgeneral.com/tasas-comisiones-recargos/",
+              "tasa_anual": 15.0,
+              "pago_atrasado": 5350,
+              "adelanto_efectivo": {
+                "porcentaje": 5,
+                "minimo": 749
+              },
+              "pago_minimo": {
+                "porcentaje": 3,
+                "minimo": 2500
+              },
+              "sobregiro": {
+                "permitido": 10,
+                "cargo": 5350
+              },
+              "fechas": {
+                "corte": 5,
+                "pago": 3
+              },
+              "dias_para_pagar": 28
+            }
+          ]
+        },
+        {
+          "id": "bg-credito-mileageplus-infinite",
+          "nombre": "Crédito MileagePlus Infinite",
+          "clase": "credito",
+          "versiones": [
+            {
+              "vigente_desde": "2025-10-01",
+              "verificado": "2026-11-02",
+              "fuente": "https://www.bgeneral.com/tasas-comisiones-recargos/",
+              "tasa_anual": 14.0,
+              "pago_atrasado": 5350,
+              "adelanto_efectivo": {
+                "porcentaje": 5,
+                "minimo": 749
+              },
+              "pago_minimo": {
+                "porcentaje": 3,
+                "minimo": 2500
+              },
+              "sobregiro": {
+                "permitido": 10,
+                "cargo": 5350
+              },
+              "fechas": {
+                "corte": 5,
+                "pago": 3
+              },
+              "dias_para_pagar": 28
             }
           ]
         },
@@ -544,14 +685,58 @@
           "versiones": [
             {
               "vigente_desde": "2025-10-01",
-              "verificado": "2026-11-01",
+              "verificado": "2026-11-02",
               "fuente": "https://www.bgeneral.com/tasas-comisiones-recargos/",
               "tasa_anual": 19.99,
               "pago_atrasado": 5350,
               "adelanto_efectivo": {
                 "porcentaje": 5,
                 "minimo": 749
-              }
+              },
+              "pago_minimo": {
+                "porcentaje": 3,
+                "minimo": 2500
+              },
+              "sobregiro": {
+                "permitido": null,
+                "cargo": 5350
+              },
+              "fechas": {
+                "corte": 7,
+                "pago": 5
+              },
+              "dias_para_pagar": 28
+            }
+          ]
+        },
+        {
+          "id": "bg-credito-connectmiles-signature",
+          "nombre": "Crédito ConnectMiles Signature",
+          "clase": "credito",
+          "versiones": [
+            {
+              "vigente_desde": "2025-10-01",
+              "verificado": "2026-11-02",
+              "fuente": "https://www.bgeneral.com/tasas-comisiones-recargos/",
+              "tasa_anual": 15.0,
+              "pago_atrasado": 5350,
+              "adelanto_efectivo": {
+                "porcentaje": 5,
+                "minimo": 749
+              },
+              "pago_minimo": {
+                "porcentaje": 3,
+                "minimo": 2500
+              },
+              "sobregiro": {
+                "permitido": null,
+                "cargo": 5350
+              },
+              "fechas": {
+                "corte": 7,
+                "pago": 5
+              },
+              "dias_para_pagar": 28
             }
           ]
         },
@@ -562,14 +747,89 @@
           "versiones": [
             {
               "vigente_desde": "2025-10-01",
-              "verificado": "2026-11-01",
+              "verificado": "2026-11-02",
               "fuente": "https://www.bgeneral.com/tasas-comisiones-recargos/",
               "tasa_anual": 22.99,
               "pago_atrasado": 5350,
               "adelanto_efectivo": {
                 "porcentaje": 5,
                 "minimo": 749
-              }
+              },
+              "pago_minimo": {
+                "porcentaje": 3,
+                "minimo": 2000
+              },
+              "sobregiro": {
+                "permitido": 5,
+                "cargo": 3210
+              },
+              "fechas": {
+                "corte": 17,
+                "pago": 15
+              },
+              "dias_para_pagar": 28
+            }
+          ]
+        },
+        {
+          "id": "bg-credito-visa-esencial-platinum",
+          "nombre": "Visa Esencial Platinum",
+          "clase": "credito",
+          "versiones": [
+            {
+              "vigente_desde": "2025-10-01",
+              "verificado": "2026-11-02",
+              "fuente": "https://www.bgeneral.com/tasas-comisiones-recargos/",
+              "tasa_anual": 24.0,
+              "pago_atrasado": 5350,
+              "adelanto_efectivo": {
+                "porcentaje": 5,
+                "minimo": 749
+              },
+              "pago_minimo": {
+                "porcentaje": 3,
+                "minimo": 2500
+              },
+              "sobregiro": {
+                "permitido": null,
+                "cargo": 5350
+              },
+              "fechas": {
+                "corte": 17,
+                "pago": 15
+              },
+              "dias_para_pagar": 28
+            }
+          ]
+        },
+        {
+          "id": "bg-credito-mastercard-esencial",
+          "nombre": "Mastercard Esencial Platinum",
+          "clase": "credito",
+          "versiones": [
+            {
+              "vigente_desde": "2025-10-01",
+              "verificado": "2026-11-02",
+              "fuente": "https://www.bgeneral.com/tasas-comisiones-recargos/",
+              "tasa_anual": 24.0,
+              "pago_atrasado": 5350,
+              "adelanto_efectivo": {
+                "porcentaje": 5,
+                "minimo": 749
+              },
+              "pago_minimo": {
+                "porcentaje": 3,
+                "minimo": 2500
+              },
+              "sobregiro": {
+                "permitido": null,
+                "cargo": 5350
+              },
+              "fechas": {
+                "corte": 15,
+                "pago": 12
+              },
+              "dias_para_pagar": 28
             }
           ]
         },
@@ -580,14 +840,27 @@
           "versiones": [
             {
               "vigente_desde": "2025-10-01",
-              "verificado": "2026-11-01",
+              "verificado": "2026-11-02",
               "fuente": "https://www.bgeneral.com/tasas-comisiones-recargos/",
               "tasa_anual": 21.99,
               "pago_atrasado": 5350,
               "adelanto_efectivo": {
                 "porcentaje": 5,
                 "minimo": 749
-              }
+              },
+              "pago_minimo": {
+                "porcentaje": 3,
+                "minimo": 2000
+              },
+              "sobregiro": {
+                "permitido": 5,
+                "cargo": 3210
+              },
+              "fechas": {
+                "corte": 8,
+                "pago": 6
+              },
+              "dias_para_pagar": 28
             }
           ]
         },
@@ -598,14 +871,27 @@
           "versiones": [
             {
               "vigente_desde": "2025-10-01",
-              "verificado": "2026-11-01",
+              "verificado": "2026-11-02",
               "fuente": "https://www.bgeneral.com/tasas-comisiones-recargos/",
               "tasa_anual": 18.99,
               "pago_atrasado": 5350,
               "adelanto_efectivo": {
                 "porcentaje": 5,
                 "minimo": 749
-              }
+              },
+              "pago_minimo": {
+                "porcentaje": 3,
+                "minimo": 2500
+              },
+              "sobregiro": {
+                "permitido": null,
+                "cargo": 5350
+              },
+              "fechas": {
+                "corte": 8,
+                "pago": 6
+              },
+              "dias_para_pagar": 28
             }
           ]
         },
@@ -616,14 +902,50 @@
           "versiones": [
             {
               "vigente_desde": "2025-10-01",
-              "verificado": "2026-11-01",
+              "verificado": "2026-11-02",
               "fuente": "https://www.bgeneral.com/tasas-comisiones-recargos/",
               "tasa_anual": 21.99,
               "pago_atrasado": 5350,
               "adelanto_efectivo": {
                 "porcentaje": 5,
                 "minimo": 749
-              }
+              },
+              "pago_minimo": {
+                "porcentaje": 3,
+                "minimo": 2000
+              },
+              "sobregiro": {
+                "permitido": 5,
+                "cargo": 3210
+              },
+              "dias_para_pagar": 28
+            }
+          ]
+        },
+        {
+          "id": "bg-credito-platinum",
+          "nombre": "Crédito Banco General Platinum",
+          "clase": "credito",
+          "versiones": [
+            {
+              "vigente_desde": "2025-10-01",
+              "verificado": "2026-11-02",
+              "fuente": "https://www.bgeneral.com/tasas-comisiones-recargos/",
+              "tasa_anual": 18.99,
+              "pago_atrasado": 5350,
+              "adelanto_efectivo": {
+                "porcentaje": 5,
+                "minimo": 749
+              },
+              "pago_minimo": {
+                "porcentaje": 3,
+                "minimo": 2500
+              },
+              "sobregiro": {
+                "permitido": null,
+                "cargo": 5350
+              },
+              "dias_para_pagar": 28
             }
           ]
         }
