@@ -4,7 +4,7 @@
     "SBP, Acuerdo 7-2026 (desde el 4/ene/2027): limita algunas comisiones (depósitos y retiros en sucursal, entre otras). Según la nota de prensa no toca la membresía de la tarjeta de débito. Revisarlo cuando entre en vigor.",
     "Banco General: el contrato no dice si los tramos de interés se aplican combinados o no, ni si la base es 365 o 360 días. Se asume no combinado y 365 hasta comparar con un estado de cuenta.",
     "Banco General, tarjetas de crédito (tabla de octubre de 2025, revisada el 2/nov/2026): pago mínimo = 3% del saldo del estado de cuenta, nunca menos de US$20 (Classic/Gold/Standard) o US$25 (Platinum y más); el contrato de 2019 decía «más ITBMS» y la tabla no: se usa la tabla. Sobregiro permitido = % sobre el límite que se puede pasar dentro del ciclo sin cargo; si al cierre se pasa de ahí, cobran el cargo una vez (las tarjetas sin % publicado solo dicen «hasta US$53.50»). Lo que pase del límite se debe abonar de inmediato (contrato, cláusula 7e). La fecha de pago es 28 días después del corte; si el corte cae en día inhábil, se corre al día hábil anterior. `fechas` es el corte y el pago que publica la tabla para ese producto: de referencia, el del cliente puede ser otro.",
-    "`diseno` de cada tarjeta: colores y red (Visa o Mastercard) para dibujarla en la app. Es un dibujo aproximado, no la imagen del banco."
+    "`diseno` de cada tarjeta: colores y red (Visa o Mastercard) para dibujarla si no hay imagen. `imagen`: de dónde sale la foto de la tarjeta en la página del banco (el comparador de tarjetas de BG, revisado el 3/nov/2026). La imagen no va en el repo: el servidor la baja la primera vez y la guarda en datos/tarjetas/."
   ],
   "bancos": [
     {
@@ -459,6 +459,12 @@
             "tinta": "#FFFFFF",
             "red": "visa"
           },
+          "imagen": {
+            "url": "https://www.bgeneral.com/wp-content/uploads/2024/01/Tarjeta-Estrellas-12-400x252-1.png",
+            "nombre": "Visa Estrellas Gold",
+            "fuente": "https://www.bgeneral.com/tarjetas-de-credito/comparador/",
+            "verificado": "2026-11-03"
+          },
           "versiones": [
             {
               "vigente_desde": "2025-10-01",
@@ -497,6 +503,12 @@
             ],
             "tinta": "#1A1D23",
             "red": "visa"
+          },
+          "imagen": {
+            "url": "https://www.bgeneral.com/wp-content/uploads/2024/01/VISA-EstrellasPlatinum.png",
+            "nombre": "Visa Estrellas Platinum",
+            "fuente": "https://www.bgeneral.com/tarjetas-de-credito/comparador/",
+            "verificado": "2026-11-03"
           },
           "versiones": [
             {
@@ -537,6 +549,12 @@
             "tinta": "#FFFFFF",
             "red": "visa"
           },
+          "imagen": {
+            "url": "https://www.bgeneral.com/wp-content/uploads/2024/01/VISA-EstrellasSignaturer.png",
+            "nombre": "Visa Estrellas Signature",
+            "fuente": "https://www.bgeneral.com/tarjetas-de-credito/comparador/",
+            "verificado": "2026-11-03"
+          },
           "versiones": [
             {
               "vigente_desde": "2025-10-01",
@@ -575,6 +593,12 @@
             ],
             "tinta": "#FFFFFF",
             "red": "mastercard"
+          },
+          "imagen": {
+            "url": "https://www.bgeneral.com/wp-content/uploads/2024/01/Mastercard-EstrellasSignature.png",
+            "nombre": "Mastercard Estrellas Black",
+            "fuente": "https://www.bgeneral.com/tarjetas-de-credito/comparador/",
+            "verificado": "2026-11-03"
           },
           "versiones": [
             {
@@ -615,6 +639,12 @@
             "tinta": "#FFFFFF",
             "red": "visa"
           },
+          "imagen": {
+            "url": "https://www.bgeneral.com/wp-content/uploads/2026/08/visa mileageplus tcbg (4).webp",
+            "nombre": "Visa MileagePlus Gold",
+            "fuente": "https://www.bgeneral.com/tarjetas-de-credito/comparador/",
+            "verificado": "2026-11-03"
+          },
           "versiones": [
             {
               "vigente_desde": "2025-10-01",
@@ -653,6 +683,12 @@
             ],
             "tinta": "#1A1D23",
             "red": "visa"
+          },
+          "imagen": {
+            "url": "https://www.bgeneral.com/wp-content/uploads/2026/08/visa mileageplus tcbg (6).webp",
+            "nombre": "Visa MileagePlus Platinum",
+            "fuente": "https://www.bgeneral.com/tarjetas-de-credito/comparador/",
+            "verificado": "2026-11-03"
           },
           "versiones": [
             {
@@ -693,6 +729,12 @@
             "tinta": "#FFFFFF",
             "red": "visa"
           },
+          "imagen": {
+            "url": "https://www.bgeneral.com/wp-content/uploads/2024/01/VISA-MileagePlusSignature.png",
+            "nombre": "Visa MileagePlus Signature",
+            "fuente": "https://www.bgeneral.com/tarjetas-de-credito/comparador/",
+            "verificado": "2026-11-03"
+          },
           "versiones": [
             {
               "vigente_desde": "2025-10-01",
@@ -732,6 +774,12 @@
             "tinta": "#FFFFFF",
             "red": "visa"
           },
+          "imagen": {
+            "url": "https://www.bgeneral.com/wp-content/uploads/2026/08/visa mileageplus tcbg (5).webp",
+            "nombre": "Visa MileagePlus Infinite",
+            "fuente": "https://www.bgeneral.com/tarjetas-de-credito/comparador/",
+            "verificado": "2026-11-03"
+          },
           "versiones": [
             {
               "vigente_desde": "2025-10-01",
@@ -768,7 +816,14 @@
               "#0C3B5E",
               "#1E7A9C"
             ],
-            "tinta": "#FFFFFF"
+            "tinta": "#FFFFFF",
+            "red": "visa"
+          },
+          "imagen": {
+            "url": "https://www.bgeneral.com/wp-content/uploads/2024/01/VISA-ConnectMilePlatinum.png",
+            "nombre": "Visa ConnectMiles Platinum",
+            "fuente": "https://www.bgeneral.com/tarjetas-de-credito/comparador/",
+            "verificado": "2026-11-03"
           },
           "versiones": [
             {
@@ -806,7 +861,14 @@
               "#0A1E33",
               "#1B3E5C"
             ],
-            "tinta": "#FFFFFF"
+            "tinta": "#FFFFFF",
+            "red": "visa"
+          },
+          "imagen": {
+            "url": "https://www.bgeneral.com/wp-content/uploads/2024/01/VISA-ConnectMileSignature.png",
+            "nombre": "Visa ConnectMiles Signature",
+            "fuente": "https://www.bgeneral.com/tarjetas-de-credito/comparador/",
+            "verificado": "2026-11-03"
           },
           "versiones": [
             {
@@ -847,6 +909,12 @@
             "tinta": "#FFFFFF",
             "red": "visa"
           },
+          "imagen": {
+            "url": "https://www.bgeneral.com/wp-content/uploads/2024/01/VISA-Essencial.png",
+            "nombre": "Visa Esencial Platinum (el banco no publica la Classic/Gold aparte)",
+            "fuente": "https://www.bgeneral.com/tarjetas-de-credito/comparador/",
+            "verificado": "2026-11-03"
+          },
           "versiones": [
             {
               "vigente_desde": "2025-10-01",
@@ -885,6 +953,12 @@
             ],
             "tinta": "#1A1D23",
             "red": "visa"
+          },
+          "imagen": {
+            "url": "https://www.bgeneral.com/wp-content/uploads/2024/01/VISA-Essencial.png",
+            "nombre": "Visa Esencial Platinum",
+            "fuente": "https://www.bgeneral.com/tarjetas-de-credito/comparador/",
+            "verificado": "2026-11-03"
           },
           "versiones": [
             {
@@ -925,6 +999,12 @@
             "tinta": "#FFFFFF",
             "red": "mastercard"
           },
+          "imagen": {
+            "url": "https://www.bgeneral.com/wp-content/uploads/2024/01/Mastercard-Essencial.png",
+            "nombre": "Mastercard Esencial Platinum",
+            "fuente": "https://www.bgeneral.com/tarjetas-de-credito/comparador/",
+            "verificado": "2026-11-03"
+          },
           "versiones": [
             {
               "vigente_desde": "2025-10-01",
@@ -961,7 +1041,14 @@
               "#1E7D4F",
               "#3DBB7A"
             ],
-            "tinta": "#FFFFFF"
+            "tinta": "#FFFFFF",
+            "red": "visa"
+          },
+          "imagen": {
+            "url": "https://www.bgeneral.com/wp-content/uploads/2024/01/VISA-CashbackGold.png",
+            "nombre": "Visa CashBack Gold",
+            "fuente": "https://www.bgeneral.com/tarjetas-de-credito/comparador/",
+            "verificado": "2026-11-03"
           },
           "versiones": [
             {
@@ -999,7 +1086,14 @@
               "#56606B",
               "#ABB5BF"
             ],
-            "tinta": "#1A1D23"
+            "tinta": "#1A1D23",
+            "red": "visa"
+          },
+          "imagen": {
+            "url": "https://www.bgeneral.com/wp-content/uploads/2024/01/VISA-CashbackPlatinum.png",
+            "nombre": "Visa CashBack Platinum",
+            "fuente": "https://www.bgeneral.com/tarjetas-de-credito/comparador/",
+            "verificado": "2026-11-03"
           },
           "versiones": [
             {

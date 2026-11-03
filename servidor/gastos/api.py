@@ -30,7 +30,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from . import avisos, correo, db, importar, pagina, recurrencias
+from . import avisos, correo, db, imagenes, importar, pagina, recurrencias
 from .config import Config
 
 SIN_ENTRADA = "Falta el token o no es el de este servidor"
@@ -441,10 +441,12 @@ def _sincronizar_cargos(con: sqlite3.Connection, cuenta_id: str, vinculo: Vincul
     recurrencias.materializar(con, hoy)
 
 
-def create_app(config: Config | None = None, hoy=date.today, web: Path = WEB, extractor=None, elector=None) -> FastAPI:
+def create_app(config: Config | None = None, hoy=date.today, web: Path = WEB, extractor=None, elector=None,
+               bajador=imagenes.bajar) -> FastAPI:
     """`hoy` es una función para que las pruebas puedan mover el reloj; `web`, dónde está la app web;
     `extractor`, la función que lee un aviso del banco (por defecto Claude; las pruebas ponen una falsa);
-    `elector`, la que elige la categoría de un Yappy o un Apple Pay (igual: Claude, o una falsa)."""
+    `elector`, la que elige la categoría de un Yappy o un Apple Pay (igual: Claude, o una falsa);
+    `bajador`, el que trae la imagen de una tarjeta de la página del banco (las pruebas ponen uno falso)."""
     config = config or Config.desde_entorno()
     inicial = db.conectar(config.ruta_db)
     try:
@@ -515,6 +517,19 @@ def create_app(config: Config | None = None, hoy=date.today, web: Path = WEB, ex
         """La web avisa cuánto tardó en abrir (ver public/index.html); queda en el registro."""
         print(f"Arranque web desde {request.client.host if request.client else '?'}: {(await request.body())[:300].decode(errors='replace')}", flush=True)
         return {"ok": True}
+
+    @app.get("/tarjetas/{id_}.png", include_in_schema=False)
+    def imagen_tarjeta(id_: str):
+        """La imagen de una tarjeta del catálogo, sin pedir entrar (como /app: es pública, la publica el banco y
+        un <img> no manda el token). Se baja una vez de la página del banco y queda en datos/tarjetas/."""
+        try:
+            archivo = imagenes.ruta_de(config.carpeta, CATALOGO, id_, bajador)
+        except Exception as e:  # sin internet, el banco cambió la imagen de lugar…: la app dibuja la tarjeta
+            print(f"No se pudo traer la imagen de {id_}: {e}", flush=True)
+            raise HTTPException(404, "No se pudo traer la imagen de esa tarjeta")
+        if archivo is None:
+            raise HTTPException(404, "Esa tarjeta no tiene imagen")
+        return FileResponse(archivo, media_type="image/png", headers={"Cache-Control": "public, max-age=604800"})
 
     @app.get("/salud")
     def salud():
