@@ -6,6 +6,19 @@ se probó sale; lo que quedó a medias entra.
 
 Última actualización: 2/nov/2026.
 
+## Por probar: tarjetas de otros bancos, pila de tarjetas y cifras separadas (2/nov, noche)
+
+Hecho y probado en Chrome con un servidor de prueba (datos inventados); en los datos reales **no se tocó nada**.
+1. **La tarjeta del BAC**: Editar cuenta → Banco «Otro banco» → nombre «BAC» y el de la tarjeta → bloque «Reglas de
+   tu tarjeta»: % del mínimo y su piso, interés anual, cargo por atraso, sobregiro y días para pagar (de su estado de
+   cuenta o la tabla de tarifas del BAC). Ver que el mínimo y la fecha de pago salgan bien en su pantalla.
+2. **La VISA ESTRELLA**: Editar cuenta → ver la pila de tarjetas de BG (toca la elegida para abrirla) y que la
+   suya siga elegida. Los colores son un dibujo aproximado: si alguna se ve muy distinta de la real, decir cuál.
+3. **La pantalla de cada cuenta**: cifras arriba en cuadros, filas de cifras abajo, notas aparte y «Qué es cada
+   cosa» al pie. Decir si se lee mejor o si falta/sobra algo.
+4. **Día del corte**: con el estado de cuenta del 18/nov de la VISA, ver si las compras con fecha de registro del
+   18 salen en ese estado o en el siguiente (la app hoy cuenta el día del corte dentro del corte).
+
 ## Por hacer y probar: Yappy, Apple Pay, resumen del mes y bancos (2/nov)
 
 Ver «Qué lleva la app», Yappy, Apple Pay y cargos fijos en `CLAUDE.md`. Pruebas del servidor (152) y

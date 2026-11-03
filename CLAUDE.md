@@ -249,6 +249,28 @@ Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
   (el usuario lo pidió así), el interés estimado del mes (saldo de cada día, 0 los días bajo el
   mínimo), los cargos del mes y el neto al cierre (`lib/banco.ts`). Se asume tramos no combinados y
   base 365 hasta compararlo con un estado de cuenta real.
+  **Elegir la tarjeta en una pila** (2/nov, lo pidió el usuario): en la hoja de la cuenta, Banco = Ninguno ·
+  <bancos del catálogo> · **Otro banco**. Con un banco del catálogo, sus tarjetas salen **dibujadas** en una pila
+  al estilo Wallet (`ui/tarjetaBanco.tsx`; colores y red en `diseno` de cada tarjeta en `bancos.json`: es un
+  dibujo aproximado, **no** la imagen del banco, que no va en un repo público); tocar una la elige y la pila se
+  cierra sobre ella; debajo, lo que dice el banco de esa tarjeta en filas de dato (mínimo, interés, atraso,
+  sobregiro, fechas).
+  **Banco fuera del catálogo** (2/nov, la tarjeta del BAC del usuario): «Otro banco» pide el nombre (y el de la
+  tarjeta) y, si es de crédito, un bloque «Reglas de tu tarjeta» (todas opcionales): % y piso del mínimo, interés
+  anual, cargo por atraso, sobregiro (% sin cargo y cargo) y días para pagar. Van en `cuenta.reglas` (JSON,
+  esquema v11) con la misma forma que una versión del catálogo: `calculos.reglasTarjeta` las devuelve cuando no
+  hay tarjeta del catálogo, así mínimo, fecha de pago, sobregiro y el aviso de pagos (`avisos._reglas`) salen
+  igual. Con una tarjeta del catálogo elegida, el servidor descarta las reglas propias.
+- **Cifras aparte de las explicaciones** (2/nov, lo pidió el usuario): en la pantalla de una cuenta, la cabecera
+  muestra cada dato con su rótulo arriba, en cuadros de dos columnas (nada de frases con números dentro); el
+  bloque de abajo lleva solo filas de cifras, luego **notas** (lo que pasa hoy: compras que pasan al otro corte,
+  sobregiro, atraso aprendido) y al pie **«Qué es cada cosa»**, cerrado, con las definiciones.
+- **¿Entran las compras del día del corte?** (averiguado el 2/nov): ninguna fuente pública de BG lo dice. El
+  contrato de tarjetas de BG cobra intereses «desde el día en que se efectúa la transacción hasta la fecha de
+  corte» y BAC Panamá da el ejemplo «corte el 20 = del 21 al 20». La app toma el periodo (corte anterior, corte],
+  o sea, **el día del corte entra**. Lo que de verdad decide es la fecha en que el banco registra la compra (2–4
+  días después), y eso ya lo aprende la app con el mínimo confirmado de cada corte. Confirmarlo con el estado de
+  cuenta del 18/nov.
 - **Captura desde el correo** (2/nov/2026): un script del servidor (sin IA) revisa Gmail cada 5 min con
   la **API de Gmail y permiso de solo lectura** (OAuth, sin contraseña: se autoriza una vez con
   `uv run python -m gastos.correo --autorizar`; la app de Google Cloud va «En producción» para que el
