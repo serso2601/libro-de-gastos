@@ -3,7 +3,8 @@
   "notas": [
     "SBP, Acuerdo 7-2026 (desde el 4/ene/2027): limita algunas comisiones (depósitos y retiros en sucursal, entre otras). Según la nota de prensa no toca la membresía de la tarjeta de débito. Revisarlo cuando entre en vigor.",
     "Banco General: el contrato no dice si los tramos de interés se aplican combinados o no, ni si la base es 365 o 360 días. Se asume no combinado y 365 hasta comparar con un estado de cuenta.",
-    "Banco General, tarjetas de crédito (tabla de octubre de 2025, revisada el 2/nov/2026): pago mínimo = 3% del saldo del estado de cuenta, nunca menos de US$20 (Classic/Gold/Standard) o US$25 (Platinum y más); el contrato de 2019 decía «más ITBMS» y la tabla no: se usa la tabla. Sobregiro permitido = % sobre el límite que se puede pasar dentro del ciclo sin cargo; si al cierre se pasa de ahí, cobran el cargo una vez (las tarjetas sin % publicado solo dicen «hasta US$53.50»). Lo que pase del límite se debe abonar de inmediato (contrato, cláusula 7e). La fecha de pago es 28 días después del corte; si el corte cae en día inhábil, se corre al día hábil anterior. `fechas` es el corte y el pago que publica la tabla para ese producto: de referencia, el del cliente puede ser otro."
+    "Banco General, tarjetas de crédito (tabla de octubre de 2025, revisada el 2/nov/2026): pago mínimo = 3% del saldo del estado de cuenta, nunca menos de US$20 (Classic/Gold/Standard) o US$25 (Platinum y más); el contrato de 2019 decía «más ITBMS» y la tabla no: se usa la tabla. Sobregiro permitido = % sobre el límite que se puede pasar dentro del ciclo sin cargo; si al cierre se pasa de ahí, cobran el cargo una vez (las tarjetas sin % publicado solo dicen «hasta US$53.50»). Lo que pase del límite se debe abonar de inmediato (contrato, cláusula 7e). La fecha de pago es 28 días después del corte; si el corte cae en día inhábil, se corre al día hábil anterior. `fechas` es el corte y el pago que publica la tabla para ese producto: de referencia, el del cliente puede ser otro.",
+    "`diseno` de cada tarjeta: colores y red (Visa o Mastercard) para dibujarla en la app. Es un dibujo aproximado, no la imagen del banco."
   ],
   "bancos": [
     {
@@ -210,6 +211,14 @@
           "id": "bg-visa-debito",
           "nombre": "Visa Débito",
           "clase": "debito",
+          "diseno": {
+            "fondo": [
+              "#1F3B8C",
+              "#3E6FD8"
+            ],
+            "tinta": "#FFFFFF",
+            "red": "visa"
+          },
           "versiones": [
             {
               "vigente_desde": "2026-03-01",
@@ -322,6 +331,14 @@
           "id": "bg-mastercard-debito",
           "nombre": "Mastercard Débito",
           "clase": "debito",
+          "diseno": {
+            "fondo": [
+              "#26262E",
+              "#55556A"
+            ],
+            "tinta": "#FFFFFF",
+            "red": "mastercard"
+          },
           "versiones": [
             {
               "vigente_desde": "2026-03-01",
@@ -434,6 +451,14 @@
           "id": "bg-credito-estrellas-classic",
           "nombre": "Crédito Estrellas Classic/Gold",
           "clase": "credito",
+          "diseno": {
+            "fondo": [
+              "#0F4C9A",
+              "#2E7BD6"
+            ],
+            "tinta": "#FFFFFF",
+            "red": "visa"
+          },
           "versiones": [
             {
               "vigente_desde": "2025-10-01",
@@ -465,6 +490,14 @@
           "id": "bg-credito-estrellas-platinum",
           "nombre": "Crédito Estrellas Platinum",
           "clase": "credito",
+          "diseno": {
+            "fondo": [
+              "#7C8794",
+              "#CBD3DC"
+            ],
+            "tinta": "#1A1D23",
+            "red": "visa"
+          },
           "versiones": [
             {
               "vigente_desde": "2025-10-01",
@@ -496,6 +529,14 @@
           "id": "bg-credito-estrellas-signature",
           "nombre": "Crédito Estrellas Signature",
           "clase": "credito",
+          "diseno": {
+            "fondo": [
+              "#1B1F3A",
+              "#3A4170"
+            ],
+            "tinta": "#FFFFFF",
+            "red": "visa"
+          },
           "versiones": [
             {
               "vigente_desde": "2025-10-01",
@@ -527,6 +568,14 @@
           "id": "bg-credito-mastercard-black",
           "nombre": "Mastercard Black",
           "clase": "credito",
+          "diseno": {
+            "fondo": [
+              "#0B0B0D",
+              "#2C2C31"
+            ],
+            "tinta": "#FFFFFF",
+            "red": "mastercard"
+          },
           "versiones": [
             {
               "vigente_desde": "2025-10-01",
@@ -558,6 +607,14 @@
           "id": "bg-credito-mileageplus-classic",
           "nombre": "Crédito MileagePlus Classic/Gold",
           "clase": "credito",
+          "diseno": {
+            "fondo": [
+              "#0A2F6B",
+              "#1F5FB5"
+            ],
+            "tinta": "#FFFFFF",
+            "red": "visa"
+          },
           "versiones": [
             {
               "vigente_desde": "2025-10-01",
@@ -589,6 +646,14 @@
           "id": "bg-credito-mileageplus-platinum",
           "nombre": "Crédito MileagePlus Platinum",
           "clase": "credito",
+          "diseno": {
+            "fondo": [
+              "#5E6A78",
+              "#B0BAC6"
+            ],
+            "tinta": "#1A1D23",
+            "red": "visa"
+          },
           "versiones": [
             {
               "vigente_desde": "2025-10-01",
@@ -620,6 +685,14 @@
           "id": "bg-credito-mileageplus-signature",
           "nombre": "Crédito MileagePlus Signature",
           "clase": "credito",
+          "diseno": {
+            "fondo": [
+              "#14213D",
+              "#2F3F66"
+            ],
+            "tinta": "#FFFFFF",
+            "red": "visa"
+          },
           "versiones": [
             {
               "vigente_desde": "2025-10-01",
@@ -651,6 +724,14 @@
           "id": "bg-credito-mileageplus-infinite",
           "nombre": "Crédito MileagePlus Infinite",
           "clase": "credito",
+          "diseno": {
+            "fondo": [
+              "#0D0D10",
+              "#36363D"
+            ],
+            "tinta": "#FFFFFF",
+            "red": "visa"
+          },
           "versiones": [
             {
               "vigente_desde": "2025-10-01",
@@ -682,6 +763,13 @@
           "id": "bg-credito-connectmiles-platinum",
           "nombre": "Crédito ConnectMiles Platinum",
           "clase": "credito",
+          "diseno": {
+            "fondo": [
+              "#0C3B5E",
+              "#1E7A9C"
+            ],
+            "tinta": "#FFFFFF"
+          },
           "versiones": [
             {
               "vigente_desde": "2025-10-01",
@@ -713,6 +801,13 @@
           "id": "bg-credito-connectmiles-signature",
           "nombre": "Crédito ConnectMiles Signature",
           "clase": "credito",
+          "diseno": {
+            "fondo": [
+              "#0A1E33",
+              "#1B3E5C"
+            ],
+            "tinta": "#FFFFFF"
+          },
           "versiones": [
             {
               "vigente_desde": "2025-10-01",
@@ -744,6 +839,14 @@
           "id": "bg-credito-visa-esencial-classic",
           "nombre": "Visa Esencial Classic/Gold",
           "clase": "credito",
+          "diseno": {
+            "fondo": [
+              "#00796B",
+              "#26A69A"
+            ],
+            "tinta": "#FFFFFF",
+            "red": "visa"
+          },
           "versiones": [
             {
               "vigente_desde": "2025-10-01",
@@ -775,6 +878,14 @@
           "id": "bg-credito-visa-esencial-platinum",
           "nombre": "Visa Esencial Platinum",
           "clase": "credito",
+          "diseno": {
+            "fondo": [
+              "#6B7785",
+              "#BAC4CE"
+            ],
+            "tinta": "#1A1D23",
+            "red": "visa"
+          },
           "versiones": [
             {
               "vigente_desde": "2025-10-01",
@@ -806,6 +917,14 @@
           "id": "bg-credito-mastercard-esencial",
           "nombre": "Mastercard Esencial Platinum",
           "clase": "credito",
+          "diseno": {
+            "fondo": [
+              "#4A3B8F",
+              "#7B66C9"
+            ],
+            "tinta": "#FFFFFF",
+            "red": "mastercard"
+          },
           "versiones": [
             {
               "vigente_desde": "2025-10-01",
@@ -837,6 +956,13 @@
           "id": "bg-credito-cashback-classic",
           "nombre": "Crédito CashBack Classic/Gold",
           "clase": "credito",
+          "diseno": {
+            "fondo": [
+              "#1E7D4F",
+              "#3DBB7A"
+            ],
+            "tinta": "#FFFFFF"
+          },
           "versiones": [
             {
               "vigente_desde": "2025-10-01",
@@ -868,6 +994,13 @@
           "id": "bg-credito-cashback-platinum",
           "nombre": "Crédito CashBack Platinum",
           "clase": "credito",
+          "diseno": {
+            "fondo": [
+              "#56606B",
+              "#ABB5BF"
+            ],
+            "tinta": "#1A1D23"
+          },
           "versiones": [
             {
               "vigente_desde": "2025-10-01",
@@ -899,6 +1032,13 @@
           "id": "bg-credito-classic",
           "nombre": "Crédito Banco General Classic",
           "clase": "credito",
+          "diseno": {
+            "fondo": [
+              "#B4380B",
+              "#F07A2A"
+            ],
+            "tinta": "#FFFFFF"
+          },
           "versiones": [
             {
               "vigente_desde": "2025-10-01",
@@ -926,6 +1066,13 @@
           "id": "bg-credito-platinum",
           "nombre": "Crédito Banco General Platinum",
           "clase": "credito",
+          "diseno": {
+            "fondo": [
+              "#6B7280",
+              "#B7BEC8"
+            ],
+            "tinta": "#1A1D23"
+          },
           "versiones": [
             {
               "vigente_desde": "2025-10-01",
