@@ -286,11 +286,11 @@ export function TituloSeccion({ children, accion }: { children: string; accion?:
 }
 
 /** Rótulo sobre una lista ("En los próximos 30 días"). */
-export function Rotulo({ children, derecha }: { children: ReactNode; derecha?: ReactNode }) {
+export function Rotulo({ children, derecha, color }: { children: ReactNode; derecha?: ReactNode; color?: string }) {
   const { c } = useTema();
   return (
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 4, minHeight: 22 }}>
-      <Texto tam={13} peso="medio" color={c.tenue}>{children}</Texto>
+      <Texto tam={13} peso="medio" color={color ?? c.tenue}>{children}</Texto>
       {derecha}
     </View>
   );

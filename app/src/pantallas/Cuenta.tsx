@@ -113,6 +113,49 @@ function FilaCifra({ texto, valor, color, tenue = false }: { texto: string; valo
   );
 }
 
+/** Lo que hay que saber de las cifras de arriba (estados de hoy, no definiciones): una nota por línea, con un punto. */
+function Notas({ items }: { items: { texto: string; alerta?: boolean }[] }) {
+  const { c } = useTema();
+  if (items.length === 0) return null;
+  return (
+    <View style={{ borderTopWidth: 1, borderTopColor: c.linea, marginTop: 6, paddingTop: 8, gap: 6 }}>
+      {items.map((n, i) => (
+        <View key={i} style={{ flexDirection: 'row', gap: 8 }}>
+          <View style={{ width: 5, height: 5, borderRadius: 3, marginTop: 7, backgroundColor: n.alerta ? c.alerta : c.tenue }} />
+          <Texto tam={13} color={n.alerta ? c.alerta : c.tenue} style={{ flex: 1, lineHeight: 18 }}>{n.texto}</Texto>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/** Al pie del bloque, cerrado: qué significa cada cifra. Las cifras quedan arriba, solas. */
+function QueEsCadaCosa({ items }: { items: [string, string][] }) {
+  const { c } = useTema();
+  const [abierto, setAbierto] = useState(false);
+  if (items.length === 0) return null;
+  return (
+    <View style={{ borderTopWidth: 1, borderTopColor: c.linea, marginTop: 6 }}>
+      <Pressable onPress={() => { Haptics.selectionAsync(); setAbierto((v) => !v); }} hitSlop={4} accessibilityRole="button"
+        style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 38, opacity: pressed ? 0.6 : 1 })}>
+        <Icono nombre="info" tam={15} color={c.tenue} />
+        <Texto tam={13} peso="medio" color={c.tenue} style={{ flex: 1 }}>Qué es cada cosa</Texto>
+        <Icono nombre={abierto ? 'abajo' : 'adelante'} tam={14} color={c.tenue} grosor={2} />
+      </Pressable>
+      {abierto && (
+        <View style={{ gap: 10, paddingBottom: 8 }}>
+          {items.map(([termino, que]) => (
+            <View key={termino} style={{ gap: 2 }}>
+              <Texto tam={13} peso="semi">{termino}</Texto>
+              <Texto tam={13} color={c.tenue} style={{ lineHeight: 18 }}>{que}</Texto>
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
 /** '2026-10-18' → '18 oct'. */
 function fechaCorta(iso: string): string {
   return `${Number(iso.slice(8, 10))} ${MESES_CORTOS[Number(iso.slice(5, 7)) - 1]}`;
@@ -137,7 +180,7 @@ function PieBanca({ banca }: { banca: { nombre: string; url: string; pasos: stri
 }
 
 /** Resumen del mes de una cuenta (no de crédito): lo anotado y, si está vinculada a un banco, lo que él da o cobra. Callado. */
-function ResumenDelMes({ cuenta, fondo }: { cuenta: TCuenta; fondo: string }) {
+function ResumenDelMes({ cuenta, fondo, tinta }: { cuenta: TCuenta; fondo: string; tinta?: string }) {
   const d = useDatos();
   const { c } = useTema();
   const actual = d.hoy.slice(0, 7);
@@ -151,6 +194,7 @@ function ResumenDelMes({ cuenta, fondo }: { cuenta: TCuenta; fondo: string }) {
   const interes = res?.interes ?? null;
   const cargos = res?.cargos;
   const hayBanco = !!res && (!!interes || (!!cargos && (cargos.cargos.length > 0 || !!cargos.anual)));
+  const minimoDiario = vinculo?.producto ? (vinculo.producto.versiones[vinculo.producto.versiones.length - 1].interes?.minimo_diario ?? 0) : 0;
   const flecha = (delta: number, activa: boolean) => (
     <Pressable onPress={() => { Haptics.selectionAsync(); setMes(moverMes(sel, delta)); }} disabled={!activa} hitSlop={6}
       accessibilityLabel={delta < 0 ? 'Mes anterior' : 'Mes siguiente'}
@@ -160,7 +204,7 @@ function ResumenDelMes({ cuenta, fondo }: { cuenta: TCuenta; fondo: string }) {
   );
   return (
     <View style={{ gap: 6 }}>
-      <Rotulo derecha={<View style={{ flexDirection: 'row' }}>{flecha(-1, true)}{flecha(1, sel < actual)}</View>}>Resumen de {nombreMes}</Rotulo>
+      <Rotulo color={tinta} derecha={<View style={{ flexDirection: 'row' }}>{flecha(-1, true)}{flecha(1, sel < actual)}</View>}>Resumen de {nombreMes}</Rotulo>
       <Tarjeta color={fondo} style={{ paddingHorizontal: 16, paddingVertical: 10, gap: 2, overflow: 'hidden' }}>
         <Deslizar clave={sel}>
           <View style={{ gap: 2 }}>
@@ -179,11 +223,7 @@ function ResumenDelMes({ cuenta, fondo }: { cuenta: TCuenta; fondo: string }) {
                   <>
                     <FilaCifra texto="Interés (aprox.)" valor={`+${neto(interes.alCierre, d.moneda)}`} color={c.ingreso} />
                     {r.esActual && <FilaCifra texto="hasta hoy" valor={`+${neto(interes.hastaHoy, d.moneda)}`} tenue />}
-                    {interes.diasBajoMinimo > 0 && (
-                      <Texto tam={13} color={c.tenue}>
-                        {interes.diasBajoMinimo} {interes.diasBajoMinimo === 1 ? 'día bajo' : 'días bajo'} {dineroCorto(vinculo?.producto ? (vinculo.producto.versiones[vinculo.producto.versiones.length - 1].interes?.minimo_diario ?? 0) : 0, d.moneda)} no {interes.diasBajoMinimo === 1 ? 'ganó' : 'ganaron'} interés
-                      </Texto>
-                    )}
+                    <FilaCifra texto="Tasa de hoy" valor={`${interes.tasa}% al año`} tenue />
                   </>
                 )}
                 {cargos?.cargos.map((x, i) => <FilaCifra key={`cargo${i}`} texto={x.nombre} valor={`−${neto(x.monto, d.moneda)}`} color={c.gasto} />)}
@@ -191,12 +231,20 @@ function ResumenDelMes({ cuenta, fondo }: { cuenta: TCuenta; fondo: string }) {
                 {(interes || (cargos && cargos.cargos.length > 0)) && (
                   <FilaCifra texto="Neto del banco (aprox.)" valor={neto(res.neto, d.moneda, true)} />
                 )}
-                {interes && <Texto tam={12} color={c.tenue} style={{ marginTop: 4 }}>Estimado con el saldo de cada día. El banco lo acredita al cierre del mes.</Texto>}
               </View>
             )}
+            <Notas items={interes && interes.diasBajoMinimo > 0 ? [{
+              texto: `${interes.diasBajoMinimo} ${interes.diasBajoMinimo === 1 ? 'día' : 'días'} con el saldo bajo ${dineroCorto(minimoDiario, d.moneda)}: no ${interes.diasBajoMinimo === 1 ? 'ganó' : 'ganaron'} interés.`,
+            }] : []} />
           </View>
         </Deslizar>
-        <Texto tam={12} color={c.tenue} style={{ marginTop: 6 }}>Solo lo que anotaste: lo que entró y gastaste tú.</Texto>
+        <QueEsCadaCosa items={[
+          ['Entró y salió', 'Solo lo que anotaste: lo que te entró y lo que gastaste tú, no todo lo que pasó por la cuenta.'],
+          ...(interes ? [['Interés (aprox.)', 'Lo estima la app con el saldo de cada día y la tasa del banco. El banco lo acredita al cierre del mes; puede variar unos centavos.'] as [string, string]] : []),
+          ...(interes && interes.diasBajoMinimo >= 0 && minimoDiario > 0 ? [['Saldo mínimo', `Los días que el saldo está bajo ${dineroCorto(minimoDiario, d.moneda)} no ganan interés.`] as [string, string]] : []),
+          ...(cargos && cargos.cargos.length > 0 ? [['Cargos', 'Lo que el banco cobra este mes según su tabla de tarifas (membresía, seguro, saldo bajo).'] as [string, string]] : []),
+          ...(res && (interes || (cargos && cargos.cargos.length > 0)) ? [['Neto del banco', 'El interés que te da menos los cargos que te cobra.'] as [string, string]] : []),
+        ]} />
         {banca && <PieBanca banca={banca} />}
       </Tarjeta>
     </View>
@@ -207,17 +255,15 @@ function ResumenDelMes({ cuenta, fondo }: { cuenta: TCuenta; fondo: string }) {
  * Tarjeta de crédito: lo que va del corte, lo que se debía al último corte con su pago mínimo, el límite y el
  * sobregiro, y lo que dice el banco (tasa, interés si no pagas el total, pago atrasado).
  */
-function ResumenTarjeta({ cuenta, fondo }: { cuenta: TCuenta; fondo: string }) {
+function ResumenTarjeta({ cuenta, fondo, tinta }: { cuenta: TCuenta; fondo: string; tinta?: string }) {
   const d = useDatos();
   const { c } = useTema();
-  const res = useMemo(() => resumenBanco(d, cuenta, d.hoy.slice(0, 7)), [d, cuenta]);
   const estado = useMemo(() => estadoTarjeta(d, cuenta), [d, cuenta]);
   const reglas = reglasTarjeta(d, cuenta);
   const fechaPago = cicloTarjeta(cuenta, d.hoy, reglas?.dias_para_pagar)?.fechaPago ?? null;
   const vinculo = vinculoDe(d.catalogo, cuenta);
-  const credito = res?.credito ?? null;
   const cerca = comprasCercaDelCorte(d, cuenta);
-  const nombre = vinculo ? [vinculo.banco.nombre, vinculo.tarjeta?.nombre].filter(Boolean).join(' · ') : 'Tarjeta de crédito';
+  const nombre = (vinculo ? [vinculo.banco.nombre, vinculo.tarjeta?.nombre] : [cuenta.reglas?.banco, cuenta.reglas?.tarjeta]).filter(Boolean).join(' · ') || 'Tarjeta de crédito';
   const banca = vinculo?.banco.banca;
   const sg = estado?.sobregiro ?? null;
   const pasado = estado?.limite ? Math.max(0, deudaTarjeta(d, cuenta) - estado.limite) : 0;
@@ -233,14 +279,57 @@ function ResumenTarjeta({ cuenta, fondo }: { cuenta: TCuenta; fondo: string }) {
     const pasan = ajusteMinimo(d, cuenta, minimo)?.pasan ?? [];
     acciones.guardarCorte(cuenta.id, estado.corte, { minimo, dias: atrasoObservado(d, cuenta, estado.corte, pasan) });
   }
+  const deuda = deudaTarjeta(d, cuenta);
+  const tasa = reglas?.tasa_anual ?? null;
+  const pagoAtrasado = reglas?.pago_atrasado ?? 0;
+  const regla = reglas?.pago_minimo;
+
+  // Lo que está pasando hoy (no definiciones): va debajo de las cifras, una nota por línea.
+  const notas: { texto: string; alerta?: boolean }[] = [];
+  if (cerca > 0) notas.push({ texto: `${neto(cerca, d.moneda)} de compras de los últimos días antes del corte pueden pasar al siguiente.` });
+  if (estado && estado.pasan.length > 0) {
+    notas.push({ texto: `${estado.segun === 'promedio' ? 'Según tus cortes anteriores' : 'Con el mínimo de tu banco'}, ${estado.pasan.length === 1 ? 'esta compra entra' : 'estas compras entran'} en el corte siguiente: ${estado.pasan.map((m) =>
+      `${m.nota || 'compra'} ${neto(m.monto, d.moneda)} (${fechaCorta(m.fecha)})`).join(', ')}.` });
+  }
+  if (estado?.faltaAnotar != null) {
+    notas.push({ texto: `Tu banco cuenta unos ${neto(estado.faltaAnotar, d.moneda)} más de lo anotado al corte: puede faltar algo por anotar, o intereses o cargos.` });
+  }
+  if (sg && sg.estado === 'permitido') {
+    notas.push({ texto: `Vas ${neto(pasado, d.moneda)} sobre el límite, dentro del ${sg.porcentaje}% que no cobra. El banco pide abonar lo que pasa del límite.` });
+  }
+  if (sg && sg.estado === 'cobra') {
+    notas.push({ alerta: true, texto: `Vas ${neto(pasado, d.moneda)} sobre el límite${sg.hasta !== null ? `, más del ${sg.porcentaje}% permitido` : ''}: si sigue así al corte, el banco cobra ${sg.hasta !== null ? '' : 'hasta '}${neto(sg.cargo, d.moneda)}.` });
+  }
+  if (atraso && atraso.dias > 0) {
+    notas.push({ texto: `Tu banco suele hacer efectivas las compras ${atraso.dias === 1 ? '1 día' : `${atraso.dias} días`} después (según ${atraso.cortes === 1 ? '1 corte' : `${atraso.cortes} cortes`}).` });
+  }
+
+  // Qué significa cada cifra: cerrado al pie del bloque.
+  const definiciones: [string, string][] = [
+    ['Gastado en este corte', 'Lo que compraste desde el día después del último corte. Va en el próximo estado de cuenta.'],
+  ];
+  if (estado && estado.alCorte > 0) {
+    definiciones.push(['Debías al corte', 'El saldo de tu último estado de cuenta. Si lo pagas completo antes de la fecha de pago, no pagas intereses.']);
+    definiciones.push(['Pago mínimo', regla
+      ? `${regla.porcentaje}% de lo que debías al corte${regla.minimo ? `, nunca menos de ${dineroCorto(regla.minimo, d.moneda)}` : ''}, más lo que pase del límite. ${estado.origen === 'banco' ? 'Este es el que dijo tu banco para este corte.' : 'Si tu estado de cuenta dice otro, toca «Editar».'}`
+      : 'Lo menos que hay que pagar antes de la fecha de pago para no caer en atraso. Cópialo de tu estado de cuenta.']);
+  }
+  if (estado?.limite) {
+    definiciones.push(['Disponible', 'Tu límite de crédito menos lo que debes hoy.']);
+    if (sg) {
+      definiciones.push(['Sobregiro', sg.hasta !== null
+        ? `Puedes pasarte hasta ${neto(sg.hasta, d.moneda)} (${sg.porcentaje}% más del límite) sin cargo${sg.cargo ? `; más de eso, ${neto(sg.cargo, d.moneda)} al corte` : ''}.`
+        : `Si pasas el límite, el banco cobra hasta ${neto(sg.cargo, d.moneda)} al corte.`]);
+    }
+  }
+  if (tasa !== null) definiciones.push(['Interés si no pagas el total', `Con ${tasa}% al año, lo que cobraría el banco en un mes sobre lo que debes hoy (aprox.).`]);
+  definiciones.push(['Aprox.', 'Sale de lo que anotaste, no del estado de cuenta. El corte real lo da tu banco.']);
+
   return (
     <View style={{ gap: 6 }}>
-      <Rotulo>{nombre}</Rotulo>
+      <Rotulo color={tinta}>{nombre}</Rotulo>
       <Tarjeta color={fondo} style={{ paddingHorizontal: 16, paddingVertical: 10, gap: 2 }}>
-        <FilaCifra texto="Al corte (aprox.)" valor={neto(gastadoEnCorte(d, cuenta), d.moneda)} />
-        {cerca > 0 && (
-          <Texto tam={13} color={c.tenue}>Las compras de los últimos días antes del corte pueden pasar al siguiente: {neto(cerca, d.moneda)}</Texto>
-        )}
+        <FilaCifra texto="Gastado en este corte (aprox.)" valor={neto(gastadoEnCorte(d, cuenta), d.moneda)} />
         {estado && estado.alCorte > 0 && (
           <View style={{ borderTopWidth: 1, borderTopColor: c.linea, marginTop: 6, paddingTop: 6, gap: 2 }}>
             <FilaCifra texto={`Debías al corte del ${fechaCorta(estado.corte)}`} valor={neto(estado.alCorte, d.moneda)} />
@@ -251,41 +340,9 @@ function ResumenTarjeta({ cuenta, fondo }: { cuenta: TCuenta; fondo: string }) {
               <Enlace tam={13} onPress={() => abrir({ tipo: 'minimo', cuenta })}>{estado.minimo ? 'Editar' : 'Poner'}</Enlace>
               {estado.minimo ? <Texto num tam={15} peso="medio">{neto(estado.minimo, d.moneda)}</Texto> : null}
             </View>
-            {estado.origen === 'regla' && reglas?.pago_minimo && (
-              <Texto tam={13} color={c.tenue}>
-                {reglas.pago_minimo.porcentaje}% de lo que debías, nunca menos de {dineroCorto(reglas.pago_minimo.minimo, d.moneda)}
-                {estado.exceso > 0 ? `, más ${neto(estado.exceso, d.moneda)} que pasaba del límite` : ''}.
-              </Texto>
-            )}
-            {estado.pasan.length > 0 && (
-              <Texto tam={13} color={c.tenue}>
-                {estado.segun === 'promedio' ? 'Según tus cortes anteriores' : 'Con el mínimo de tu banco'}, {estado.pasan.length === 1 ? 'esta compra entra' : 'estas compras entran'} en el corte siguiente: {estado.pasan.map((m) =>
-                  `${m.nota || 'compra'} ${neto(m.monto, d.moneda)} (${fechaCorta(m.fecha)})`).join(', ')}.
-              </Texto>
-            )}
-            {pideConfirmar && estado.minimo && (
-              <View style={{ marginTop: 6, gap: 8, backgroundColor: c.suave, borderRadius: 12, padding: 12 }}>
-                <Texto tam={13} style={{ lineHeight: 18 }}>
-                  ¿Tu estado de cuenta del {fechaCorta(estado.corte)} dice {neto(estado.minimo, d.moneda)} de mínimo? Así la app aprende qué compras entran en cada corte.
-                </Texto>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <Ficha texto="Sí, es ese" activa={false} alto={34} onPress={() => confirmar(estado.minimo!)} />
-                  <Ficha texto="Es otro" activa={false} alto={34} onPress={() => abrir({ tipo: 'minimo', cuenta })} />
-                </View>
-              </View>
-            )}
-            {estado.faltaAnotar !== null && (
-              <Texto tam={13} color={c.tenue}>
-                Tu banco cuenta unos {neto(estado.faltaAnotar, d.moneda)} más de lo anotado al corte: puede faltar algo por anotar, o intereses o cargos.
-              </Texto>
-            )}
+            {estado.exceso > 0 && <FilaCifra texto="De eso, lo que pasaba del límite" valor={neto(estado.exceso, d.moneda)} tenue />}
             {pagado > 0 && <FilaCifra texto="Pagado desde el corte" valor={neto(pagado, d.moneda)} tenue />}
             {fechaPago && <FilaCifra texto="Paga antes del" valor={fechaCorta(fechaPago)} tenue />}
-            {atraso && atraso.dias > 0 && (
-              <Texto tam={12} color={c.tenue}>
-                Tu banco suele hacer efectivas las compras {atraso.dias === 1 ? '1 día' : `${atraso.dias} días`} después (según {atraso.cortes === 1 ? '1 corte' : `${atraso.cortes} cortes`}).
-              </Texto>
-            )}
           </View>
         )}
         {estado?.limite && (
@@ -293,36 +350,31 @@ function ResumenTarjeta({ cuenta, fondo }: { cuenta: TCuenta; fondo: string }) {
             <FilaCifra texto="Límite" valor={neto(estado.limite, d.moneda)} tenue />
             <FilaCifra texto="Disponible" valor={neto(estado.disponible ?? 0, d.moneda)} color={(estado.disponible ?? 0) < 0 ? c.alerta : undefined} />
             {sg && sg.hasta !== null && (
-              <FilaCifra texto={`Disponible con sobregiro (${sg.porcentaje}%)`} valor={neto(sg.hasta - deudaTarjeta(d, cuenta), d.moneda)}
-                color={sg.hasta - deudaTarjeta(d, cuenta) < 0 ? c.alerta : undefined} />
-            )}
-            {sg && sg.estado === 'dentro' && (
-              <Texto tam={13} color={c.tenue}>
-                {sg.hasta !== null
-                  ? `Puedes pasarte hasta ${neto(sg.hasta, d.moneda)} (${sg.porcentaje}% más) sin cargo; más de eso, ${neto(sg.cargo, d.moneda)} al corte.`
-                  : `Si pasas el límite, el banco cobra hasta ${neto(sg.cargo, d.moneda)} al corte.`}
-              </Texto>
-            )}
-            {sg && sg.estado === 'permitido' && (
-              <Texto tam={13} color={c.tenue}>
-                Vas {neto(pasado, d.moneda)} sobre el límite, dentro del {sg.porcentaje}% que no cobra. El banco pide abonar lo que pasa del límite.
-              </Texto>
-            )}
-            {sg && sg.estado === 'cobra' && (
-              <Texto tam={13} color={c.alerta}>
-                Vas {neto(pasado, d.moneda)} sobre el límite{sg.hasta !== null ? `, más del ${sg.porcentaje}% permitido` : ''}: si sigue así al corte, el banco cobra {sg.hasta !== null ? '' : 'hasta '}{neto(sg.cargo, d.moneda)}.
-              </Texto>
+              <FilaCifra texto={`Disponible con sobregiro (${sg.porcentaje}%)`} valor={neto(sg.hasta - deuda, d.moneda)}
+                color={sg.hasta - deuda < 0 ? c.alerta : undefined} />
             )}
           </View>
         )}
-        {credito && (
+        {(tasa !== null || pagoAtrasado > 0) && (
           <View style={{ borderTopWidth: 1, borderTopColor: c.linea, marginTop: 6, paddingTop: 6, gap: 2 }}>
-            <FilaCifra texto="Tasa anual" valor={`${credito.tasa}%`} />
-            <Texto tam={13} color={c.tenue}>Si no pagas el total: unos {neto(interesSiNoPagas(deudaTarjeta(d, cuenta), credito.tasa), d.moneda)} de interés al mes</Texto>
-            {credito.pagoAtrasado > 0 && <FilaCifra texto="Pago atrasado" valor={neto(credito.pagoAtrasado, d.moneda)} tenue />}
+            {tasa !== null && <FilaCifra texto="Interés anual" valor={`${tasa}%`} tenue />}
+            {tasa !== null && deuda > 0 && <FilaCifra texto="Interés si no pagas el total" valor={`${neto(interesSiNoPagas(deuda, tasa), d.moneda)} al mes`} />}
+            {pagoAtrasado > 0 && <FilaCifra texto="Cargo por pago atrasado" valor={neto(pagoAtrasado, d.moneda)} tenue />}
           </View>
         )}
-        <Texto tam={12} color={c.tenue} style={{ marginTop: 6 }}>Solo lo que anotaste. El corte real lo da tu banco.</Texto>
+        {pideConfirmar && estado?.minimo && (
+          <View style={{ marginTop: 8, gap: 8, backgroundColor: c.suave, borderRadius: 12, padding: 12 }}>
+            <Texto tam={13} style={{ lineHeight: 18 }}>
+              ¿Tu estado de cuenta del {fechaCorta(estado.corte)} dice {neto(estado.minimo, d.moneda)} de mínimo? Así la app aprende qué compras entran en cada corte.
+            </Texto>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <Ficha texto="Sí, es ese" activa={false} alto={34} onPress={() => confirmar(estado.minimo!)} />
+              <Ficha texto="Es otro" activa={false} alto={34} onPress={() => abrir({ tipo: 'minimo', cuenta })} />
+            </View>
+          </View>
+        )}
+        <Notas items={notas} />
+        <QueEsCadaCosa items={definiciones} />
         {banca && <PieBanca banca={banca} />}
       </Tarjeta>
     </View>
@@ -330,8 +382,8 @@ function ResumenTarjeta({ cuenta, fondo }: { cuenta: TCuenta; fondo: string }) {
 }
 
 /** El bloque de la cuenta con lo del mes (o del corte, si es tarjeta de crédito). */
-function BloqueBanco({ cuenta, fondo }: { cuenta: TCuenta; fondo: string }) {
-  return cuenta.es_credito ? <ResumenTarjeta cuenta={cuenta} fondo={fondo} /> : <ResumenDelMes cuenta={cuenta} fondo={fondo} />;
+function BloqueBanco({ cuenta, fondo, tinta }: { cuenta: TCuenta; fondo: string; tinta?: string }) {
+  return cuenta.es_credito ? <ResumenTarjeta cuenta={cuenta} fondo={fondo} tinta={tinta} /> : <ResumenDelMes cuenta={cuenta} fondo={fondo} tinta={tinta} />;
 }
 
 const TOP_CATEGORIAS = 5;
@@ -411,14 +463,13 @@ function CuentaColor({ cuenta }: { cuenta: TCuenta }) {
   const pago = esTarjeta ? pagoSugerido(d, cuenta) : null;
   // El día de pago que puso el usuario o, si no puso, la fecha que da el banco (28 días después del corte en BG).
   const fechaPago = esTarjeta ? cicloTarjeta(cuenta, d.hoy, reglasTarjeta(d, cuenta)?.dias_para_pagar)?.fechaPago ?? null : null;
-  const fechas = [cuenta.dia_corte ? `Corta el ${cuenta.dia_corte}` : '',
-    cuenta.dia_pago ? `paga el ${cuenta.dia_pago}` : fechaPago ? `paga el ${fechaCorta(fechaPago)}` : ''].filter(Boolean).join(' · ');
   const disponible = esTarjeta && cuenta.limite ? cuenta.limite - deudaTarjeta(d, cuenta) : null;
   // Con sobregiro permitido (el % que publica el banco), también lo que queda contando ese margen.
   const hastaSobregiro = esTarjeta && cuenta.limite ? estadoTarjeta(d, cuenta)?.sobregiro?.hasta ?? null : null;
   const disponibleSobregiro = hastaSobregiro !== null ? hastaSobregiro - deudaTarjeta(d, cuenta) : null;
   // Pagar abre la transferencia a la tarjeta sin monto: en la hoja se elige total, lo del corte, el mínimo u otro.
-  const deuda = esTarjeta ? deudaTarjeta(d, cuenta) : 0;
+  // `deuda` negativa = la tarjeta quedó a favor.
+  const deuda = esTarjeta ? -saldo(cuenta, d.movimientos) : 0;
   function pagar() {
     anotar({ tipoInicial: 'transferencia', cuentaInicial: d.cuentas.find((x) => !x.es_credito)?.id, destinoInicial: cuenta.id,
       notaInicial: `Pago de ${cuenta.nombre}` });
@@ -432,26 +483,30 @@ function CuentaColor({ cuenta }: { cuenta: TCuenta }) {
       <BotonRedondo icono={buscando ? 'cerrar' : 'buscar'} etiqueta={`Buscar en ${cuenta.nombre}`} fondo={alfa(tinta, 0.16)} color={tinta}
         onPress={() => { setBuscando((v) => !v); setBusqueda(''); }} />
     </View>
-    <View style={{ gap: 6 }}>
-      <Texto tam={17} peso="semi" color={tinta}>{cuenta.nombre}</Texto>
-      {esTarjeta ? (
-        <>
-          <Num tam={38} color={tinta}>Debes {neto(deudaTarjeta(d, cuenta), d.moneda)}</Num>
-          <Texto tam={14} color={tinta} style={{ marginTop: 4 }}>Gastado en este corte <Texto num tam={14} color={tinta}>{neto(gastadoEnCorte(d, cuenta), d.moneda)}</Texto></Texto>
-          {fechas !== '' && <Texto tam={14} color={tinta}>{fechas}</Texto>}
-          {!!pago?.minimo && <Texto tam={14} color={tinta}>Pago mínimo <Texto num tam={14} color={tinta}>{neto(pago.minimo, d.moneda)}</Texto></Texto>}
-          {disponible !== null && <Texto tam={14} color={tinta}>Disponible <Texto num tam={14} color={tinta}>{neto(disponible, d.moneda)}</Texto></Texto>}
-          {disponibleSobregiro !== null && (
-            <Texto tam={14} color={tinta}>Disponible con sobregiro <Texto num tam={14} color={tinta}>{neto(disponibleSobregiro, d.moneda)}</Texto></Texto>
-          )}
-        </>
-      ) : (
-        <>
-          <Num tam={38} color={tinta}>{neto(saldo(cuenta, d.movimientos), d.moneda)}</Num>
-          <Texto tam={14} color={tinta} style={{ marginTop: 4 }}>Entró en {mes} <Texto num tam={14} color={tinta}>+{neto(f.entro, d.moneda)}</Texto></Texto>
-          <Texto tam={14} color={tinta}>Salió en {mes} <Texto num tam={14} color={tinta}>−{neto(f.salio, d.moneda)}</Texto></Texto>
-        </>
-      )}
+    <View style={{ gap: 14 }}>
+      <View style={{ gap: 2 }}>
+        <Texto tam={17} peso="semi" color={tinta}>{cuenta.nombre}</Texto>
+        {esTarjeta && <Texto tam={13} color={tinta} style={{ opacity: 0.8, marginTop: 6 }}>{deuda < 0 ? 'A favor' : 'Debes hoy'}</Texto>}
+        <Num tam={38} color={tinta}>{esTarjeta ? neto(Math.abs(saldo(cuenta, d.movimientos)), d.moneda) : neto(saldo(cuenta, d.movimientos), d.moneda)}</Num>
+      </View>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: 12 }}>
+        {(esTarjeta ? [
+          ['Gastado en este corte', neto(gastadoEnCorte(d, cuenta), d.moneda)],
+          ...(pago?.minimo ? [['Pago mínimo', neto(pago.minimo, d.moneda)]] : []),
+          ...(disponible !== null ? [['Disponible', neto(disponible, d.moneda)]] : []),
+          ...(disponibleSobregiro !== null ? [['Con sobregiro', neto(disponibleSobregiro, d.moneda)]] : []),
+          ...(cuenta.dia_corte ? [['Corta el', String(cuenta.dia_corte)]] : []),
+          ...(fechaPago ? [['Paga el', cuenta.dia_pago ? String(cuenta.dia_pago) : fechaCorta(fechaPago)]] : []),
+        ] : [
+          [`Entró en ${mes}`, `+${neto(f.entro, d.moneda)}`],
+          [`Salió en ${mes}`, `−${neto(f.salio, d.moneda)}`],
+        ]).map(([r, v]) => (
+          <View key={r} style={{ width: '50%', paddingRight: 10, gap: 2 }}>
+            <Texto tam={12} peso="medio" color={tinta} lineas={1} style={{ opacity: 0.75 }}>{r}</Texto>
+            <Num tam={17} color={tinta} lineas={1}>{v}</Num>
+          </View>
+        ))}
+      </View>
     </View>
     <View style={{ flexDirection: 'row', gap: 10 }}>
       <Tocable onPress={() => anotar({ cuentaInicial: cuenta.id })}
@@ -464,7 +519,7 @@ function CuentaColor({ cuenta }: { cuenta: TCuenta }) {
         <Texto tam={15} peso="medio" color={tinta}>Editar cuenta</Texto>
       </Tocable>
     </View>
-    {dosColumnas && <BloqueBanco cuenta={cuenta} fondo={c.tarjeta} />}
+    {dosColumnas && <BloqueBanco cuenta={cuenta} fondo={c.tarjeta} tinta={alfa(tinta, 0.8)} />}
     {esTarjeta && deuda > 0 && (
       <Tocable onPress={pagar} accessibilityLabel={`Pagar ${cuenta.nombre}`}
         style={{ height: 46, borderRadius: 23, borderWidth: 1.5, borderColor: tinta, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center' }}>
