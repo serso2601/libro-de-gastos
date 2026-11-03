@@ -6,7 +6,7 @@ import * as Haptics from 'expo-haptics';
 import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { useAcciones } from '@/lib/acciones';
-import { ajusteMinimo, cicloTarjeta, DIAS_SIN_ENTRAR, estadoTarjeta, minimoCorregido, reglasTarjeta } from '@/lib/calculos';
+import { ajusteMinimo, atrasoObservado, cicloTarjeta, DIAS_SIN_ENTRAR, estadoTarjeta, minimoCorregido, reglasTarjeta } from '@/lib/calculos';
 import { useDatos } from '@/lib/datos';
 import { aCentavos, aTexto, dineroCorto, MESES_CORTOS, neto } from '@/lib/formato';
 import type { Cuenta } from '@/lib/tipos';
@@ -23,19 +23,30 @@ export function DialogoMinimo({ cuenta, alCerrar }: { cuenta: Cuenta; alCerrar: 
   const corte = ciclo?.corteAnterior ?? d.hoy;
   const reglas = reglasTarjeta(d, cuenta);
   const regla = reglas?.pago_minimo;
-  // Lo que calcula la app sin la corrección, para comparar.
-  const sinCorregir = useMemo(() => estadoTarjeta(d, { ...cuenta, pago_minimo: null, minimo_corte: null }), [d, cuenta]);
-  const corregido = regla ? minimoCorregido(cuenta, corte) : cuenta.pago_minimo ?? null;
+  // Lo que calcula la app sin la corrección (ni lo confirmado de este corte), para comparar.
+  const sinCorregir = useMemo(() => estadoTarjeta(
+    { ...d, cortes_tarjeta: (d.cortes_tarjeta ?? []).filter((x) => !(x.cuenta_id === cuenta.id && x.corte === corte)) },
+    { ...cuenta, pago_minimo: null, minimo_corte: null }), [d, cuenta, corte]);
+  const corregido = regla ? minimoCorregido(d, cuenta, corte) : cuenta.pago_minimo ?? null;
   const [texto, setTexto] = useState(corregido ? aTexto(corregido) : '');
   const [error, setError] = useState('');
   const escrito = texto.trim() === '' ? null : aCentavos(texto);
   const valido = escrito !== null && !Number.isNaN(escrito) && escrito > 0 ? escrito : null;
   const ajuste = useMemo(() => (valido && regla ? ajusteMinimo(d, cuenta, valido) : null), [d, cuenta, valido, regla]);
 
-  /** Guarda el mínimo corregido para este corte, o null para volver al cálculo de la app. */
+  /**
+   * Guarda el mínimo del estado de cuenta para este corte (o null para volver al cálculo de la app). Con reglas del
+   * banco queda en el historial de cortes con el atraso que se vio, para que la app aprenda qué compras pasan.
+   */
   function guardar(monto: number | null) {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    acciones.guardarCuenta({ ...cuenta, pago_minimo: monto, minimo_corte: monto ? corte : null });
+    if (regla) {
+      const pasan = monto ? ajusteMinimo(d, cuenta, monto)?.pasan ?? [] : [];
+      acciones.guardarCorte(cuenta.id, corte, monto ? { minimo: monto, dias: atrasoObservado(d, cuenta, corte, pasan) } : null);
+      if (cuenta.minimo_corte) acciones.guardarCuenta({ ...cuenta, pago_minimo: null, minimo_corte: null });
+    } else {
+      acciones.guardarCuenta({ ...cuenta, pago_minimo: monto, minimo_corte: monto ? corte : null });
+    }
     alCerrar();
   }
 

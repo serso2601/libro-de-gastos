@@ -185,6 +185,12 @@ Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
   desde una cuenta normal hacia la tarjeta («Pagas desde» / «Tarjeta que pagas», con las fichas). Todo dinero que
   entra a la tarjeta (transferencia o un ingreso viejo) cuenta como pago para el mínimo (`pagadoDesdeCorte`,
   `avisos.py`), aunque no se haya tocado la ficha «Mínimo».
+  **Confirmar el mínimo en cada corte y aprender** (2/nov): después de cada corte y hasta la fecha de pago, la
+  pantalla de la tarjeta pregunta callado «¿Tu estado de cuenta del … dice $X de mínimo?» (Sí / Es otro → hoja del
+  mínimo). La respuesta va a la tabla `corte_tarjeta` (esquema v10: mínimo y `dias` = atraso observado:
+  `calculos.atrasoObservado`). El promedio de los últimos 6 (`atrasoAprendido`) predice en el corte siguiente qué
+  compras pasan («Según tus cortes anteriores…», `comprasQuePasan`) y ensancha la ventana de búsqueda. El mínimo
+  confirmado de un corte manda (`minimoCorregido`, también en `avisos.py`).
   **Pagar** (2/nov): en todas las tarjetas, «Pagar» abre Anotar como transferencia a la tarjeta, sin monto, con
   fichas **Total · Lo del corte · Mínimo · Otro monto** (descuentan lo pagado desde el corte; `pagoSugerido`
   sale solo si al corte se debía algo y no se pagó todo eso). Si se escribe «pago … tarjeta» como gasto, la hoja

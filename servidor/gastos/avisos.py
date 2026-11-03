@@ -105,7 +105,10 @@ def texto_de_pagos(con: sqlite3.Connection, catalogo: dict, hoy: date) -> str:
             {"id": c["id"], "corte": corte.isoformat()}).fetchone()[0]
         if al_corte_inicial:
             pagado += c["pagos_tras_corte"] or 0
-        m = minimo(al_corte, c["limite"], reglas, c["pago_minimo"], c["minimo_corte"], corte)
+        # Si el usuario confirmó el mínimo de este corte (lo que dice su estado de cuenta), manda ese.
+        confirmado = con.execute("SELECT minimo FROM corte_tarjeta WHERE cuenta_id = ? AND corte = ?",
+                                 (c["id"], corte.isoformat())).fetchone()
+        m = confirmado["minimo"] or None if confirmado else minimo(al_corte, c["limite"], reglas, c["pago_minimo"], c["minimo_corte"], corte)
         if (m is not None and pagado >= m) or (m is None and pagado > 0) or pagado >= al_corte:
             continue
         cuando = "hoy" if faltan == 0 else "mañana" if faltan == 1 else f"el {pago.day} {MESES[pago.month - 1]}"

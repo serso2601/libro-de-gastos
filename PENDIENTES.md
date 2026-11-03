@@ -33,6 +33,9 @@ compilación de la app pasan; **nada se vio todavía en pantalla**.
    hizo después del corte. Así el mínimo sale del saldo al corte y no de todo. Luego, comparar el **pago mínimo** con el de la banca y, si es otro, corregirlo con «Editar» junto al mínimo
    (ver qué compras pasan al corte siguiente); **pagar con las fichas** Total / Lo del corte / Mínimo / Otro monto
    cuando pague antes del 15/nov; ver «paga el 15» en la tarjeta del Inicio la semana del pago.
+6a. **Confirmar el mínimo del corte**: en la VISA ESTRELLA sale «¿Tu estado de cuenta del 18 oct dice $X de mínimo?».
+   Responder Sí o Es otro (con el de la banca). Desde el corte del 18/nov, con compras anotadas cerca del corte, la
+   app empieza a aprender cuántos días tarda BG en hacerlas efectivas: ver que lo que predice cuadre.
 6b. **Atajo de avisos de pago** (Ajustes → «Avisos de pago en el iPhone»): armarlo y ver que el 12, 14 y 15/nov
    llegue la notificación (el botón «Probar ahora» de la hoja dice qué contestaría la PC hoy).
 6c. **Total sin tarjetas** («Qué saldo ver» → «Sin tarjetas de crédito») y **montos con comas** al escribir: probar en

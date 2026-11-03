@@ -117,6 +117,11 @@ class CuentaIn(BaseModel):
         return self
 
 
+class CorteIn(BaseModel):
+    minimo: int = Field(ge=0)
+    dias: int | None = Field(default=None, ge=0)
+
+
 class CategoriaIn(BaseModel):
     nombre: str = Field(min_length=1, max_length=60)
     tipo: Literal["gasto", "ingreso"]
@@ -299,6 +304,8 @@ def leer_todo(con: sqlite3.Connection, hoy: date) -> dict:
         "recurrencias": [dict(f) for f in con.execute("SELECT * FROM recurrencia ORDER BY fecha_inicio")],
         "presupuesto": _presupuesto(con),
         "proximos": recurrencias.proximas(con, hoy),
+        "cortes_tarjeta": [dict(f) for f in con.execute(
+            "SELECT cuenta_id, corte, minimo, dias FROM corte_tarjeta ORDER BY cuenta_id, corte")],
         "catalogo": CATALOGO,
         "pendientes": _pendientes(con),
         "cuenta_yappy": correo.cuenta_yappy(con),
@@ -527,7 +534,29 @@ def create_app(config: Config | None = None, hoy=date.today, web: Path = WEB, ex
             if con_todo:
                 con.execute("DELETE FROM movimiento WHERE cuenta_id = :id OR cuenta_destino_id = :id", {"id": id_})
                 con.execute("DELETE FROM recurrencia WHERE cuenta_id = :id OR cuenta_destino_id = :id", {"id": id_})
+            con.execute("DELETE FROM corte_tarjeta WHERE cuenta_id = ?", (id_,))
             con.execute("DELETE FROM cuenta WHERE id = ?", (id_,))
+        return {"ok": True}
+
+    # --- Cortes de tarjeta ---------------------------------------------------------------------
+    @r.put("/cuentas/{id_}/cortes/{corte}")
+    def guardar_corte(id_: str, corte: date, c: CorteIn, con: sqlite3.Connection = Depends(conexion)):
+        """El mínimo del estado de cuenta de un corte y, si se pudo saber, los días de atraso del banco."""
+        cuenta = con.execute("SELECT es_credito FROM cuenta WHERE id = ?", (id_,)).fetchone()
+        if not cuenta or not cuenta["es_credito"]:
+            raise HTTPException(404, "No hay una tarjeta de crédito con ese id")
+        with con:
+            con.execute(
+                """INSERT INTO corte_tarjeta (cuenta_id, corte, minimo, dias, creado) VALUES (?, ?, ?, ?, ?)
+                   ON CONFLICT (cuenta_id, corte) DO UPDATE SET minimo = excluded.minimo, dias = excluded.dias""",
+                (id_, corte.isoformat(), c.minimo, c.dias, db.ahora()),
+            )
+        return {"cuenta_id": id_, "corte": corte.isoformat(), "minimo": c.minimo, "dias": c.dias}
+
+    @r.delete("/cuentas/{id_}/cortes/{corte}")
+    def borrar_corte(id_: str, corte: str, con: sqlite3.Connection = Depends(conexion)):
+        with con:
+            con.execute("DELETE FROM corte_tarjeta WHERE cuenta_id = ? AND corte = ?", (id_, corte))
         return {"ok": True}
 
     # --- Categorías --------------------------------------------------------------------------

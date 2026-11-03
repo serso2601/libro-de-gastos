@@ -86,3 +86,11 @@ def test_un_ingreso_en_la_tarjeta_tambien_cuenta_como_pago(visa, reloj):
     visa.put("/api/movimientos/i1", json={"tipo": "ingreso", "monto": 2400, "fecha": "2026-11-01",
                                           "cuenta_id": "visa", "categoria_id": "otros-ingresos"})
     assert aviso(visa, reloj, date(2026, 11, 14)) == ""
+
+
+def test_el_minimo_confirmado_del_corte_manda(visa, reloj):
+    visa.put("/api/cuentas/visa/cortes/2026-10-18", json={"minimo": 3000, "dias": 2})
+    assert "mínimo $30.00" in aviso(visa, reloj, date(2026, 11, 14))
+    visa.put("/api/movimientos/p1", json={"tipo": "transferencia", "monto": 3000, "fecha": "2026-11-01",
+                                          "cuenta_id": "efectivo", "cuenta_destino_id": "visa"})
+    assert aviso(visa, reloj, date(2026, 11, 14)) == ""

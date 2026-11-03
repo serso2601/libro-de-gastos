@@ -8,13 +8,14 @@ import { Linking, Pressable, ScrollView, View } from 'react-native';
 import { useAbrir, useAnotar } from '@/dialogos/abrir';
 import { comprasCercaDelCorte, interesSiNoPagas, resumenBanco, resumenMes, vinculoDe } from '@/lib/banco';
 import {
-  cicloTarjeta, configPresupuesto, deudaTarjeta, estadoTarjeta, flujoCuenta, gastadoEnCorte, montoEnCuenta, pagadoDesdeCorte, pagoSugerido, periodoDe, porDia,
+  ajusteMinimo, atrasoAprendido, atrasoObservado, cicloTarjeta, configPresupuesto, deudaTarjeta, estadoTarjeta, flujoCuenta, gastadoEnCorte, montoEnCuenta, pagadoDesdeCorte, pagoSugerido, periodoDe, porDia,
   porVenirDelMes, reglasTarjeta,
 } from '@/lib/calculos';
+import { useAcciones } from '@/lib/acciones';
 import { useDatos } from '@/lib/datos';
 import { conSigno, dineroCorto, MESES, MESES_CORTOS, neto, ordenarPorFecha, saldo, tituloDia } from '@/lib/formato';
 import type { Cuenta as TCuenta } from '@/lib/tipos';
-import { BotonRedondo, Buscador, CabeceraDia, Enlace, FilaMovimiento, Lista, Num, Rotulo, Tarjeta, Texto, Vacio } from '@/ui/componentes';
+import { BotonRedondo, Buscador, CabeceraDia, Enlace, Ficha, FilaMovimiento, Lista, Num, Rotulo, Tarjeta, Texto, Vacio } from '@/ui/componentes';
 import { useVez } from '@/ui/animar';
 import { avisar } from '@/ui/aviso';
 import { Deslizar } from '@/ui/deslizar';
@@ -222,6 +223,16 @@ function ResumenTarjeta({ cuenta, fondo }: { cuenta: TCuenta; fondo: string }) {
   const pasado = estado?.limite ? Math.max(0, deudaTarjeta(d, cuenta) - estado.limite) : 0;
   const pagado = estado ? pagadoDesdeCorte(d, cuenta, estado.corte) : 0;
   const abrir = useAbrir();
+  const acciones = useAcciones();
+  const atraso = atrasoAprendido(d, cuenta);
+  // Después de cada corte (hasta la fecha de pago), una pregunta callada: ¿el mínimo es ese? Con la respuesta la app
+  // aprende cuántos días tarda el banco en hacer efectivas las compras.
+  const pideConfirmar = !!estado && estado.origen === 'regla' && !estado.confirmado && estado.alCorte > 0 && !!fechaPago && d.hoy <= fechaPago;
+  function confirmar(minimo: number) {
+    if (!estado) return;
+    const pasan = ajusteMinimo(d, cuenta, minimo)?.pasan ?? [];
+    acciones.guardarCorte(cuenta.id, estado.corte, { minimo, dias: atrasoObservado(d, cuenta, estado.corte, pasan) });
+  }
   return (
     <View style={{ gap: 6 }}>
       <Rotulo>{nombre}</Rotulo>
@@ -248,9 +259,20 @@ function ResumenTarjeta({ cuenta, fondo }: { cuenta: TCuenta; fondo: string }) {
             )}
             {estado.pasan.length > 0 && (
               <Texto tam={13} color={c.tenue}>
-                Con ese mínimo, {estado.pasan.length === 1 ? 'esta compra entra' : 'estas compras entran'} en el corte siguiente: {estado.pasan.map((m) =>
+                {estado.segun === 'promedio' ? 'Según tus cortes anteriores' : 'Con el mínimo de tu banco'}, {estado.pasan.length === 1 ? 'esta compra entra' : 'estas compras entran'} en el corte siguiente: {estado.pasan.map((m) =>
                   `${m.nota || 'compra'} ${neto(m.monto, d.moneda)} (${fechaCorta(m.fecha)})`).join(', ')}.
               </Texto>
+            )}
+            {pideConfirmar && estado.minimo && (
+              <View style={{ marginTop: 6, gap: 8, backgroundColor: c.suave, borderRadius: 12, padding: 12 }}>
+                <Texto tam={13} style={{ lineHeight: 18 }}>
+                  ¿Tu estado de cuenta del {fechaCorta(estado.corte)} dice {neto(estado.minimo, d.moneda)} de mínimo? Así la app aprende qué compras entran en cada corte.
+                </Texto>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <Ficha texto="Sí, es ese" activa={false} alto={34} onPress={() => confirmar(estado.minimo!)} />
+                  <Ficha texto="Es otro" activa={false} alto={34} onPress={() => abrir({ tipo: 'minimo', cuenta })} />
+                </View>
+              </View>
             )}
             {estado.faltaAnotar !== null && (
               <Texto tam={13} color={c.tenue}>
@@ -259,6 +281,11 @@ function ResumenTarjeta({ cuenta, fondo }: { cuenta: TCuenta; fondo: string }) {
             )}
             {pagado > 0 && <FilaCifra texto="Pagado desde el corte" valor={neto(pagado, d.moneda)} tenue />}
             {fechaPago && <FilaCifra texto="Paga antes del" valor={fechaCorta(fechaPago)} tenue />}
+            {atraso && atraso.dias > 0 && (
+              <Texto tam={12} color={c.tenue}>
+                Tu banco suele hacer efectivas las compras {atraso.dias === 1 ? '1 día' : `${atraso.dias} días`} después (según {atraso.cortes === 1 ? '1 corte' : `${atraso.cortes} cortes`}).
+              </Texto>
+            )}
           </View>
         )}
         {estado?.limite && (

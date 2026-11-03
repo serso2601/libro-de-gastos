@@ -147,6 +147,21 @@ export function useAcciones() {
       },
 
       /** Marcar en qué cuenta está el Yappy (null la quita). */
+      /**
+       * Lo que dijo el banco en un corte de la tarjeta: el mínimo y los días de atraso que se vieron (con eso la app
+       * aprende qué compras suelen pasar al corte siguiente). null lo borra.
+       */
+      guardarCorte(cuentaId: string, corte: string, valor: { minimo: number; dias: number | null } | null) {
+        const ruta = `/api/cuentas/${enc(cuentaId)}/cortes/${corte}`;
+        const sin = (l: Datos['cortes_tarjeta']) => (l ?? []).filter((x) => !(x.cuenta_id === cuentaId && x.corte === corte));
+        if (!valor) {
+          cambiar({ metodo: 'DELETE', ruta, descripcion: 'Quitar el mínimo confirmado del corte' }, (d) => ({ ...d, cortes_tarjeta: sin(d.cortes_tarjeta) }));
+        } else {
+          cambiar({ metodo: 'PUT', ruta, cuerpo: valor, descripcion: 'Guardar el mínimo del corte' },
+            (d) => ({ ...d, cortes_tarjeta: [...sin(d.cortes_tarjeta), { cuenta_id: cuentaId, corte, ...valor }] }));
+        }
+      },
+
       guardarCuentaYappy(id: string | null) {
         cambiar({ metodo: 'PUT', ruta: '/api/ajustes', cuerpo: { cuenta_yappy: id ?? '' }, descripcion: 'Guardar la cuenta del Yappy' },
           (d) => ({ ...d, cuenta_yappy: id }));

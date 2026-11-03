@@ -9,7 +9,7 @@ from datetime import date, datetime
 from pathlib import Path
 
 ESQUEMA = Path(__file__).with_name("esquema.sql")
-VERSION = 9
+VERSION = 10
 
 # {versión a la que lleva: sql}. Cada paso corre con las claves foráneas apagadas: rehacer una
 # tabla no debe tocar las filas que la apuntan (movimiento.recurrencia_id es ON DELETE SET NULL).
@@ -130,6 +130,19 @@ MIGRACIONES: dict[int, str] = {
     ALTER TABLE cuenta ADD COLUMN corte_inicial TEXT;
     ALTER TABLE cuenta ADD COLUMN deuda_al_corte INTEGER CHECK (deuda_al_corte >= 0);
     ALTER TABLE cuenta ADD COLUMN pagos_tras_corte INTEGER CHECK (pagos_tras_corte >= 0);
+    COMMIT;
+    """,
+    # Tarjeta: el mínimo de cada estado de cuenta y los días de atraso del banco en ese corte.
+    10: """
+    BEGIN;
+    CREATE TABLE IF NOT EXISTS corte_tarjeta (
+        cuenta_id   TEXT NOT NULL REFERENCES cuenta(id) ON DELETE CASCADE,
+        corte       TEXT NOT NULL,
+        minimo      INTEGER NOT NULL CHECK (minimo >= 0),
+        dias        INTEGER CHECK (dias >= 0),
+        creado      TEXT NOT NULL,
+        PRIMARY KEY (cuenta_id, corte)
+    );
     COMMIT;
     """,
 }

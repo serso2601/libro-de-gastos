@@ -31,6 +31,16 @@ CREATE TABLE IF NOT EXISTS cuenta (
     terminacion     TEXT
 );
 
+-- Tarjetas: el pago mínimo que dijo el estado de cuenta de cada corte y los días de atraso del banco observados.
+CREATE TABLE IF NOT EXISTS corte_tarjeta (
+    cuenta_id   TEXT NOT NULL REFERENCES cuenta(id) ON DELETE CASCADE,
+    corte       TEXT NOT NULL,  -- fecha del corte
+    minimo      INTEGER NOT NULL CHECK (minimo >= 0),  -- el mínimo del estado de cuenta (centavos)
+    dias        INTEGER CHECK (dias >= 0),  -- días de atraso observados en ese corte (NULL = no se pudo saber)
+    creado      TEXT NOT NULL,
+    PRIMARY KEY (cuenta_id, corte)
+);
+
 CREATE TABLE IF NOT EXISTS categoria (
     id              TEXT PRIMARY KEY,
     nombre          TEXT NOT NULL,

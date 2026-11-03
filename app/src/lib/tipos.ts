@@ -183,7 +183,12 @@ export interface Datos {
   cuenta_yappy?: string | null;
   /** La categoría que se les pone a los Yappy por defecto, por tipo; null = automática. */
   yappy_categorias?: { gasto: string | null; ingreso: string | null };
+  /** Los cortes de tarjeta que el usuario confirmó: el mínimo del estado de cuenta y los días de atraso vistos. */
+  cortes_tarjeta?: CorteTarjeta[];
 }
+
+/** Un corte confirmado: `dias` = cuántos días antes del corte las compras no entraron (null si no se pudo saber). */
+export interface CorteTarjeta { cuenta_id: string; corte: string; minimo: number; dias: number | null }
 
 export const FRECUENCIAS: [Frecuencia, string][] = [
   ['semanal', 'Cada semana'],
