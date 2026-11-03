@@ -1,13 +1,15 @@
-// Las tarjetas del banco dibujadas (con los colores de `diseno` en bancos.json; un dibujo aproximado, no la imagen
-// del banco) y el selector en pila de la hoja de la cuenta: como la pila del Inicio, las tarjetas quedan una encima
-// de otra, asomando su nombre; tocar una la elige y la pila se cierra sobre ella. Tocar la elegida la vuelve a abrir.
+// Las tarjetas del banco: con su foto (la que publica el banco; el servidor la baja una vez y la sirve en
+// /tarjetas/<id>.png) o, si no tiene o no carga, dibujadas con los colores de `diseno` en bancos.json. Y el selector
+// en pila de la hoja de la cuenta: como la pila del Inicio, las tarjetas quedan una encima de otra, asomando su
+// nombre; tocar una la elige y la pila se cierra sobre ella. Tocar la elegida la vuelve a abrir.
 
 import * as Haptics from 'expo-haptics';
 import { useEffect, useId, useState, type ReactNode } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Image, StyleSheet, View } from 'react-native';
 import Animated, { interpolate, useAnimatedStyle, useSharedValue, withSpring, type SharedValue } from 'react-native-reanimated';
 import Svg, { Circle, Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
-import type { DisenoTarjeta } from '@/lib/tipos';
+import { base, leerConexion } from '@/lib/api';
+import type { Catalogo, Cuenta, DisenoTarjeta, Tarjeta } from '@/lib/tipos';
 import { resorte } from './animar';
 import { Enlace, Texto } from './componentes';
 import { mezclar, sobre, useTema } from './tema';
@@ -16,6 +18,37 @@ import { Tocable } from './tocable';
 const PROPORCION = 1.586; // la de una tarjeta de verdad (85.6 × 54 mm)
 const PASO = 50;          // lo que asoma de cada tarjeta con la pila abierta
 const RESORTE = resorte(0.5, 1);
+
+/** La dirección de la foto de una tarjeta del catálogo (la sirve el servidor de la PC), o null si no tiene. */
+export function urlImagen(tarjeta: Pick<Tarjeta, 'id' | 'imagen'> | null | undefined): string | null {
+  const con = leerConexion();
+  return tarjeta?.imagen && con ? `${base(con.direccion)}/tarjetas/${encodeURIComponent(tarjeta.id)}.png` : null;
+}
+
+/** La tarjeta del catálogo a la que está vinculada una cuenta (la de crédito o la de débito), o null. */
+export function tarjetaDeCuenta(catalogo: Catalogo | undefined, cuenta: Cuenta): Tarjeta | null {
+  const v = cuenta.banco;
+  if (!catalogo || !v?.tarjeta) return null;
+  return catalogo.bancos.find((b) => b.id === v.banco)?.tarjetas.find((t) => t.id === v.tarjeta) ?? null;
+}
+
+/** Las fotos que no cargaron (sin internet la primera vez, el banco la movió…): no se vuelven a intentar. */
+const fallidas = new Set<string>();
+
+/** La foto de la tarjeta: `alFallar` avisa si no carga, para dibujarla en su lugar. */
+export function FotoTarjeta({ url, alFallar }: { url: string; alFallar: () => void }) {
+  return (
+    <Image source={{ uri: url }} resizeMode="cover" style={StyleSheet.absoluteFill} accessibilityIgnoresInvertColors
+      onError={() => { fallidas.add(url); alFallar(); }} />
+  );
+}
+
+/** La foto de una tarjeta, si tiene y no falló antes; con el estado para dejarla de usar si no carga. */
+export function useFoto(url: string | null): [string | null, () => void] {
+  const [falla, setFalla] = useState(false);
+  const usable = url && !falla && !fallidas.has(url) ? url : null;
+  return [usable, () => setFalla(true)];
+}
 
 /** «Crédito Estrellas Classic/Gold» → «Estrellas Classic/Gold»: en la tarjeta ya se ve que es de crédito. */
 export function nombreCorto(nombre: string): string {
@@ -41,12 +74,37 @@ function Red({ red, tinta }: { red: DisenoTarjeta['red']; tinta: string }) {
   return null;
 }
 
-/** Una tarjeta dibujada: el nombre arriba (lo que asoma en la pila), el chip, los 4 dígitos y la red. */
-export function DibujoTarjeta({ banco, nombre, diseno, clase, terminacion, ancho }: {
+/** Una pastilla oscura con texto, sobre la foto de una tarjeta. */
+function Pastilla({ texto, num }: { texto: string; num?: boolean }) {
+  return (
+    <View style={{ alignSelf: 'flex-start', backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 9, paddingHorizontal: 9, paddingVertical: 4 }}>
+      <Texto num={num} tam={12} peso="semi" color="#FFFFFF" lineas={1} style={num ? { letterSpacing: 1.2 } : undefined}>{texto}</Texto>
+    </View>
+  );
+}
+
+/**
+ * Una tarjeta: su foto (con el nombre en una pastilla arriba, lo que asoma en la pila, y los 4 dígitos abajo) o,
+ * si no tiene foto, dibujada: el nombre arriba, el chip, los 4 dígitos y la red.
+ */
+export function DibujoTarjeta({ banco, nombre, diseno, clase, terminacion, ancho, imagen }: {
   banco: string; nombre: string; diseno: DisenoTarjeta; clase?: 'credito' | 'debito'; terminacion?: string | null; ancho: number;
+  imagen?: string | null;
 }) {
   const id = `t${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
   const alto = Math.round(ancho / PROPORCION);
+  const [foto, fallo] = useFoto(imagen ?? null);
+  if (foto) {
+    return (
+      <View style={{ width: ancho, height: alto, borderRadius: 16, overflow: 'hidden', backgroundColor: diseno.fondo[1] }}>
+        <FotoTarjeta url={foto} alFallar={fallo} />
+        <View style={{ flex: 1, paddingHorizontal: 12, paddingTop: 12, paddingBottom: 12, justifyContent: 'space-between' }}>
+          <Pastilla texto={nombre} />
+          {terminacion ? <Pastilla texto={`•••• ${terminacion}`} num /> : null}
+        </View>
+      </View>
+    );
+  }
   const { fondo: [a, b], tinta } = diseno;
   return (
     <View style={{ width: ancho, height: alto, borderRadius: 16, overflow: 'hidden', backgroundColor: b }}>
@@ -98,7 +156,7 @@ export function TarjetaMedida(props: Omit<Parameters<typeof DibujoTarjeta>[0], '
   );
 }
 
-export interface OpcionTarjeta { id: string; nombre: string; diseno?: DisenoTarjeta }
+export interface OpcionTarjeta { id: string; nombre: string; diseno?: DisenoTarjeta; imagen?: Tarjeta['imagen'] }
 
 /**
  * Una tarjeta dentro de la pila: abierta, en su lugar (i × PASO), tapando la mitad de abajo de la anterior; cerrada,
@@ -160,7 +218,7 @@ export function ElegirTarjetaBanco({ banco, tarjetas, valor, alCambiar, clase, t
             <EnLaPila key={t.id} i={i} elegida={i === elegidaI} arriba={i === elegidaI && !abiertaDe} ab={ab} ancho={ancho} onPress={() => tocar(t.id)}
               etiqueta={`${t.nombre}${i === elegidaI ? ', elegida' : ''}`}>
               <DibujoTarjeta banco={banco} nombre={nombreCorto(t.nombre)} diseno={t.diseno ?? disenoConColor(color)} clase={clase}
-                terminacion={i === elegidaI ? terminacion : null} ancho={ancho} />
+                terminacion={i === elegidaI ? terminacion : null} ancho={ancho} imagen={urlImagen(t)} />
             </EnLaPila>
           ))}
         </Animated.View>

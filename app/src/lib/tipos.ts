@@ -93,7 +93,11 @@ export interface VersionTarjeta {
 }
 /** Cómo se dibuja la tarjeta en la app (un dibujo aproximado, no la imagen del banco). */
 export interface DisenoTarjeta { fondo: [string, string]; tinta: string; red?: 'visa' | 'mastercard' }
-export interface Tarjeta { id: string; nombre: string; clase: 'debito' | 'credito'; diseno?: DisenoTarjeta; versiones: VersionTarjeta[] }
+/** De dónde sale la foto de la tarjeta en la página del banco (el servidor la baja y la sirve en /tarjetas/<id>.png). */
+export interface ImagenTarjeta { url: string; nombre: string; fuente: string; verificado: string }
+export interface Tarjeta {
+  id: string; nombre: string; clase: 'debito' | 'credito'; diseno?: DisenoTarjeta; imagen?: ImagenTarjeta; versiones: VersionTarjeta[];
+}
 
 export interface Banco { id: string; nombre: string; banca?: { nombre: string; url: string; pasos: string }; cuentas: ProductoCuenta[]; tarjetas: Tarjeta[] }
 export interface Catalogo { acerca?: string; notas?: string[]; bancos: Banco[] }

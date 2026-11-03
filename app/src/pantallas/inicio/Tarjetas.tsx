@@ -29,6 +29,7 @@ import { Resorte, useMotor } from '@/ui/resorte';
 import { vibrar } from '@/ui/vibrar';
 import { alfa, mezclar, sobre, useTema } from '@/ui/tema';
 import { Tocable } from '@/ui/tocable';
+import { FotoTarjeta, tarjetaDeCuenta, urlImagen, useFoto } from '@/ui/tarjetaBanco';
 
 /** Cuántos movimientos salen en «Recientes» (al lado de la pila, en una pantalla ancha, caben más). */
 const RECIENTES = 6;
@@ -103,10 +104,14 @@ export function Tarjetas() {
   const N = d.cuentas.length;
   // Los colores de cada tarjeta se calculan una vez, no en cada cuadro de la animación.
   const tonos = useMemo(() => {
-    const m: Record<string, { fondo: string; tinta: string; borde: string }> = {};
-    d.cuentas.forEach((x) => { const fondo = colorCuenta(x.color); m[x.id] = { fondo, tinta: sobre(fondo), borde: mezclar(fondo, '#000000', 0.42) }; });
+    const m: Record<string, { fondo: string; tinta: string; borde: string; foto: string | null }> = {};
+    d.cuentas.forEach((x) => {
+      const fondo = colorCuenta(x.color);
+      // Si la cuenta está vinculada a una tarjeta del catálogo con foto, la tarjeta se ve como la de verdad.
+      m[x.id] = { fondo, tinta: sobre(fondo), borde: mezclar(fondo, '#000000', 0.42), foto: urlImagen(tarjetaDeCuenta(d.catalogo, x)) };
+    });
     return m;
-  }, [d.cuentas, colorCuenta]);
+  }, [d.cuentas, d.catalogo, colorCuenta]);
 
   /** El salto ya llegó: la tarjeta queda arriba y se vuelve a poder tocar. */
   function terminarSalto() {
@@ -171,7 +176,7 @@ export function Tarjetas() {
 
   const cartas = d.cuentas.map((x, k) => {
     const esta = x.id === frente.id;
-    const { fondo, tinta, borde } = tonos[x.id];
+    const { fondo, tinta, borde, foto } = tonos[x.id];
     const reposo = esta ? 0 : ALTO + HUECO + rank[x.id] * APINADO;
     const abierta = colocar(k * SEPARACION, INCLINACION);
     // Cascada: cada tarjeta arranca un poco después de la anterior dentro del mismo avance de la pila.
@@ -217,8 +222,8 @@ export function Tarjetas() {
           style={{ flex: 1, borderRadius: 22, overflow: 'hidden' }}>
           <View pointerEvents={activa ? 'auto' : 'none'} style={StyleSheet.absoluteFill}>
             {esta
-              ? <CapaInclinada rx={rx} ry={ry} fondo={fondo}><Contenido cuenta={x} tinta={tinta} /></CapaInclinada>
-              : <Contenido cuenta={x} tinta={tinta} />}
+              ? <CapaInclinada rx={rx} ry={ry} fondo={fondo}><Contenido cuenta={x} tinta={tinta} foto={foto} /></CapaInclinada>
+              : <Contenido cuenta={x} tinta={tinta} foto={foto} />}
           </View>
           {/* Las del fondo se oscurecen: están más adentro de la cartera. */}
           <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: '#000000', opacity: velo }]} />
@@ -270,8 +275,11 @@ export function Tarjetas() {
 
 /** Lo de dentro de cada tarjeta: el estado de la cuenta (saldo o deuda, lo del mes) y las acciones sobre ella.
  *  Es igual para todas: las de atrás solo quedan tapadas por las de adelante. Memoizado: no cambia mientras se mueven. */
-const Contenido = memo(function Contenido({ cuenta, tinta }: { cuenta: Cuenta; tinta: string }) {
+const Contenido = memo(function Contenido({ cuenta, tinta: tintaColor, foto: fotoUrl }: { cuenta: Cuenta; tinta: string; foto: string | null }) {
   const d = useDatos();
+  // Con la foto de la tarjeta de fondo (y un velo oscuro encima), la letra va en blanco; si no carga, el color de la cuenta.
+  const [foto, fallo] = useFoto(fotoUrl);
+  const tinta = foto ? '#FFFFFF' : tintaColor;
   const anotar = useAnotar();
   const s = saldo(cuenta, d.movimientos);
   const ciclo = cuenta.es_credito ? cicloTarjeta(cuenta, d.hoy) : null;
@@ -288,20 +296,38 @@ const Contenido = memo(function Contenido({ cuenta, tinta }: { cuenta: Cuenta; t
 
   return (
     <View style={{ flex: 1, paddingVertical: 18, paddingHorizontal: 20, justifyContent: 'space-between', gap: 14 }}>
-      <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" pointerEvents="none">
-        <Defs>
-          <LinearGradient id="brillo" x1="0.2" y1="0" x2="0.8" y2="1">
-            <Stop offset="0" stopColor="#FFFFFF" stopOpacity={0.2} />
-            <Stop offset="0.46" stopColor="#FFFFFF" stopOpacity={0} />
-            <Stop offset="1" stopColor="#000000" stopOpacity={0.08} />
-          </LinearGradient>
-        </Defs>
-        <Rect x="0" y="0" width="100%" height="100%" fill="url(#brillo)" />
-      </Svg>
-      <Svg width={220} height={220} style={{ position: 'absolute', right: -70, bottom: -90 }}>
-        <Circle cx={110} cy={110} r={40} stroke={tinta} strokeOpacity={0.12} strokeWidth={18} fill="none" />
-        <Circle cx={110} cy={110} r={80} stroke={tinta} strokeOpacity={0.12} strokeWidth={18} fill="none" />
-      </Svg>
+      {foto ? (
+        <>
+          <FotoTarjeta url={foto} alFallar={fallo} />
+          <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" pointerEvents="none">
+            <Defs>
+              <LinearGradient id="velo" x1="0" y1="0" x2="0" y2="1">
+                <Stop offset="0" stopColor="#000000" stopOpacity={0.42} />
+                <Stop offset="0.45" stopColor="#000000" stopOpacity={0.3} />
+                <Stop offset="1" stopColor="#000000" stopOpacity={0.62} />
+              </LinearGradient>
+            </Defs>
+            <Rect x="0" y="0" width="100%" height="100%" fill="url(#velo)" />
+          </Svg>
+        </>
+      ) : (
+        <>
+          <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" pointerEvents="none">
+            <Defs>
+              <LinearGradient id="brillo" x1="0.2" y1="0" x2="0.8" y2="1">
+                <Stop offset="0" stopColor="#FFFFFF" stopOpacity={0.2} />
+                <Stop offset="0.46" stopColor="#FFFFFF" stopOpacity={0} />
+                <Stop offset="1" stopColor="#000000" stopOpacity={0.08} />
+              </LinearGradient>
+            </Defs>
+            <Rect x="0" y="0" width="100%" height="100%" fill="url(#brillo)" />
+          </Svg>
+          <Svg width={220} height={220} style={{ position: 'absolute', right: -70, bottom: -90 }}>
+            <Circle cx={110} cy={110} r={40} stroke={tinta} strokeOpacity={0.12} strokeWidth={18} fill="none" />
+            <Circle cx={110} cy={110} r={80} stroke={tinta} strokeOpacity={0.12} strokeWidth={18} fill="none" />
+          </Svg>
+        </>
+      )}
 
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
         <Texto tam={17} peso="semi" color={tinta} lineas={1} style={{ flex: 1 }}>{cuenta.nombre}</Texto>
