@@ -257,7 +257,7 @@ Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
   la foto que publica BG en su comparador (bgeneral.com/tarjetas-de-credito/comparador/; 15 de crédito: BG Classic,
   BG Platinum y las de débito no tienen foto publicada; Visa Esencial Classic usa la de la Platinum). Las fotos
   **no van en el repo**: `GET /tarjetas/<id>.png` (sin token, como /app) la baja la primera vez, le quita el borde
-  vacío con Pillow (`gastos/imagenes.py`) y la guarda en `datos	arjetas\`. La app la usa en la pila de la hoja
+  vacío con Pillow (`gastos/imagenes.py`) y la guarda en `datos\tarjetas\`. La app la usa en la pila de la hoja
   (con el nombre y los 4 dígitos en pastillas) y como fondo de la tarjeta en el **Inicio**, con un velo oscuro y la
   letra en blanco. Si no hay foto o no carga, se dibuja con `diseno` (colores y red). Estrellas existe en Visa y en
   Mastercard; el catálogo usa la Visa (la del usuario).
