@@ -4,7 +4,17 @@ Lo que quedó por probar, revisar o retomar. Claude lo lee al iniciar cada chat 
 seguir con otra cosa (ver «Al iniciar cada chat» en `CLAUDE.md`). Al terminar una sesión se actualiza: lo que ya
 se probó sale; lo que quedó a medias entra.
 
-Última actualización: 2/nov/2026.
+Última actualización: 3/nov/2026.
+
+## Elegir y probar: la hoja de la tarjeta y las fotos (3/nov)
+
+1. **Elegir cómo se ordena la hoja de la tarjeta**: 4 opciones en https://claude.ai/artifact/ENzBgY2Cg4CWksDWBAGYd3
+   (`datos\maquetas\hoja-tarjeta.html`): A lo esencial arriba y lo opcional plegado · B filas como Ajustes ·
+   C por pasos al crearla · D pestañas. El usuario dijo «aún no lo hagas»: esperar su elección.
+2. **Fotos de las tarjetas de BG** (hecho el 3/nov, **sin verlo en pantalla**: la extensión de Chrome no conectó):
+   ver la pila de la hoja con las fotos y la VISA ESTRELLA en el Inicio con su foto de fondo. Mirar si la letra se lee
+   bien sobre la foto (velo en `Contenido` de `pantallas/inicio/Tarjetas.tsx`) y si alguna foto no corresponde a la
+   tarjeta física (Estrellas Classic/Gold usa la «Visa Estrellas Gold»).
 
 ## Por probar: tarjetas de otros bancos, pila de tarjetas y cifras separadas (2/nov, noche)
 

@@ -251,10 +251,16 @@ Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
   base 365 hasta compararlo con un estado de cuenta real.
   **Elegir la tarjeta en una pila** (2/nov, lo pidió el usuario): en la hoja de la cuenta, Banco = Ninguno ·
   <bancos del catálogo> · **Otro banco**. Con un banco del catálogo, sus tarjetas salen **dibujadas** en una pila
-  al estilo Wallet (`ui/tarjetaBanco.tsx`; colores y red en `diseno` de cada tarjeta en `bancos.json`: es un
-  dibujo aproximado, **no** la imagen del banco, que no va en un repo público); tocar una la elige y la pila se
-  cierra sobre ella; debajo, lo que dice el banco de esa tarjeta en filas de dato (mínimo, interés, atraso,
-  sobregiro, fechas).
+  al estilo Wallet (`ui/tarjetaBanco.tsx`); tocar una la elige y la pila se cierra sobre ella; debajo, lo que dice
+  el banco de esa tarjeta en filas de dato (mínimo, interés, atraso, sobregiro, fechas).
+  **Fotos de las tarjetas** (3/nov, lo pidió el usuario): `imagen.url` de cada tarjeta en `bancos.json` apunta a
+  la foto que publica BG en su comparador (bgeneral.com/tarjetas-de-credito/comparador/; 15 de crédito: BG Classic,
+  BG Platinum y las de débito no tienen foto publicada; Visa Esencial Classic usa la de la Platinum). Las fotos
+  **no van en el repo**: `GET /tarjetas/<id>.png` (sin token, como /app) la baja la primera vez, le quita el borde
+  vacío con Pillow (`gastos/imagenes.py`) y la guarda en `datos	arjetas\`. La app la usa en la pila de la hoja
+  (con el nombre y los 4 dígitos en pastillas) y como fondo de la tarjeta en el **Inicio**, con un velo oscuro y la
+  letra en blanco. Si no hay foto o no carga, se dibuja con `diseno` (colores y red). Estrellas existe en Visa y en
+  Mastercard; el catálogo usa la Visa (la del usuario).
   **Banco fuera del catálogo** (2/nov, la tarjeta del BAC del usuario): «Otro banco» pide el nombre (y el de la
   tarjeta) y, si es de crédito, un bloque «Reglas de tu tarjeta» (todas opcionales): % y piso del mínimo, interés
   anual, cargo por atraso, sobregiro (% sin cargo y cargo) y días para pagar. Van en `cuenta.reglas` (JSON,
