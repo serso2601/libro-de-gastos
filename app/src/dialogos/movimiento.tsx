@@ -52,10 +52,39 @@ export function DialogoMovimiento({ inicial, tipoInicial = 'gasto', fechaInicial
   // Mientras la hoja está abierta (y un rato después), las listas de atrás acomodan sus filas con resorte.
   useEffect(() => abrirHoja(), []);
 
+  // En una tarjeta de crédito no entra dinero como «ingreso»: lo que entra es un pago desde otra cuenta. «Pago» es
+  // una transferencia hacia la tarjeta, con las fichas de total, lo del corte y mínimo.
+  const esCredito = (id: string) => !!cuentas.find((x) => x.id === id)?.es_credito;
+  const [modoPago, setModoPago] = useState(() => (inicial?.tipo ?? tipoPendiente) === 'transferencia' && esCredito(destino));
+  const etiquetaPago = modoPago || (tipo !== 'transferencia' && esCredito(cuenta));
+  const tipos: [TipoMovimiento, string][] = TIPOS.map(([t, txt]) => [t, t === 'ingreso' && etiquetaPago ? 'Pago' : txt]);
+  const origenDePago = (tarjeta: string) => cuentas.find((x) => !x.es_credito && x.id !== tarjeta)?.id ?? cuenta;
+
+  /** Pasa la hoja a «pago de la tarjeta»: hacia la tarjeta, desde la primera cuenta que no es de crédito. */
+  function comoPago(tarjeta: string) {
+    setTipo('transferencia');
+    setModoPago(true);
+    setDestino(tarjeta);
+    setCuenta(origenDePago(tarjeta));
+    const nombre = cuentas.find((x) => x.id === tarjeta)?.nombre ?? '';
+    if (!nota.trim()) setNota(`Pago de ${nombre}`);
+  }
+
   function cambiarTipo(t: TipoMovimiento) {
-    setTipo(t);
     setError('');
+    if (t === 'ingreso' && !editando && etiquetaPago) {
+      if (!modoPago) comoPago(cuenta);
+      return;
+    }
+    setModoPago(false);
+    setTipo(t);
     if (t !== 'transferencia' && categorias.find((x) => x.id === categoria)?.tipo !== t) setCategoria(primeraDe(t));
+  }
+
+  /** Elegir la cuenta: un ingreso que cae en una tarjeta de crédito se vuelve pago de esa tarjeta. */
+  function elegirCuenta(id: string) {
+    if (tipo === 'ingreso' && !editando && esCredito(id)) return comoPago(id);
+    setCuenta(id);
   }
 
   function guardar() {
@@ -138,9 +167,9 @@ export function DialogoMovimiento({ inicial, tipoInicial = 'gasto', fechaInicial
   function comoPagoDeTarjeta() {
     if (!pareceTarjeta) return;
     Haptics.selectionAsync();
-    setTipo('transferencia');
-    setDestino(pareceTarjeta.id);
-    if (cuenta === pareceTarjeta.id) setCuenta(cuentas.find((x) => !x.es_credito)?.id ?? cuenta);
+    const origen = esCredito(cuenta) ? origenDePago(pareceTarjeta.id) : cuenta;
+    comoPago(pareceTarjeta.id);
+    setCuenta(origen);
   }
   const destinoInicialTarjeta = cuentas.some((x) => x.id === destinoInicial && x.es_credito);
 
@@ -153,7 +182,7 @@ export function DialogoMovimiento({ inicial, tipoInicial = 'gasto', fechaInicial
     <Hoja titulo={editando ? 'Editar' : pendiente ? 'Por revisar' : 'Anotar'} alCerrar={alCerrar}
       derecha={editando ? <Pressable onPress={borrar} hitSlop={10}><Texto tam={17} color={c.alerta}>Borrar</Texto></Pressable> : undefined}
       pie={<><TextoError texto={error} /><BotonPrincipal onPress={guardar}>{textoGuardar}</BotonPrincipal></>}>
-      <Segmentos opciones={TIPOS} valor={tipo} alCambiar={cambiarTipo} />
+      <Segmentos opciones={tipos} valor={modoPago ? 'ingreso' : tipo} alCambiar={cambiarTipo} />
 
       {opcionesPago.length > 0 && (
         <View style={{ gap: 6 }}>
@@ -181,7 +210,7 @@ export function DialogoMovimiento({ inicial, tipoInicial = 'gasto', fechaInicial
         <Tocable onPress={comoPagoDeTarjeta} accessibilityLabel={`Anotarlo como pago de ${pareceTarjeta.nombre}`}
           style={{ borderRadius: 14, backgroundColor: c.suave, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <Icono nombre="transferir" tam={18} color={c.tinta} />
-          <Texto tam={13} style={{ flex: 1 }}>¿Es el pago de {pareceTarjeta.nombre}? Anótalo como transferencia a la tarjeta, así no cuenta como gasto dos veces.</Texto>
+          <Texto tam={13} style={{ flex: 1 }}>¿Es el pago de {pareceTarjeta.nombre}? Anótalo como pago de la tarjeta, así no cuenta como gasto dos veces.</Texto>
         </Tocable>
       )}
 
@@ -190,8 +219,8 @@ export function DialogoMovimiento({ inicial, tipoInicial = 'gasto', fechaInicial
 
       {tipo !== 'transferencia' && <ElegirCategoria tipo={tipo} valor={categoria} alCambiar={setCategoria} fecha={fecha} />}
 
-      <ElegirCuenta rotulo={tipo === 'transferencia' ? 'Desde' : 'Cuenta'} valor={cuenta} alCambiar={setCuenta} />
-      {tipo === 'transferencia' && <ElegirCuenta rotulo="Hacia" valor={destino} alCambiar={setDestino} />}
+      <ElegirCuenta rotulo={modoPago ? 'Pagas desde' : tipo === 'transferencia' ? 'Desde' : 'Cuenta'} valor={cuenta} alCambiar={elegirCuenta} solo={modoPago ? (x) => !x.es_credito : undefined} />
+      {tipo === 'transferencia' && <ElegirCuenta rotulo={modoPago ? 'Tarjeta que pagas' : 'Hacia'} valor={destino} alCambiar={setDestino} solo={modoPago ? (x) => !!x.es_credito : undefined} />}
 
       {!editando && !pendiente && (
         <View style={{ backgroundColor: c.suave, borderRadius: 14 }}>

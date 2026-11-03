@@ -8,7 +8,7 @@ import { useAcciones } from '@/lib/acciones';
 import { configPresupuesto, periodoDe, topes } from '@/lib/calculos';
 import { useDatos } from '@/lib/datos';
 import { aFecha, diaCorto, dineroCorto, fechaISO, horaTexto, nuevoId, saldo } from '@/lib/formato';
-import type { Categoria, TipoCategoria } from '@/lib/tipos';
+import type { Categoria, Cuenta, TipoCategoria } from '@/lib/tipos';
 import { Campo, Colores, Etiqueta, Num, Texto } from '@/ui/componentes';
 import { PALETA } from '@/ui/estilos';
 import { CalendarioFecha, SelectorHora } from '@/ui/fecha';
@@ -163,14 +163,18 @@ export function ElegirCategoria({ tipo, valor, alCambiar, fecha, rotulo = true }
 }
 
 /** Elegir una cuenta: tarjetas de colores con su saldo. */
-export function ElegirCuenta({ valor, alCambiar, rotulo }: { valor: string; alCambiar: (id: string) => void; rotulo?: string }) {
+export function ElegirCuenta({ valor, alCambiar, rotulo, solo }: {
+  valor: string; alCambiar: (id: string) => void; rotulo?: string;
+  /** Qué cuentas se muestran (p. ej. solo tarjetas de crédito al pagar una); por defecto, todas. */
+  solo?: (cu: Cuenta) => boolean;
+}) {
   const d = useDatos();
   const { c, colorCuenta } = useTema();
   return (
     <View style={{ gap: 8 }}>
       {rotulo && <Etiqueta>{rotulo}</Etiqueta>}
       <Grilla columnas={3}>
-        {d.cuentas.map((cu) => {
+        {d.cuentas.filter((cu) => !solo || solo(cu) || cu.id === valor).map((cu) => {
           const activa = cu.id === valor;
           const tocar = () => { Haptics.selectionAsync(); alCambiar(cu.id); };
           const fondo = colorCuenta(cu.color);

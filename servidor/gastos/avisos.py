@@ -99,8 +99,10 @@ def texto_de_pagos(con: sqlite3.Connection, catalogo: dict, hoy: date) -> str:
         if al_corte <= 0:
             continue
         pagado = con.execute(
-            "SELECT COALESCE(SUM(monto), 0) FROM movimiento WHERE tipo = 'transferencia' AND cuenta_destino_id = ? AND fecha > ?",
-            (c["id"], corte.isoformat())).fetchone()[0]
+            # Todo dinero que entra a la tarjeta es pago: la transferencia hacia ella o un «ingreso» anotado en ella.
+            """SELECT COALESCE(SUM(monto), 0) FROM movimiento WHERE fecha > :corte
+                 AND ((tipo = 'transferencia' AND cuenta_destino_id = :id) OR (tipo = 'ingreso' AND cuenta_id = :id))""",
+            {"id": c["id"], "corte": corte.isoformat()}).fetchone()[0]
         if al_corte_inicial:
             pagado += c["pagos_tras_corte"] or 0
         m = minimo(al_corte, c["limite"], reglas, c["pago_minimo"], c["minimo_corte"], corte)

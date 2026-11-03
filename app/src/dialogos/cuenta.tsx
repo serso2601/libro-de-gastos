@@ -53,10 +53,11 @@ export function DialogoCuenta({ inicial, alCerrar }: { inicial?: Cuenta; alCerra
   const [pago, setPago] = useState<number | null>(inicial?.dia_pago ?? null);
   const [minimo, setMinimo] = useState(inicial?.pago_minimo ? aTexto(inicial.pago_minimo) : '');
   const [limite, setLimite] = useState(inicial?.limite ? aTexto(inicial.limite) : '');
-  // Al crear la tarjeta: lo que se debía al último corte o lo que se hizo efectivo después (con uno sale el otro:
-  // lo de hoy ya lo trae todo).
+  // Al crear la tarjeta: lo que se debía al último corte o las compras que se hicieron efectivas después (con uno
+  // sale el otro: lo de hoy ya lo trae todo), y los pagos hechos después del corte (p. ej. el mínimo).
   const [alCorteTxt, setAlCorteTxt] = useState(inicial?.deuda_al_corte != null ? aTexto(inicial.deuda_al_corte) : '');
   const [despuesTxt, setDespuesTxt] = useState('');
+  const [pagosTxt, setPagosTxt] = useState(inicial?.pagos_tras_corte ? aTexto(inicial.pagos_tras_corte) : '');
   const v0 = inicial?.banco;
   const [bancoId, setBancoId] = useState<string | null>(v0?.banco ?? null);
   const [productoId, setProductoId] = useState<string | null>(v0?.cuenta ?? null);
@@ -137,24 +138,32 @@ export function DialogoCuenta({ inicial, alCerrar }: { inicial?: Cuenta; alCerra
   const corteAnt = esTarjeta && corte !== null ? cicloTarjeta({ ...(inicial ?? { id: '', nombre: '', color: '', saldo_inicial: 0, orden: 0 }), es_credito: true, dia_corte: corte }, hoy)?.corteAnterior ?? null : null;
   const usada = !!inicial && movimientos.some((m) => m.cuenta_id === inicial.id || m.cuenta_destino_id === inicial.id);
   const verInicio = esTarjeta && !!corteAnt && (!inicial || !inicial.es_credito || inicial.corte_inicial === corteAnt || (!inicial.corte_inicial && !usada));
-  // Con uno de los dos totales sale el otro: hoy = al corte + lo de después. Si están los dos, tienen que cuadrar.
-  // Lo de después es neto: si da negativo es que abonó a la tarjeta más de lo que compró (va como pago).
+  // Lo de hoy = al corte + compras después − pagos después. Con el saldo al corte o las compras sale el otro; si
+  // están los dos, tienen que cuadrar. Sin pagos escritos y con un saldo al corte mayor que lo de hoy, la diferencia
+  // es lo que se abonó de más.
   const resumenInicio = (() => {
     if (!verInicio) return null;
     const leer = (t: string) => (t.trim() === '' ? null : aCentavos(t));
     const a = leer(alCorteTxt);
     const b = leer(despuesTxt);
-    if (a === null && b === null) return null;
+    const p = leer(pagosTxt);
+    if (a === null && b === null && p === null) return null;
     const hoyDebe = saldo.trim() === '' ? 0 : aCentavos(saldo);
-    const base = { alCorte: 0, compras: 0, pagos: 0, sale: null as 'corte' | 'despues' | null };
-    if ([a, b, hoyDebe].some((x) => x !== null && Number.isNaN(x))) return { ...base, error: 'El saldo al corte o lo de después del corte no es un número' };
-    if (a !== null && b !== null && a + b !== hoyDebe) {
-      return { ...base, error: `No concuerda: ${dinero0(a)} al corte + ${dinero0(b)} después = ${dinero0(a + b)}, pero debes hoy ${dinero0(hoyDebe)}. Deja solo uno de los dos.` };
+    const base = { alCorte: 0, compras: 0, pagos: 0, sale: null as 'corte' | 'compras' | null };
+    if ([a, b, p, hoyDebe].some((x) => x !== null && Number.isNaN(x))) return { ...base, error: 'Alguno de los montos no es un número' };
+    if (a === null && b === null) return { ...base, error: 'Pon también el saldo al corte o las compras de después del corte' };
+    const pagos = p ?? 0;
+    if (a !== null && b !== null && a + b - pagos !== hoyDebe) {
+      return { ...base, error: `No concuerda: ${dinero0(a)} al corte + ${dinero0(b)} de compras − ${dinero0(pagos)} de pagos = ${dinero0(a + b - pagos)}, pero debes hoy ${dinero0(hoyDebe)}. Deja vacío el saldo al corte o las compras.` };
     }
-    const alCorte = a ?? hoyDebe - b!;
-    if (alCorte < 0) return { ...base, error: 'Lo de después del corte no puede ser más de lo que debes hoy' };
-    const despues = hoyDebe - alCorte;
-    return { alCorte, compras: Math.max(0, despues), pagos: Math.max(0, -despues), sale: a === null ? 'corte' as const : b === null ? 'despues' as const : null, error: null };
+    if (a === null) {
+      const alCorte = hoyDebe - b! + pagos;
+      if (alCorte < 0) return { ...base, error: 'Las compras de después del corte no pueden ser más de lo que debes hoy más lo que pagaste' };
+      return { alCorte, compras: b!, pagos, sale: 'corte' as const, error: null };
+    }
+    const compras = hoyDebe - a + pagos;
+    if (compras < 0 && p !== null) return { ...base, error: 'No concuerda: con ese saldo al corte y esos pagos, lo de hoy debería ser menos' };
+    return { alCorte: a, compras: Math.max(0, compras), pagos: compras < 0 ? -compras : pagos, sale: b === null ? 'compras' as const : null, error: null };
   })();
   const comoMinimo = reglas?.pago_minimo
     ? `${reglas.pago_minimo.porcentaje}% de lo que debías al corte, nunca menos de ${dinero0(reglas.pago_minimo.minimo)}` : '';
@@ -282,7 +291,7 @@ export function DialogoCuenta({ inicial, alCerrar }: { inicial?: Cuenta; alCerra
         <View style={{ gap: 10, backgroundColor: c.suave, borderRadius: 14, padding: 14 }}>
           <Texto tam={15} peso="semi">¿Cuánto era al corte del {fechaCorta(corteAnt)}?</Texto>
           <Texto tam={13} color={c.tenue} style={{ lineHeight: 18 }}>
-            Lo que el banco hizo efectivo después del corte (aunque lo hayas hecho antes) entra en el corte siguiente. Pon uno de los dos totales y la app saca el otro con lo que debes hoy; no hace falta anotarlo uno por uno.
+            Lo que el banco hizo efectivo después del corte (aunque lo hayas hecho antes) entra en el corte siguiente. Pon el saldo al corte o las compras de después (la app saca el otro con lo que debes hoy) y, si pagaste algo después del corte, cuánto. No hace falta anotarlo uno por uno.
           </Texto>
           <View style={{ gap: 6 }}>
             <Etiqueta>Saldo al corte (estado de cuenta)</Etiqueta>
@@ -290,17 +299,20 @@ export function DialogoCuenta({ inicial, alCerrar }: { inicial?: Cuenta; alCerra
               placeholder={resumenInicio?.sale === 'corte' && !resumenInicio.error ? `${dinero0(resumenInicio.alCorte)} (sale solo)` : undefined} />
           </View>
           <View style={{ gap: 6 }}>
-            <Etiqueta>Lo que se hizo efectivo después del corte</Etiqueta>
-            <CampoMonto valor={despuesTxt} alCambiar={(v) => { setDespuesTxt(v); setError(''); }} moneda={moneda} accessibilityLabel="Lo de después del corte"
-              placeholder={resumenInicio?.sale === 'despues' && !resumenInicio.error
-                ? `${dinero0(resumenInicio.compras || resumenInicio.pagos)} (sale solo)` : undefined} />
-            <Texto tam={13} color={c.tenue}>Compras y cargos que el banco cobró después del corte, menos lo que abonaste a la tarjeta.</Texto>
+            <Etiqueta>Compras que se hicieron efectivas después del corte</Etiqueta>
+            <CampoMonto valor={despuesTxt} alCambiar={(v) => { setDespuesTxt(v); setError(''); }} moneda={moneda} accessibilityLabel="Compras después del corte"
+              placeholder={resumenInicio?.sale === 'compras' && !resumenInicio.error ? `${dinero0(resumenInicio.compras)} (sale solo)` : undefined} />
+            <Texto tam={13} color={c.tenue}>Compras y cargos que el banco cobró después del corte, aunque los hayas hecho antes.</Texto>
+          </View>
+          <View style={{ gap: 6 }}>
+            <Etiqueta derecha={<Texto tam={13} color={c.tenue}>Opcional</Texto>}>Pagos a la tarjeta después del corte</Etiqueta>
+            <CampoMonto valor={pagosTxt} alCambiar={(v) => { setPagosTxt(v); setError(''); }} moneda={moneda} accessibilityLabel="Pagos después del corte" />
+            <Texto tam={13} color={c.tenue}>Por ejemplo, el mínimo si ya lo pagaste. Cuenta como pagado en este corte.</Texto>
           </View>
           {resumenInicio && (
             <Texto tam={13} color={resumenInicio.error ? c.alerta : undefined} style={{ lineHeight: 18 }}>
               {resumenInicio.error
-                ?? `Al corte debías ${dinero0(resumenInicio.alCorte)} · después del corte: ${resumenInicio.pagos > 0
-                  ? `abonaste ${dinero0(resumenInicio.pagos)} más de lo que compraste` : `${dinero0(resumenInicio.compras)}`}. De aquí en adelante, anota cada compra y pago nuevo de la tarjeta.`}
+                ?? `Al corte debías ${dinero0(resumenInicio.alCorte)} · después: compras ${dinero0(resumenInicio.compras)}, pagos ${dinero0(resumenInicio.pagos)}. De aquí en adelante, anota cada compra y pago nuevo de la tarjeta.`}
             </Texto>
           )}
         </View>

@@ -80,3 +80,9 @@ def test_minimo_con_exceso_del_limite_y_piso():
     assert avisos.minimo(103000, 100000, reglas, None, None, corte) == 3090 + 3000  # más lo que pasa del límite
     assert avisos.minimo(80000, None, reglas, 5000, "2026-09-18", corte) == 2400  # corregido para otro corte
     assert avisos.minimo(80000, None, None, 4500, None, corte) == 4500  # sin reglas: el copiado
+
+
+def test_un_ingreso_en_la_tarjeta_tambien_cuenta_como_pago(visa, reloj):
+    visa.put("/api/movimientos/i1", json={"tipo": "ingreso", "monto": 2400, "fecha": "2026-11-01",
+                                          "cuenta_id": "visa", "categoria_id": "otros-ingresos"})
+    assert aviso(visa, reloj, date(2026, 11, 14)) == ""

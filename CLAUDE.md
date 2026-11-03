@@ -175,12 +175,16 @@ Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
   Todo rotulado «aprox.»: sale de lo anotado, no del estado de cuenta.
   **Al crear la tarjeta** (2/nov, el usuario prefirió totales a anotar uno por uno): «Lo que debes hoy» es el
   saldo actual de la banca (`saldo_inicial`, con todo lo de después del corte) y un bloque pide «Saldo al corte
-  (estado de cuenta)» o «Lo que se hizo efectivo después del corte»: **con uno sale el otro** (hoy = al corte +
-  después); si pone los dos y no suman lo de hoy, «No concuerda» (`corte_inicial`, `deuda_al_corte`,
-  `pagos_tras_corte` = lo abonado de más si «después» da negativo; esquema v9). Lo de después cuenta en el corte
-  siguiente
+  (estado de cuenta)» o «Compras que se hicieron efectivas después del corte» (**con uno sale el otro**) y,
+  opcional, «Pagos a la tarjeta después del corte» (p. ej. el mínimo): hoy = al corte + compras − pagos; si pone
+  los dos primeros y no cuadran, «No concuerda» (`corte_inicial`, `deuda_al_corte`, `pagos_tras_corte`; esquema
+  v9). Las compras de después cuentan en el corte siguiente y los pagos, como pagado en ese corte
   (`calculos.inicioDeTarjeta`, usado por `deudaAl`, `pagadoDesdeCorte` y `gastadoEnCorte`; igual en `avisos.py`). El
   bloque solo sale al crearla o mientras siga en ese primer corte; de ahí en adelante se anota cada compra y pago.
+  **En una tarjeta de crédito no hay «Ingreso»**: en Anotar el segmento dice «Pago» y arma la transferencia
+  desde una cuenta normal hacia la tarjeta («Pagas desde» / «Tarjeta que pagas», con las fichas). Todo dinero que
+  entra a la tarjeta (transferencia o un ingreso viejo) cuenta como pago para el mínimo (`pagadoDesdeCorte`,
+  `avisos.py`), aunque no se haya tocado la ficha «Mínimo».
   **Pagar** (2/nov): en todas las tarjetas, «Pagar» abre Anotar como transferencia a la tarjeta, sin monto, con
   fichas **Total · Lo del corte · Mínimo · Otro monto** (descuentan lo pagado desde el corte; `pagoSugerido`
   sale solo si al corte se debía algo y no se pagó todo eso). Si se escribe «pago … tarjeta» como gasto, la hoja

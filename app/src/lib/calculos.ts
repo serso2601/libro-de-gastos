@@ -559,11 +559,13 @@ export function estadoTarjeta(d: Datos, cuenta: Cuenta): EstadoTarjeta | null {
   };
 }
 
-/** Lo que se le pagó a la tarjeta desde el último corte (transferencias que entraron a ella). */
+/** Lo que se le pagó a la tarjeta desde el último corte (todo lo que entró a ella, y lo pagado al crearla si es ese corte). */
 export function pagadoDesdeCorte(d: Datos, cuenta: Cuenta, corte: string): number {
   const ini = inicioDeTarjeta(cuenta);
   const alCrearla = ini && ini.corte === corte ? ini.pagos : 0;
-  return alCrearla + d.movimientos.reduce((s, m) => s + (m.tipo === 'transferencia' && m.cuenta_destino_id === cuenta.id && m.fecha > corte ? m.monto : 0), 0);
+  // Todo dinero que entra a la tarjeta es pago: la transferencia hacia ella o un «ingreso» anotado en ella.
+  const entra = (m: Movimiento) => (m.tipo === 'transferencia' && m.cuenta_destino_id === cuenta.id) || (m.tipo === 'ingreso' && m.cuenta_id === cuenta.id);
+  return alCrearla + d.movimientos.reduce((s, m) => s + (entra(m) && m.fecha > corte ? m.monto : 0), 0);
 }
 
 export interface PagoSugerido {
