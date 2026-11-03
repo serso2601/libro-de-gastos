@@ -69,7 +69,7 @@ export function useAcciones() {
               corte_inicial: c.es_credito ? c.corte_inicial ?? null : null,
               deuda_al_corte: c.es_credito ? c.deuda_al_corte ?? null : null,
               pagos_tras_corte: c.es_credito ? c.pagos_tras_corte ?? null : null,
-              banco: c.banco ?? null, terminacion: c.terminacion || null } },
+              banco: c.banco ?? null, terminacion: c.terminacion || null, reglas: c.reglas ?? null } },
           (d) => ({ ...d, cuentas: reemplazar(d.cuentas, c) }),
         );
       },

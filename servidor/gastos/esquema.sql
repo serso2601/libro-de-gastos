@@ -28,7 +28,9 @@ CREATE TABLE IF NOT EXISTS cuenta (
     -- Vínculo con el catálogo de bancos (bancos.json), en JSON, o NULL; y los últimos 4 dígitos de
     -- su tarjeta, con los que se reconoce de qué cuenta es un aviso del banco.
     banco           TEXT,
-    terminacion     TEXT
+    terminacion     TEXT,
+    -- Sin banco del catálogo: las reglas que el usuario puso para su tarjeta (JSON, ver `ReglasPropias`), o NULL.
+    reglas          TEXT
 );
 
 -- Tarjetas: el pago mínimo que dijo el estado de cuenta de cada corte y los días de atraso del banco observados.

@@ -72,7 +72,7 @@ export function DialogoMinimo({ cuenta, alCerrar }: { cuenta: Cuenta; alCerrar: 
         <Tarjeta color={c.suave} style={{ padding: 14, gap: 4 }}>
           <Texto tam={15}>La app calcula <Texto num tam={15} peso="semi">{neto(sinCorregir.minimo, d.moneda)}</Texto> (aprox.)</Texto>
           <Texto tam={13} color={c.tenue}>
-            {regla.porcentaje}% de lo que debías al corte, nunca menos de {dineroCorto(regla.minimo, d.moneda)}{sinCorregir.exceso > 0 ? ', más lo que pasaba del límite' : ''}.
+            {regla.porcentaje}% de lo que debías al corte{regla.minimo ? `, nunca menos de ${dineroCorto(regla.minimo, d.moneda)}` : ''}{sinCorregir.exceso > 0 ? ', más lo que pasaba del límite' : ''}.
           </Texto>
         </Tarjeta>
       )}

@@ -91,6 +91,32 @@ class VinculoBanco(BaseModel):
         return self
 
 
+class MinimoPropio(BaseModel):
+    porcentaje: float = Field(gt=0, le=100)  # % del saldo al corte
+    minimo: int = Field(default=0, ge=0)  # centavos; nunca menos de esto
+
+
+class SobregiroPropio(BaseModel):
+    permitido: float | None = Field(default=None, ge=0, le=100)  # % sobre el límite que se puede pasar sin cargo
+    cargo: int = Field(default=0, ge=0)  # centavos; lo que cobra al corte si te pasas de ahí
+
+
+class ReglasPropias(BaseModel):
+    """Las reglas de una tarjeta de crédito de un banco que no está en el catálogo: las pone el usuario.
+
+    Tienen la misma forma que una versión de tarjeta de `bancos.json`, así el mínimo, el sobregiro y la fecha de
+    pago se calculan igual. `banco` y `tarjeta` son solo nombres para mostrar.
+    """
+
+    banco: str | None = Field(default=None, max_length=40)
+    tarjeta: str | None = Field(default=None, max_length=40)
+    pago_minimo: MinimoPropio | None = None
+    tasa_anual: float | None = Field(default=None, ge=0, le=200)
+    pago_atrasado: int | None = Field(default=None, ge=0)
+    sobregiro: SobregiroPropio | None = None
+    dias_para_pagar: int | None = Field(default=None, ge=1, le=60)
+
+
 class CuentaIn(BaseModel):
     nombre: str = Field(min_length=1, max_length=60)
     color: str = Color
@@ -106,6 +132,7 @@ class CuentaIn(BaseModel):
     pagos_tras_corte: int | None = Field(default=None, ge=0)  # centavos; lo pagado después de ese corte y antes de crear la tarjeta
     banco: VinculoBanco | None = None  # vínculo con el catálogo, para calcular intereses y cargos
     terminacion: str | None = Field(default=None, pattern=r"^\d{4}$")  # últimos 4 dígitos de su tarjeta
+    reglas: ReglasPropias | None = None  # banco que no está en el catálogo: su nombre y, si es tarjeta, sus reglas
 
     @model_validator(mode="after")
     def _credito(self):
@@ -114,6 +141,12 @@ class CuentaIn(BaseModel):
         if not self.es_credito:
             self.dia_corte = self.dia_pago = self.pago_minimo = self.limite = self.minimo_corte = None
             self.corte_inicial = self.deuda_al_corte = self.pagos_tras_corte = None
+            if self.reglas:  # de un banco fuera del catálogo, una cuenta normal solo guarda el nombre
+                self.reglas = ReglasPropias(banco=self.reglas.banco)
+        if self.banco is not None and self.banco.tarjeta is not None:  # con tarjeta del catálogo, las reglas son las suyas
+            self.reglas = None
+        if self.reglas and not any(v not in (None, "") for v in self.reglas.model_dump().values()):
+            self.reglas = None
         return self
 
 
@@ -230,7 +263,8 @@ def _validar(con: sqlite3.Connection, m: MovimientoIn | RecurrenciaIn) -> None:
 
 def _cuenta(fila: sqlite3.Row | dict) -> dict:
     """Una cuenta como la ve la API: `es_credito` sale como booleano y `banco` como objeto (o null)."""
-    return {**dict(fila), "es_credito": bool(fila["es_credito"]), "banco": json.loads(fila["banco"]) if fila["banco"] else None}
+    return {**dict(fila), "es_credito": bool(fila["es_credito"]), "banco": json.loads(fila["banco"]) if fila["banco"] else None,
+            "reglas": json.loads(fila["reglas"]) if fila["reglas"] else None}
 
 
 def _categoria(fila: sqlite3.Row | dict) -> dict:
@@ -500,20 +534,21 @@ def create_app(config: Config | None = None, hoy=date.today, web: Path = WEB, ex
             con.execute(
                 """INSERT INTO cuenta (id, nombre, color, saldo_inicial, orden, creado, actualizado,
                      es_credito, dia_corte, dia_pago, pago_minimo, limite, minimo_corte,
-                     corte_inicial, deuda_al_corte, pagos_tras_corte, banco, terminacion)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     corte_inicial, deuda_al_corte, pagos_tras_corte, banco, terminacion, reglas)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                    ON CONFLICT (id) DO UPDATE SET nombre = excluded.nombre, color = excluded.color,
                      saldo_inicial = excluded.saldo_inicial, actualizado = excluded.actualizado,
                      es_credito = excluded.es_credito, dia_corte = excluded.dia_corte,
                      dia_pago = excluded.dia_pago, pago_minimo = excluded.pago_minimo, limite = excluded.limite,
                      minimo_corte = excluded.minimo_corte, corte_inicial = excluded.corte_inicial,
                      deuda_al_corte = excluded.deuda_al_corte, pagos_tras_corte = excluded.pagos_tras_corte,
-                     banco = excluded.banco, terminacion = excluded.terminacion""",
+                     banco = excluded.banco, terminacion = excluded.terminacion, reglas = excluded.reglas""",
                 (id_, c.nombre.strip(), c.color, c.saldo_inicial, orden, marca, marca,
                  int(c.es_credito), c.dia_corte, c.dia_pago, c.pago_minimo, c.limite,
                  c.minimo_corte.isoformat() if c.minimo_corte else None,
                  c.corte_inicial.isoformat() if c.corte_inicial else None, c.deuda_al_corte, c.pagos_tras_corte,
-                 json.dumps(c.banco.model_dump(), ensure_ascii=False) if c.banco else None, c.terminacion),
+                 json.dumps(c.banco.model_dump(), ensure_ascii=False) if c.banco else None, c.terminacion,
+                 json.dumps(c.reglas.model_dump(exclude_none=True), ensure_ascii=False) if c.reglas else None),
             )
         _sincronizar_cargos(con, id_, c.banco, hoy())
         return _cuenta(con.execute("SELECT * FROM cuenta WHERE id = ?", (id_,)).fetchone())

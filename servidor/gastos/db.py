@@ -9,7 +9,7 @@ from datetime import date, datetime
 from pathlib import Path
 
 ESQUEMA = Path(__file__).with_name("esquema.sql")
-VERSION = 10
+VERSION = 11
 
 # {versión a la que lleva: sql}. Cada paso corre con las claves foráneas apagadas: rehacer una
 # tabla no debe tocar las filas que la apuntan (movimiento.recurrencia_id es ON DELETE SET NULL).
@@ -143,6 +143,13 @@ MIGRACIONES: dict[int, str] = {
         creado      TEXT NOT NULL,
         PRIMARY KEY (cuenta_id, corte)
     );
+    COMMIT;
+    """,
+    # Tarjeta de un banco que no está en el catálogo: sus reglas las pone el usuario (JSON: nombre del banco y de
+    # la tarjeta, % y piso del mínimo, tasa, cargo por atraso, sobregiro, días para pagar).
+    11: """
+    BEGIN;
+    ALTER TABLE cuenta ADD COLUMN reglas TEXT;
     COMMIT;
     """,
 }

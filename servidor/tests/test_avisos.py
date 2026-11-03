@@ -94,3 +94,13 @@ def test_el_minimo_confirmado_del_corte_manda(visa, reloj):
     visa.put("/api/movimientos/p1", json={"tipo": "transferencia", "monto": 3000, "fecha": "2026-11-01",
                                           "cuenta_id": "efectivo", "cuenta_destino_id": "visa"})
     assert aviso(visa, reloj, date(2026, 11, 14)) == ""
+
+
+def test_tarjeta_de_otro_banco_avisa_con_sus_reglas(cliente, reloj):
+    # BAC (no está en el catálogo): el usuario puso 4% con piso de $25 y 25 días para pagar. Corte 10 oct → paga 4 nov.
+    cliente.put("/api/cuentas/bac", json={"nombre": "BAC", "es_credito": True, "dia_corte": 10, "saldo_inicial": -100000,
+                                          "reglas": {"banco": "BAC", "pago_minimo": {"porcentaje": 4, "minimo": 2500},
+                                                     "dias_para_pagar": 25}})
+    assert aviso(cliente, reloj, date(2026, 11, 1)) == (
+        "BAC: paga el 4 nov (mínimo $40.00, del corte $1,000.00).\n"
+        "Si ya pagaste, anótalo en la app como pago de la tarjeta.")

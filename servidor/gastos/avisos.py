@@ -35,10 +35,11 @@ def ciclo(dia_corte: int, dia_pago: int | None, dias_para_pagar: int | None, hoy
     return anterior, (anterior + timedelta(days=dias_para_pagar)) if dias_para_pagar else None
 
 
-def _reglas(catalogo: dict, banco: dict | None, hoy: date) -> dict | None:
-    """La versión vigente de la tarjeta del catálogo a la que está vinculada la cuenta, o None."""
+def _reglas(catalogo: dict, banco: dict | None, hoy: date, propias: dict | None = None) -> dict | None:
+    """La versión vigente de la tarjeta del catálogo a la que está vinculada la cuenta; si no está en el catálogo,
+    las reglas que puso el usuario (misma forma); o None."""
     if not banco or not banco.get("tarjeta"):
-        return None
+        return propias or None
     for b in catalogo["bancos"]:
         if b["id"] != banco.get("banco"):
             continue
@@ -79,7 +80,7 @@ def texto_de_pagos(con: sqlite3.Connection, catalogo: dict, hoy: date) -> str:
     lineas = []
     for c in con.execute("SELECT * FROM cuenta WHERE es_credito = 1 AND dia_corte IS NOT NULL ORDER BY orden, creado"):
         banco = json.loads(c["banco"]) if c["banco"] else None
-        reglas = _reglas(catalogo, banco, hoy)
+        reglas = _reglas(catalogo, banco, hoy, json.loads(c["reglas"]) if c["reglas"] else None)
         corte, pago = ciclo(c["dia_corte"], c["dia_pago"], (reglas or {}).get("dias_para_pagar"), hoy)
         if pago is None:
             continue

@@ -336,3 +336,25 @@ def test_el_catalogo_trae_las_reglas_de_cada_tarjeta_de_credito():
                 assert v["sobregiro"]["cargo"] > 0 and v["sobregiro"]["permitido"] in (None, 5, 10), t["id"]
                 assert v["dias_para_pagar"] == 28, t["id"]
                 assert "fechas" not in v or (1 <= v["fechas"]["corte"] <= 31 and 1 <= v["fechas"]["pago"] <= 31), t["id"]
+
+
+def test_tarjeta_de_otro_banco_guarda_sus_reglas(cliente):
+    reglas = {"banco": "BAC", "tarjeta": "Visa Clásica", "pago_minimo": {"porcentaje": 4, "minimo": 2500},
+              "tasa_anual": 54, "pago_atrasado": 3000, "sobregiro": {"permitido": 5, "cargo": 2500}, "dias_para_pagar": 25}
+    tarjeta = {"nombre": "BAC", "es_credito": True, "dia_corte": 10, "reglas": reglas}
+    r = cliente.put("/api/cuentas/bac", json=tarjeta)
+    assert r.status_code == 200 and r.json()["reglas"] == reglas
+    por_id = {c["id"]: c for c in cliente.get("/api/datos").json()["cuentas"]}
+    assert por_id["bac"]["reglas"] == reglas and por_id["efectivo"]["reglas"] is None
+
+    # Lo que no se llena no se guarda; sin nada, queda en null.
+    r = cliente.put("/api/cuentas/bac", json={**tarjeta, "reglas": {"banco": "BAC", "tasa_anual": None}})
+    assert r.json()["reglas"] == {"banco": "BAC"}
+    assert cliente.put("/api/cuentas/bac", json={**tarjeta, "reglas": {}}).json()["reglas"] is None
+    # Una cuenta normal de otro banco guarda solo el nombre; con banco del catálogo, las reglas son las del catálogo.
+    assert cliente.put("/api/cuentas/bac", json={**tarjeta, "es_credito": False}).json()["reglas"] == {"banco": "BAC"}
+    con_bg = {**tarjeta, "banco": {"banco": "bg", "tarjeta": "bg-credito-estrellas-classic"}}
+    assert cliente.put("/api/cuentas/bac", json=con_bg).json()["reglas"] is None
+    # Valores fuera de lugar.
+    assert cliente.put("/api/cuentas/bac", json={**tarjeta, "reglas": {"pago_minimo": {"porcentaje": 0}}}).status_code == 422
+    assert cliente.put("/api/cuentas/bac", json={**tarjeta, "reglas": {"pago_atrasado": -1}}).status_code == 422

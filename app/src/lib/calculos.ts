@@ -349,12 +349,26 @@ export function versionVigente<V extends { vigente_desde: string }>(producto: { 
   return elegida;
 }
 
-/** Las reglas que da el banco para la tarjeta de crédito (catálogo), si está vinculada a una que las trae. */
+/**
+ * Las reglas de la tarjeta de crédito: las que da el banco (catálogo) si está vinculada a una que las trae; si no,
+ * las que puso el usuario para su tarjeta (banco fuera del catálogo). null si no hay ninguna.
+ */
 export function reglasTarjeta(d: Pick<Datos, 'catalogo' | 'hoy'>, cuenta: Cuenta): VersionTarjeta | null {
+  if (!cuenta.es_credito) return null;
   const v = cuenta.banco;
-  if (!cuenta.es_credito || !v?.tarjeta || !d.catalogo) return null;
-  const tarjeta = d.catalogo.bancos.find((b) => b.id === v.banco)?.tarjetas.find((t) => t.id === v.tarjeta);
-  return tarjeta ? versionVigente(tarjeta, d.hoy) : null;
+  if (v?.tarjeta && d.catalogo) {
+    const tarjeta = d.catalogo.bancos.find((b) => b.id === v.banco)?.tarjetas.find((t) => t.id === v.tarjeta);
+    if (tarjeta) return versionVigente(tarjeta, d.hoy);
+  }
+  return reglasPropias(cuenta.reglas);
+}
+
+/** Las reglas que puso el usuario, con la forma de una versión del catálogo; null si no puso ninguna regla. */
+export function reglasPropias(r: Cuenta['reglas']): VersionTarjeta | null {
+  if (!r) return null;
+  const { pago_minimo, tasa_anual, pago_atrasado, sobregiro, dias_para_pagar } = r;
+  if (!pago_minimo && tasa_anual == null && pago_atrasado == null && !sobregiro && !dias_para_pagar) return null;
+  return { vigente_desde: '0000-01-01', fuente: 'Puestas por ti', pago_minimo, tasa_anual, pago_atrasado, sobregiro, dias_para_pagar };
 }
 
 export interface CicloTarjeta {

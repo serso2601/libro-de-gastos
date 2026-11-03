@@ -32,6 +32,22 @@ export interface Cuenta {
   /** Su vínculo con un banco del catálogo (opcional) y los últimos 4 dígitos de su tarjeta. */
   banco?: VinculoBanco | null;
   terminacion?: string | null;
+  /** Banco que no está en el catálogo: su nombre y, si es tarjeta de crédito, las reglas que puso el usuario. */
+  reglas?: ReglasPropias | null;
+}
+
+/**
+ * Las reglas de una tarjeta de un banco que no está en el catálogo, como las copió el usuario de su estado de cuenta
+ * o de la tabla de tarifas. Tienen la forma de una versión del catálogo, así todo se calcula igual.
+ */
+export interface ReglasPropias {
+  banco?: string;
+  tarjeta?: string;
+  pago_minimo?: { porcentaje: number; minimo: number };
+  tasa_anual?: number;
+  pago_atrasado?: number;
+  sobregiro?: { permitido: number | null; cargo: number };
+  dias_para_pagar?: number;
 }
 
 /** Con qué productos del catálogo está vinculada una cuenta. */
@@ -75,7 +91,9 @@ export interface VersionTarjeta {
   /** Días entre el corte y la fecha de pago. */
   dias_para_pagar?: number;
 }
-export interface Tarjeta { id: string; nombre: string; clase: 'debito' | 'credito'; versiones: VersionTarjeta[] }
+/** Cómo se dibuja la tarjeta en la app (un dibujo aproximado, no la imagen del banco). */
+export interface DisenoTarjeta { fondo: [string, string]; tinta: string; red?: 'visa' | 'mastercard' }
+export interface Tarjeta { id: string; nombre: string; clase: 'debito' | 'credito'; diseno?: DisenoTarjeta; versiones: VersionTarjeta[] }
 
 export interface Banco { id: string; nombre: string; banca?: { nombre: string; url: string; pasos: string }; cuentas: ProductoCuenta[]; tarjetas: Tarjeta[] }
 export interface Catalogo { acerca?: string; notas?: string[]; bancos: Banco[] }

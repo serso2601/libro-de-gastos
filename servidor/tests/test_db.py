@@ -6,10 +6,16 @@ import pytest
 from gastos import db
 
 
+def esquema_v10() -> str:
+    """El esquema de la versión 10: el actual sin las reglas propias de la tarjeta que agregó la 11."""
+    return re.sub(r",\n    -- Sin banco del catálogo: las reglas[^\n]*\n    reglas          TEXT", "",
+                  db.ESQUEMA.read_text(encoding="utf-8"))
+
+
 def esquema_v9() -> str:
-    """El esquema de la versión 9: el actual sin la tabla de cortes de tarjeta que agregó la 10."""
+    """El esquema de la versión 9: el de la 10 sin la tabla de cortes de tarjeta que agregó la 10."""
     return re.sub(r"\n-- Tarjetas: el pago mínimo que dijo[^\n]*\nCREATE TABLE IF NOT EXISTS corte_tarjeta \(.*?\n\);\n", "",
-                  db.ESQUEMA.read_text(encoding="utf-8"), flags=re.S)
+                  esquema_v10(), flags=re.S)
 
 
 def esquema_v8() -> str:
@@ -252,8 +258,24 @@ def test_migracion_10_agrega_los_cortes_de_tarjeta(tmp_path):
 
     db.inicializar(con)
 
-    assert con.execute("PRAGMA user_version").fetchone()[0] == db.VERSION == 10
+    assert con.execute("PRAGMA user_version").fetchone()[0] == db.VERSION
     assert con.execute("SELECT COUNT(*) FROM corte_tarjeta").fetchone()[0] == 0
     with con:
         con.execute("INSERT INTO corte_tarjeta (cuenta_id, corte, minimo, dias, creado) "
                     "VALUES ('visa', '2026-10-18', 2500, NULL, ?)", (marca,))
+
+
+def test_migracion_11_agrega_las_reglas_propias_de_la_tarjeta(tmp_path):
+    con = db.conectar(tmp_path / "v10.db")
+    con.executescript(esquema_v10())
+    assert "reglas" not in {f["name"] for f in con.execute("PRAGMA table_info(cuenta)")}
+    con.execute("PRAGMA user_version = 10")
+    marca = db.ahora()
+    with con:
+        con.execute("INSERT INTO cuenta (id, nombre, creado, actualizado, es_credito, dia_corte) "
+                    "VALUES ('bac', 'BAC', ?, ?, 1, 10)", (marca, marca))
+
+    db.inicializar(con)
+
+    assert con.execute("PRAGMA user_version").fetchone()[0] == db.VERSION == 11
+    assert con.execute("SELECT reglas FROM cuenta WHERE id = 'bac'").fetchone()[0] is None
