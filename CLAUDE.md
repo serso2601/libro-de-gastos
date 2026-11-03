@@ -167,7 +167,8 @@ Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
   del piso ni más de lo que se debe, más lo que pase del límite; el campo para copiarlo solo sale si la
   tarjeta no trae reglas), la **fecha de pago** si el usuario no puso día (`dias_para_pagar`: en BG, 28
   días después del corte, como dice su tabla) y, con el **límite** (columna `limite`, esquema v7), lo
-  **disponible** y el **sobregiro** (BG: 5% o 10% sobre el límite sin cargo; si al cierre se pasa de ahí,
+  **disponible** (y, si el producto publica el %, también **«Disponible con sobregiro»** = límite + % − deuda, en la
+  cabecera y el resumen de la tarjeta) y el **sobregiro** (BG: 5% o 10% sobre el límite sin cargo; si al cierre se pasa de ahí,
   $32.10–$53.50 una vez; tarjetas sin % publicado: «hasta $53.50»). En BG **el corte sí depende del
   producto** (Estrellas y Visa Esencial 17/15, MileagePlus 5/3, ConnectMiles 7/5, CashBack 8/6, MC
   Esencial 15/12): `fechas` en el catálogo; en la hoja de la cuenta el banco va **arriba** (justo bajo

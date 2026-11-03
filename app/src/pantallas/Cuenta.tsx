@@ -292,6 +292,10 @@ function ResumenTarjeta({ cuenta, fondo }: { cuenta: TCuenta; fondo: string }) {
           <View style={{ borderTopWidth: 1, borderTopColor: c.linea, marginTop: 6, paddingTop: 6, gap: 2 }}>
             <FilaCifra texto="Límite" valor={neto(estado.limite, d.moneda)} tenue />
             <FilaCifra texto="Disponible" valor={neto(estado.disponible ?? 0, d.moneda)} color={(estado.disponible ?? 0) < 0 ? c.alerta : undefined} />
+            {sg && sg.hasta !== null && (
+              <FilaCifra texto={`Disponible con sobregiro (${sg.porcentaje}%)`} valor={neto(sg.hasta - deudaTarjeta(d, cuenta), d.moneda)}
+                color={sg.hasta - deudaTarjeta(d, cuenta) < 0 ? c.alerta : undefined} />
+            )}
             {sg && sg.estado === 'dentro' && (
               <Texto tam={13} color={c.tenue}>
                 {sg.hasta !== null
@@ -410,6 +414,9 @@ function CuentaColor({ cuenta }: { cuenta: TCuenta }) {
   const fechas = [cuenta.dia_corte ? `Corta el ${cuenta.dia_corte}` : '',
     cuenta.dia_pago ? `paga el ${cuenta.dia_pago}` : fechaPago ? `paga el ${fechaCorta(fechaPago)}` : ''].filter(Boolean).join(' · ');
   const disponible = esTarjeta && cuenta.limite ? cuenta.limite - deudaTarjeta(d, cuenta) : null;
+  // Con sobregiro permitido (el % que publica el banco), también lo que queda contando ese margen.
+  const hastaSobregiro = esTarjeta && cuenta.limite ? estadoTarjeta(d, cuenta)?.sobregiro?.hasta ?? null : null;
+  const disponibleSobregiro = hastaSobregiro !== null ? hastaSobregiro - deudaTarjeta(d, cuenta) : null;
   // Pagar abre la transferencia a la tarjeta sin monto: en la hoja se elige total, lo del corte, el mínimo u otro.
   const deuda = esTarjeta ? deudaTarjeta(d, cuenta) : 0;
   function pagar() {
@@ -434,6 +441,9 @@ function CuentaColor({ cuenta }: { cuenta: TCuenta }) {
           {fechas !== '' && <Texto tam={14} color={tinta}>{fechas}</Texto>}
           {!!pago?.minimo && <Texto tam={14} color={tinta}>Pago mínimo <Texto num tam={14} color={tinta}>{neto(pago.minimo, d.moneda)}</Texto></Texto>}
           {disponible !== null && <Texto tam={14} color={tinta}>Disponible <Texto num tam={14} color={tinta}>{neto(disponible, d.moneda)}</Texto></Texto>}
+          {disponibleSobregiro !== null && (
+            <Texto tam={14} color={tinta}>Disponible con sobregiro <Texto num tam={14} color={tinta}>{neto(disponibleSobregiro, d.moneda)}</Texto></Texto>
+          )}
         </>
       ) : (
         <>
