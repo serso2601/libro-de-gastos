@@ -63,10 +63,13 @@ compilación de la app pasan; **nada se vio todavía en pantalla**.
    política = `PRIVACIDAD.md`, dominio `github.com`) y permiso de Gmail renovado ya en producción: no vence a
    los 7 días. Si algún día Google lo retira, la página de estado lo dice; se arregla con
    `uv run python -m gastos.correo --autorizar` en `servidor\`.
-3. **Atajo de Apple Pay armado por el usuario el 2/nov** (tarjeta «Debito Platinum», monto = variable «Cantidad»,
-   comercio = «Comercio», con «Configurar VPN: Tailscale» + «Esperar 2 s» antes). **Falta el primer pago real**: ver
-   que llegue (`pendiente` con origen `wallet`). Las instrucciones de la app se rehicieron con los nombres reales de
-   iOS 26. Tailscale con «VPN On Demand».
+3. **Atajo de Apple Pay: hasta el 4/nov no llegó ningún pago** (ni anotado ni en «Por revisar»). La primera vez la PC
+   estaba apagada (salió «tiempo de espera agotado»); las demás no salió nada. Lo más probable: la automatización
+   «Transacción» solo tiene marcada la tarjeta de débito y se pagó con otra; o «Preguntar antes de ejecutar» prendido.
+   Arreglado del lado de la PC (4/nov): un pago sin comercio o con un monto raro ya no se rechaza (queda en «Por
+   revisar»), y **cada pedido del iPhone queda en `datosegistros\entradas.log`** (no se borra al reiniciar; la página
+   de estado muestra el último). **Falta**: revisar en el iPhone las tarjetas marcadas en la automatización y
+   «Ejecutar inmediatamente», pagar algo y ver «Último pedido del iPhone» en la página de estado.
 4. **Cargos del banco**: reglas de membresía ($2.68) y seguro ($1.05) el día 3 en la cuenta de BG. Ver que el
    3/nov se anoten solos en «Cargos del banco».
 5. **Revisar a ojo**: el «Resumen de <mes>» en la pantalla de cada cuenta (flechas de mes, entró/salió, interés

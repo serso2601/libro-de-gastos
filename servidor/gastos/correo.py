@@ -692,9 +692,9 @@ def _aviso_directo(entrada: dict) -> dict | None:
     origen = entrada.get("origen")
     if origen == "yappy":
         return leer_yappy(entrada.get("asunto", ""), entrada.get("texto", ""))
-    if origen == "wallet" and entrada.get("comercio") and entrada.get("monto") is not None:
+    if origen == "wallet" and entrada.get("monto") is not None:
         monto = a_centavos(str(entrada["monto"]))
-        comercio = str(entrada["comercio"]).strip()[:200]
+        comercio = str(entrada.get("comercio") or "").strip()[:200] or "Apple Pay"
         if not monto or monto <= 0 or not comercio:
             return None
         terminacion = re.sub(r"\D", "", str(entrada.get("terminacion") or ""))[-4:]

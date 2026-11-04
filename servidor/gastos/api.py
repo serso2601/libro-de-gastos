@@ -26,6 +26,8 @@ from pathlib import Path
 from typing import Literal
 
 from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Request
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -205,7 +207,7 @@ class EntradaIn(BaseModel):
     texto: str | None = Field(default=None, min_length=1, max_length=20000)
     origen: Literal["atajo", "correo", "wallet"] = "atajo"
     monto: str | None = Field(default=None, max_length=30)  # «$12.50», tal como lo da el Atajo (un número también vale)
-    comercio: str | None = Field(default=None, min_length=1, max_length=200)
+    comercio: str | None = Field(default=None, max_length=200)  # puede venir vacío: hay terminales sin nombre
     terminacion: str | None = Field(default=None, max_length=30)  # los 4 dígitos de la tarjeta (se toman los últimos 4)
 
     @field_validator("monto", mode="before")
@@ -215,11 +217,10 @@ class EntradaIn(BaseModel):
 
     @model_validator(mode="after")
     def _algo_que_leer(self):
-        sueltos = self.monto is not None and self.comercio is not None
-        if self.texto is None and not sueltos:
+        # Un pago de Apple Pay nunca se rechaza: si algo no se entiende, queda en «Por revisar» (un 422 el iPhone
+        # no lo muestra y el pago se perdería sin aviso).
+        if self.texto is None and self.monto is None:
             raise ValueError("Falta el texto del aviso, o el monto y el comercio")
-        if sueltos and (correo.a_centavos(self.monto) or 0) <= 0:
-            raise ValueError("El monto no es un número válido")
         return self
 
 
@@ -466,6 +467,42 @@ def create_app(config: Config | None = None, hoy=date.today, web: Path = WEB, ex
         finally:
             con.close()
 
+    def anotar_entrada(texto: str) -> None:
+        """Una línea en datos/registros/entradas.log (no se pisa al reiniciar, como servidor.log): qué llegó de los
+        Atajos del iPhone y con qué respondió la PC, para saber por qué un pago de Apple Pay no se anotó."""
+        try:
+            ruta = config.carpeta / "registros" / "entradas.log"
+            ruta.parent.mkdir(parents=True, exist_ok=True)
+            with ruta.open("a", encoding="utf-8") as f:
+                f.write(f"{datetime.now().isoformat(timespec='seconds')}  {texto}\n")
+        except OSError:
+            pass
+
+    def ultimo_intento() -> str | None:
+        """La última respuesta a /api/entrada («2026-11-04T08:12:03 → 200»), para la página de estado."""
+        ruta = config.carpeta / "registros" / "entradas.log"
+        try:
+            lineas = [x for x in ruta.read_text(encoding="utf-8").splitlines() if "→" in x]
+        except OSError:
+            return None
+        if not lineas:
+            return None
+        fecha, _, resto = lineas[-1].partition("  ")
+        return f"{fecha.replace('T', ' ')[:16]} → {resto.rsplit('→', 1)[-1].strip()}"
+
+    @app.middleware("http")
+    async def registrar_entradas(request: Request, siguiente):
+        respuesta = await siguiente(request)
+        if request.url.path == "/api/entrada":
+            anotar_entrada(f"{request.client.host if request.client else '?'} → {respuesta.status_code}")
+        return respuesta
+
+    @app.exception_handler(RequestValidationError)
+    async def entrada_que_no_se_entiende(request: Request, exc: RequestValidationError):
+        if request.url.path == "/api/entrada":
+            anotar_entrada(f"no se entendió: {str(exc.errors())[:300]}")
+        return await request_validation_exception_handler(request, exc)
+
     @app.middleware("http")
     async def solo_la_tailnet(request: Request, siguiente):
         if not desde_red_permitida(request.client.host if request.client else None):
@@ -492,7 +529,7 @@ def create_app(config: Config | None = None, hoy=date.today, web: Path = WEB, ex
         ultimos = {f["origen"]: f["creado"] for f in con.execute(
             "SELECT origen, MAX(creado) AS creado FROM pendiente WHERE origen IN ('yappy', 'wallet') GROUP BY origen")}
         return pagina.estado(config, conteos, db.ultimo_respaldo(config.respaldos), qr,
-                              {**correo.estado_actual(config.carpeta), "ultimos": ultimos})
+                              {**correo.estado_actual(config.carpeta), "ultimos": ultimos, "ultimo_intento": ultimo_intento()})
 
     @app.get("/app", include_in_schema=False)
     def app_web_sin_barra():
@@ -734,10 +771,12 @@ def create_app(config: Config | None = None, hoy=date.today, web: Path = WEB, ex
         """Un aviso del banco: un texto (p. ej. un SMS que manda un Atajo del iPhone) o los campos sueltos de
         Apple Pay (`monto`, `comercio`, `terminacion`). Responde ya y lo lee aparte."""
         aviso = {"texto": e.texto or "", "origen": e.origen, "fecha": hoy().isoformat()}
-        if e.monto is not None and e.comercio is not None:  # Apple Pay: no hay nada que extraer del texto
-            aviso.update(origen="wallet", remitente="Apple Pay", monto=e.monto, comercio=e.comercio.strip(),
+        if e.monto is not None:  # Apple Pay: no hay nada que extraer del texto
+            comercio = (e.comercio or "").strip() or "Apple Pay"
+            aviso.update(origen="wallet", remitente="Apple Pay", monto=e.monto, comercio=comercio,
                          terminacion=e.terminacion, hora=datetime.now().strftime("%H:%M"))
-            aviso["texto"] = aviso["texto"] or f"{aviso['comercio']} · {aviso['monto']}"
+            aviso["texto"] = aviso["texto"] or f"{comercio} · {e.monto}"
+        anotar_entrada(f"recibido: monto={e.monto!r} comercio={e.comercio!r} terminacion={e.terminacion!r} texto={(e.texto or '')[:80]!r}")
         id_ = correo.registrar(con, aviso)
         threading.Thread(target=leer_en_hilo, args=(id_, aviso), daemon=True, name="entrada").start()
         return {"ok": True, "id": id_}

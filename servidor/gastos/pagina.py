@@ -126,6 +126,9 @@ def bloque_correo(info: dict) -> str:
     ultimos = info.get("ultimos") or {}
     vias = (f"<p>Último Yappy: <b>{escape(hace(ultimos.get('yappy')))}</b> · "
             f"último Apple Pay: <b>{escape(hace(ultimos.get('wallet')))}</b></p>")
+    intento = info.get("ultimo_intento")  # la última respuesta a un Atajo del iPhone (datos/registros/entradas.log)
+    if intento:
+        vias += f"<p>Último pedido del iPhone: <b>{escape(intento)}</b> (200 = llegó; 401 = la clave del Atajo no es la de la PC)</p>"
     if not info["configurado"]:
         return f"""<div class="tarjeta"><h1>Avisos (Yappy y Apple Pay) <span class="mal">● Gmail sin configurar</span></h1>
 {vias}<p>Apple Pay entra por el Atajo del iPhone. Para que los Yappy entren solos desde el correo:</p>

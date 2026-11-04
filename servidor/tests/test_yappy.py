@@ -465,10 +465,39 @@ def test_apple_pay_repetido_el_mismo_dia_es_duplicado_de_lo_anotado_a_mano(api):
     assert esperar(api, r.json()["id"])["estado"] == "duplicado"
 
 
-@pytest.mark.parametrize("cuerpo", [{}, {"monto": "$5.00"}, {"comercio": "Super 99"}, {"origen": "wallet"},
-                                    {"monto": "gratis", "comercio": "Super 99"}, {"monto": "$0.00", "comercio": "X"}])
-def test_entrada_sin_texto_ni_monto_y_comercio_es_422(api, cuerpo):
+@pytest.mark.parametrize("cuerpo", [{}, {"comercio": "Super 99"}, {"origen": "wallet"}])
+def test_entrada_sin_texto_ni_monto_es_422(api, cuerpo):
     assert api.post("/api/entrada", json=cuerpo).status_code == 422
+
+
+def test_apple_pay_sin_comercio_entra_como_apple_pay(api, elector):
+    # Hay terminales que no mandan el nombre del comercio: el pago no se pierde.
+    cuenta(api, "visa", terminacion="4821")
+    for comercio in (None, ""):
+        cuerpo = {"monto": "$4.00", "terminacion": "4821", **({} if comercio is None else {"comercio": comercio})}
+        r = api.post("/api/entrada", json=cuerpo)
+        assert r.status_code == 200
+        p = esperar(api, r.json()["id"])
+        assert p["comercio"] == "Apple Pay" and p["monto"] == 400
+
+
+@pytest.mark.parametrize("monto", ["gratis", "$0.00"])
+def test_apple_pay_con_monto_raro_queda_por_revisar(api, monto):
+    r = api.post("/api/entrada", json={"monto": monto, "comercio": "Super 99", "terminacion": "4821"})
+    assert r.status_code == 200
+    assert esperar(api, r.json()["id"])["estado"] == "nuevo"  # en «Por revisar», no perdido
+
+
+def test_cada_pedido_de_entrada_queda_en_su_registro(api, config):
+    api.post("/api/entrada", json={"monto": "$4.00", "comercio": "Cafe", "terminacion": "4821"})
+    api.post("/api/entrada", json={})
+    sin_llave = TestClient(api.app).post("/api/entrada", json={"monto": "$4.00"})
+    assert sin_llave.status_code == 401
+    lineas = (config.carpeta / "registros" / "entradas.log").read_text(encoding="utf-8").splitlines()
+    assert any("recibido: monto='$4.00' comercio='Cafe'" in x for x in lineas)
+    assert sum(x.endswith("→ 200") for x in lineas) == 1
+    assert any("no se entendió" in x for x in lineas) and any(x.endswith("→ 422") for x in lineas)
+    assert any(x.endswith("→ 401") for x in lineas)
 
 
 # --- Cargos fijos del banco -------------------------------------------------------------------------
