@@ -204,6 +204,25 @@ Dentro de la carpeta pero **ignorado por git** (nunca sube al repo público):
   «corta el 18» por «paga el 15» la última semana, «Por venir» lo lista hasta cubrir el mínimo, y un **Atajo
   diario opcional** (Ajustes → «Avisos de pago en el iPhone», `GET /api/avisos/pagos`, `gastos/avisos.py`)
   muestra una notificación 3 días antes, la víspera y el día si falta el mínimo, y recuerda anotarlo.
+- **Anotar con tarjeta** (4/nov/2026, lo pidió el usuario): la hoja sale **siempre de las cuentas elegidas**, no de
+  la pestaña: con una cuenta normal es Gasto · Ingreso · Transferencia; si la cuenta es una tarjeta de crédito o la
+  transferencia va hacia una, es **Compra · Pago · Sacar dinero** (Compra = gasto en la tarjeta; Pago = de una cuenta
+  normal hacia la tarjeta, solo cuentas normales para pagar; Sacar dinero = de la tarjeta a una cuenta, p. ej. Kash a
+  tu cuenta). A una tarjeta no le entra «ingreso». Elegir una tarjeta en el selector pasa a la forma de tarjeta y
+  elegir una cuenta normal vuelve a la normal (`dialogos/movimiento.tsx`, `hacer`, `elegirCuenta`, `elegirTarjeta`).
+  Un Kash a otra persona con la tarjeta es una Compra. Pendiente: devolución de un comercio y deuda de tarjeta a tarjeta.
+- **Crear y editar una cuenta** (4/nov): **crear va por pasos** (tipo → banco, con «Saltar» → nombre y color →
+  [tarjeta: corte y pago → límite y deuda de hoy → estado de cuenta, opcional → reglas propias si no hay tarjeta del
+  catálogo] o [normal: saldo y Yappy] → resumen con lo que falta). **Solo frena lo esencial**: el nombre y, en la
+  tarjeta, el día de corte y el **límite**; el saldo vacío es $0. Al elegir la tarjeta del banco se ponen su corte y su
+  nombre. **Editar es la opción A**: lo esencial arriba y lo opcional en filas cerradas que muestran su valor o
+  «Agregar» (la B, filas como Ajustes con una hojita por dato, está en `datos\maquetas\editar-opcion-b.html` para
+  comparar). Lo que no se puede calcular por falta de datos sale en una sola línea («Sin datos para calcular: …» y
+  «Completar») en la pantalla de la tarjeta.
+- **Movimientos «Todas · Sin tarjetas»** (4/nov): Todas = lo gastado de verdad (las compras con tarjeta son gasto; el
+  pago de la tarjeta es transferencia y no cuenta). Sin tarjetas = lo que se movió en las cuentas normales: no salen las
+  compras con tarjeta, el pago de la tarjeta cuenta como «Salió» y sacar dinero de la tarjeta, como «Entró». Vale
+  también para los Gráficos.
 - **Total del Inicio**: el usuario elige qué cuentas suman (`fueraDelTotal` en las preferencias del
   dispositivo; ficha «Sin tarjetas de crédito»), en «Qué saldo ver» y en Ajustes (`ui/cuentasEnTotal.tsx`).
 - **Montos con comas de miles mientras se escriben** (`componentes.conMiles`, `MontoGrande`, `CampoMonto`);

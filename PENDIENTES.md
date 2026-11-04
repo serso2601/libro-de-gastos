@@ -4,15 +4,14 @@ Lo que quedó por probar, revisar o retomar. Claude lo lee al iniciar cada chat 
 seguir con otra cosa (ver «Al iniciar cada chat» en `CLAUDE.md`). Al terminar una sesión se actualiza: lo que ya
 se probó sale; lo que quedó a medias entra.
 
-Última actualización: 3/nov/2026.
+Última actualización: 4/nov/2026.
 
 ## VISA ESTRELLA comparada con el estado de cuenta del 18/oct (3/nov)
 
 El detalle con los montos está en `datos\revision-visa-estrella-2026-10.md` (fuera del repo: es público). Lo
 configurado cuadra: corte, fecha de pago, deuda al corte, tasa y límite. Falta:
-1. **Mínimo**: el de la app sale unos centavos menos que el del banco. El banco parece **subir el 3% al dólar**. En la
-   tarjeta: «Es otro» → el del estado de cuenta. Con más cortes, ver si siempre redondea así y, si sí, ponerlo en la
-   regla del catálogo.
+1. **Mínimo**: el banco parece **subir el 3% al dólar** (el usuario ya puso el del estado de cuenta con «Es otro»).
+   Con más cortes, ver si siempre redondea así y, si sí, ponerlo en la regla del catálogo.
 2. **Sobregiro**: al corte debía más que límite + 5% y el estado de cuenta no trae cargo por sobregiro. Confirmar el %
    de la tarjeta (¿10%?) o el límite real en la banca.
 3. **Cargos fijos de la tarjeta** (no están en la app): seguro contra fraude y seguro de desgravamen (con ITBMS) en cada
@@ -20,15 +19,24 @@ configurado cuadra: corte, fecha de pago, deuda al corte, tasa y límite. Falta:
 4. La cuenta tiene **dos tarjetas** con números distintos (compras con una, Kash con la otra, con su cargo cada uno). La
    app solo conoce los 4 dígitos de una: los avisos de la otra no se reconocerían.
 
-## Elegir y probar: la hoja de la tarjeta y las fotos (3/nov)
+## Por probar: tarjeta en Anotar, crear cuentas por pasos y «Sin tarjetas» (4/nov)
 
-1. **Elegir cómo se ordena la hoja de la tarjeta**: 4 opciones en https://claude.ai/artifact/ENzBgY2Cg4CWksDWBAGYd3
-   (`datos\maquetas\hoja-tarjeta.html`): A lo esencial arriba y lo opcional plegado · B filas como Ajustes ·
-   C por pasos al crearla · D pestañas. El usuario dijo «aún no lo hagas»: esperar su elección.
-2. **Fotos de las tarjetas de BG** (hecho el 3/nov, **sin verlo en pantalla**: la extensión de Chrome no conectó):
-   ver la pila de la hoja con las fotos y la VISA ESTRELLA en el Inicio con su foto de fondo. Mirar si la letra se lee
-   bien sobre la foto (velo en `Contenido` de `pantallas/inicio/Tarjetas.tsx`) y si alguna foto no corresponde a la
-   tarjeta física (Estrellas Classic/Gold usa la «Visa Estrellas Gold»).
+Probado en Chrome con un servidor de prueba (datos inventados). Ver «Anotar con tarjeta» y «Crear y editar una
+cuenta» en `CLAUDE.md`.
+1. **Anotar con una tarjeta**: «Anotar aquí» o «Pagar» desde la tarjeta → Compra · Pago · Sacar dinero; desde el +,
+   al elegir una tarjeta cambia sola, y al volver a una cuenta normal vuelve a Gasto · Ingreso · Transferencia. Una
+   transferencia hacia una tarjeta se vuelve Pago.
+2. **Crear una cuenta**: por pasos. Ver si se entiende sin leer mucho y si algún paso sobra.
+3. **Editar**: opción A (lo opcional en filas cerradas). La B está en https://claude.ai/artifact/HKmSBDgQ83TbCR6qpbTRvS
+   (`datos\maquetas\editar-opcion-b.html`): **el usuario dice si se queda con la A o cambia a la B**.
+4. **Movimientos «Todas · Sin tarjetas»** (arriba de lo que entró y salió): con «Sin tarjetas» no salen las compras con
+   tarjeta y el pago de la tarjeta cuenta como salida.
+5. **Fotos de las tarjetas**: se vieron bien en la pila de la hoja y en «Editar cuenta» (4/nov). Falta verlas en el
+   Inicio del iPhone (velo en `Contenido` de `pantallas/inicio/Tarjetas.tsx`: ¿se lee la letra?).
+6. **Queda para después**: devolución de un comercio en la tarjeta (que reste sin contar como ingreso) y pasar deuda
+   de una tarjeta a otra.
+7. **Error visto**: abrir /app/conectar estando ya conectado deja la web en negro («The imperative router is
+   unavailable before the first render has finished»). No viene de lo del 4/nov; revisar `app/_layout.tsx`.
 
 ## Por probar: tarjetas de otros bancos, pila de tarjetas y cifras separadas (2/nov, noche)
 
