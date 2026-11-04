@@ -6,6 +6,20 @@ se probó sale; lo que quedó a medias entra.
 
 Última actualización: 3/nov/2026.
 
+## VISA ESTRELLA comparada con el estado de cuenta del 18/oct (3/nov)
+
+El detalle con los montos está en `datos\revision-visa-estrella-2026-10.md` (fuera del repo: es público). Lo
+configurado cuadra: corte, fecha de pago, deuda al corte, tasa y límite. Falta:
+1. **Mínimo**: el de la app sale unos centavos menos que el del banco. El banco parece **subir el 3% al dólar**. En la
+   tarjeta: «Es otro» → el del estado de cuenta. Con más cortes, ver si siempre redondea así y, si sí, ponerlo en la
+   regla del catálogo.
+2. **Sobregiro**: al corte debía más que límite + 5% y el estado de cuenta no trae cargo por sobregiro. Confirmar el %
+   de la tarjeta (¿10%?) o el límite real en la banca.
+3. **Cargos fijos de la tarjeta** (no están en la app): seguro contra fraude y seguro de desgravamen (con ITBMS) en cada
+   corte, más el financiamiento. Ver si se agregan como «Cargos del banco» al corte.
+4. La cuenta tiene **dos tarjetas** con números distintos (compras con una, Kash con la otra, con su cargo cada uno). La
+   app solo conoce los 4 dígitos de una: los avisos de la otra no se reconocerían.
+
 ## Elegir y probar: la hoja de la tarjeta y las fotos (3/nov)
 
 1. **Elegir cómo se ordena la hoja de la tarjeta**: 4 opciones en https://claude.ai/artifact/ENzBgY2Cg4CWksDWBAGYd3

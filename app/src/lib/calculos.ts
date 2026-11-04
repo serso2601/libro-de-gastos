@@ -533,11 +533,17 @@ export function ajusteMinimo(d: Datos, cuenta: Cuenta, minimoBanco: number): Aju
   }
   const pasan = candidatas.slice(0, mejor);
   const alCorte = s0 - pasan.reduce((x, m) => x + m.monto, 0);
-  // Por encima del piso, el mínimo es el % del saldo: de ahí sale el saldo que vio el banco.
+  // Por encima del piso, el mínimo crece con el saldo (el % y, pasado el límite, lo que se pasa): el saldo que vio el
+  // banco es el menor que da ese mínimo. Se busca por mitades, porque con el exceso del límite no es solo el %.
   let faltaAnotar: number | null = null;
   if (mejor === 0 && minimoBanco > minimoDeRegla(s0, limite, regla) && minimoBanco > regla.minimo) {
-    const delBanco = Math.round((minimoBanco * 100) / regla.porcentaje);
-    if (delBanco - s0 >= 100) faltaAnotar = delBanco - s0;
+    let bajo = s0;
+    let alto = s0 + Math.ceil((minimoBanco * 100) / regla.porcentaje);
+    while (bajo < alto) {
+      const medio = Math.floor((bajo + alto) / 2);
+      if (minimoDeRegla(medio, limite, regla) >= minimoBanco) alto = medio; else bajo = medio + 1;
+    }
+    if (bajo - s0 >= 100) faltaAnotar = bajo - s0;
   }
   return { pasan, alCorte, faltaAnotar };
 }

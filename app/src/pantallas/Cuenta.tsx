@@ -310,6 +310,8 @@ function ResumenTarjeta({ cuenta, fondo, tinta }: { cuenta: TCuenta; fondo: stri
   ];
   if (estado && estado.alCorte > 0) {
     definiciones.push(['Debías al corte', 'El saldo de tu último estado de cuenta. Si lo pagas completo antes de la fecha de pago, no pagas intereses.']);
+    definiciones.push(['Falta para el mínimo', 'Lo que te queda por pagar del mínimo de este corte. Cubierto: ya no hay recargo por atraso, pero sigues debiendo el resto.']);
+    definiciones.push(['Falta para no pagar intereses', 'Lo que te queda de lo que debías al corte. Si lo pagas antes de la fecha de pago, el banco no cobra financiamiento el corte siguiente.']);
     definiciones.push(['Pago mínimo', regla
       ? `${regla.porcentaje}% de lo que debías al corte${regla.minimo ? `, nunca menos de ${dineroCorto(regla.minimo, d.moneda)}` : ''}, más lo que pase del límite. ${estado.origen === 'banco' ? 'Este es el que dijo tu banco para este corte.' : 'Si tu estado de cuenta dice otro, toca «Editar».'}`
       : 'Lo menos que hay que pagar antes de la fecha de pago para no caer en atraso. Cópialo de tu estado de cuenta.']);
@@ -342,6 +344,13 @@ function ResumenTarjeta({ cuenta, fondo, tinta }: { cuenta: TCuenta; fondo: stri
             </View>
             {estado.exceso > 0 && <FilaCifra texto="De eso, lo que pasaba del límite" valor={neto(estado.exceso, d.moneda)} tenue />}
             {pagado > 0 && <FilaCifra texto="Pagado desde el corte" valor={neto(pagado, d.moneda)} tenue />}
+            {/* Lo que queda por pagar de este corte: el mínimo (o «cubierto») y lo del corte, que evita los intereses. */}
+            {estado.minimo !== null && (
+              <FilaCifra texto="Falta para el mínimo" valor={pagado >= estado.minimo ? 'Cubierto ✓' : neto(estado.minimo - pagado, d.moneda)}
+                color={pagado >= estado.minimo ? c.bien : undefined} />
+            )}
+            <FilaCifra texto="Falta para no pagar intereses" valor={pagado >= estado.alCorte ? 'Cubierto ✓' : neto(estado.alCorte - pagado, d.moneda)}
+              color={pagado >= estado.alCorte ? c.bien : undefined} />
             {fechaPago && <FilaCifra texto="Paga antes del" valor={fechaCorta(fechaPago)} tenue />}
           </View>
         )}
