@@ -1,9 +1,10 @@
-// La hoja de una cuenta: crearla, editarla o borrarla. Una cuenta puede ser tarjeta de crédito (día de
+// La hoja de una cuenta: crearla (por pasos: solo frena lo esencial) o editarla (lo esencial arriba y lo opcional
+// en filas cerradas que muestran su valor), o borrarla. Una cuenta puede ser tarjeta de crédito (día de
 // corte; día de pago, límite y mínimo si el usuario quiere): su saldo es deuda y la pantalla de la cuenta lo
 // muestra así. Si la tarjeta es una del catálogo con sus reglas, el mínimo y la fecha de pago los calcula la app.
 
 import { useState, type ReactNode } from 'react';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useAcciones } from '@/lib/acciones';
 import { useDatos } from '@/lib/datos';
 import { aCentavos, aTexto, MESES_CORTOS, nuevoId } from '@/lib/formato';
@@ -11,9 +12,11 @@ import { versionVigente } from '@/lib/banco';
 import { cicloTarjeta, reglasPropias } from '@/lib/calculos';
 import type { Cuenta, ReglasPropias, VinculoBanco } from '@/lib/tipos';
 import { avisar } from '@/ui/aviso';
-import { BotonBorrar, BotonPrincipal, Campo, CampoMonto, Colores, Etiqueta, Ficha, Hoja, MontoGrande, Segmentos, Texto, TextoError } from '@/ui/componentes';
+import { BotonBorrar, BotonPrincipal, BotonSuave, Campo, CampoMonto, Colores, Etiqueta, Ficha, Hoja, MontoGrande, Segmentos, Texto, TextoError } from '@/ui/componentes';
+import { Tocable } from '@/ui/tocable';
+import { Desplegable } from './piezas';
 import { PALETA } from '@/ui/estilos';
-import { disenoConColor, ElegirTarjetaBanco, TarjetaMedida } from '@/ui/tarjetaBanco';
+import { disenoConColor, ElegirTarjetaBanco, nombreCorto, TarjetaMedida, urlImagen } from '@/ui/tarjetaBanco';
 import { useTema } from '@/ui/tema';
 
 const fechaCorta = (iso: string) => `${Number(iso.slice(8, 10))} ${MESES_CORTOS[Number(iso.slice(5, 7)) - 1]}`;
@@ -126,6 +129,7 @@ export function DialogoCuenta({ inicial, alCerrar }: { inicial?: Cuenta; alCerra
   const eraYappy = !!inicial && cuenta_yappy === inicial.id;
   const [yappy, setYappy] = useState<'si' | 'no'>(eraYappy ? 'si' : 'no');
   const [error, setError] = useState('');
+  const [abierta, setAbierta] = useState<string | null>(null);
   const esTarjeta = credito === 'si';
 
   function guardar() {
@@ -137,6 +141,7 @@ export function DialogoCuenta({ inicial, alCerrar }: { inicial?: Cuenta; alCerra
     if (min !== null && Number.isNaN(min)) return setError('El pago mínimo no es un número');
     const lim = limite.trim() === '' ? null : aCentavos(limite);
     if (lim !== null && (Number.isNaN(lim) || lim <= 0)) return setError('El límite de crédito no es un número mayor que 0');
+    if (esTarjeta && lim === null) return setError('Pon el límite de crédito de la tarjeta');
     if (resumenInicio?.error) return setError(resumenInicio.error);
     const propias = leerPropias();
     if (typeof propias === 'string') return setError(propias);
@@ -223,6 +228,8 @@ export function DialogoCuenta({ inicial, alCerrar }: { inicial?: Cuenta; alCerra
   // Al elegir la tarjeta de crédito, si todavía no hay día de corte, se pone el que publica el banco (se cambia abajo).
   const elegirCredito = (id: string | null) => {
     setTarjetaId(id);
+    const t = tarjetas.find((x) => x.id === id);
+    if (t && !nombre.trim()) setNombre(nombreCorto(t.nombre));
     const fechas = id ? versionVigente(tarjetas.find((t) => t.id === id)!, hoy).fechas : undefined;
     if (fechas && corte === null) setCorte(fechas.corte);
   };
@@ -299,216 +306,377 @@ export function DialogoCuenta({ inicial, alCerrar }: { inicial?: Cuenta; alCerra
     ]);
   }
 
-  return (
-    <Hoja titulo={inicial ? 'Editar cuenta' : 'Nueva cuenta'} alCerrar={alCerrar}
-      pie={(
-        <>
-          <TextoError texto={error} />
-          <BotonPrincipal onPress={guardar}>{inicial ? 'Guardar cambios' : 'Crear cuenta'}</BotonPrincipal>
-          {inicial && (cuentas.length > 1
-            ? <BotonBorrar texto="Borrar cuenta" onPress={borrar} />
-            : <Texto tam={13} color={c.tenue} centro style={{ paddingVertical: 8 }}>No se puede borrar: es la única cuenta. Crea otra primero.</Texto>)}
-        </>
-      )}>
+  // --- Las piezas de la hoja (cada una sirve como paso al crear y como fila al editar) -------------------------
+
+  const secTipo = (
+    <View style={{ gap: 10 }}>
+      {([['no', 'Cuenta normal', 'Efectivo, ahorros, corriente: el dinero es tuyo.'], ['si', 'Tarjeta de crédito', 'Lo que gastas con ella es deuda que pagas después.']] as const).map(([v, t, sub]) => (
+        <Tocable key={v} onPress={() => { setCredito(v); setError(''); }} accessibilityState={{ selected: credito === v }}
+          style={{ borderRadius: 16, padding: 16, gap: 4, backgroundColor: c.suave, borderWidth: 2, borderColor: credito === v ? c.tinta : 'transparent' }}>
+          <Texto tam={17} peso="semi">{t}</Texto>
+          <Texto tam={13} color={c.tenue}>{sub}</Texto>
+        </Tocable>
+      ))}
+    </View>
+  );
+
+  const secBanco = (
+    <View style={{ gap: 12 }}>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+        <Ficha texto="Ninguno" activa={bancoId === null} alto={36} onPress={() => elegirBanco(null)} />
+        {(catalogo?.bancos ?? []).map((b) => <Ficha key={b.id} texto={b.nombre} activa={b.id === bancoId} alto={36} onPress={() => elegirBanco(b.id)} />)}
+        <Ficha texto="Otro banco" activa={bancoId === OTRO} alto={36} onPress={() => elegirBanco(OTRO)} />
+      </View>
+      {bancoId === OTRO && (
+        <View style={{ gap: 10 }}>
+          {esTarjeta ? (
+            <DosCampos
+              izquierda={['Nombre del banco', <Campo value={otroBanco} onChangeText={setOtroBanco} placeholder="Ej: BAC" />]}
+              derecha={['Nombre de la tarjeta', <Campo value={otraTarjeta} onChangeText={setOtraTarjeta} placeholder="Ej: Visa Oro" />]} />
+          ) : (
+            <Campo value={otroBanco} onChangeText={setOtroBanco} placeholder="Nombre del banco (ej: BAC)" accessibilityLabel="Nombre del banco" />
+          )}
+          <TarjetaMedida banco={otroBanco.trim() || 'Tu banco'} nombre={(esTarjeta && otraTarjeta.trim()) || nombre.trim() || (esTarjeta ? 'Tarjeta de crédito' : 'Tarjeta de débito')}
+            diseno={disenoConColor(color)} clase={esTarjeta ? 'credito' : 'debito'} terminacion={terminacion} />
+          {esTarjeta && <Texto tam={12} color={c.tenue}>Ese banco todavía no está en la app: sus reglas las pones tú (más adelante, o en «Reglas de tu tarjeta»).</Texto>}
+        </View>
+      )}
+      {banco && !esTarjeta && (
+        <View style={{ gap: 14 }}>
+          <View style={{ gap: 8 }}>
+            <Etiqueta>Tipo de cuenta</Etiqueta>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+              {productos.map((p) => <Ficha key={p.id} texto={p.nombre} activa={p.id === productoId} alto={36} onPress={() => setProductoId(p.id === productoId ? null : p.id)} />)}
+            </View>
+          </View>
+          {tarjetas.length > 0 && (
+            <View style={{ gap: 8 }}>
+              <Etiqueta>Tarjeta de débito</Etiqueta>
+              <ElegirTarjetaBanco banco={banco.nombre} tarjetas={tarjetas} valor={tarjetaId} alCambiar={elegirTarjeta} clase="debito"
+                terminacion={terminacion} color={color} ninguna="No tengo tarjeta de débito" />
+            </View>
+          )}
+          {debito && membresiaDe && (
+            <View style={{ gap: 8 }}>
+              <Etiqueta>Membresía</Etiqueta>
+              <Segmentos<'mensual' | 'anual'> opciones={[['mensual', `Mensual ${dinero0(membresiaDe.mensual)}`], ['anual', `Anual ${dinero0(membresiaDe.anual)}`]]}
+                valor={membresia} alCambiar={setMembresia} />
+            </View>
+          )}
+          {debito && segurosDe.length > 0 && (
+            <View style={{ gap: 8 }}>
+              <Etiqueta>Seguro contra fraude</Etiqueta>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                <Ficha texto="Ninguno" activa={!seguroId} alto={36} onPress={() => setSeguroId(null)} />
+                {segurosDe.map((sg) => <Ficha key={sg.id} texto={`${sg.nombre.replace('Seguro contra fraude ', '')} · ${dinero0(sg.mensual)}/mes`} activa={sg.id === seguroId} alto={36} onPress={() => setSeguroId(sg.id)} />)}
+              </View>
+            </View>
+          )}
+        </View>
+      )}
+      {banco && esTarjeta && (
+        <View style={{ gap: 10 }}>
+          <ElegirTarjetaBanco banco={banco.nombre} tarjetas={tarjetas} valor={tarjetaId} alCambiar={elegirCredito} clase="credito"
+            terminacion={terminacion} color={color} ninguna="No está aquí" />
+          {delCatalogo && (
+            <>
+              <View style={{ backgroundColor: c.suave, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 4 }}>
+                {filasReglas(delCatalogo).map(([r, v], i) => <FilaRegla key={r} rotulo={r} valor={v} primera={i === 0} />)}
+              </View>
+              <Texto tam={12} color={c.tenue}>De la tabla de tarifas de {banco.nombre}. Con esto la app calcula el mínimo, la fecha de pago y el sobregiro.</Texto>
+            </>
+          )}
+        </View>
+      )}
+    </View>
+  );
+
+  const secNombre = (
+    <View style={{ gap: 14 }}>
       <View style={{ gap: 8 }}>
         <Etiqueta>Nombre</Etiqueta>
-        <Campo value={nombre} onChangeText={setNombre} placeholder="Ej: Efectivo, Banco, Ahorros" autoFocus={!inicial} />
+        <Campo value={nombre} onChangeText={(t) => { setNombre(t); setError(''); }} placeholder={esTarjeta ? 'Ej: Visa Estrellas' : 'Ej: Efectivo, Banco, Ahorros'} autoFocus={!inicial} />
       </View>
       <View style={{ gap: 8 }}>
         <Etiqueta>Color</Etiqueta>
         <Colores valor={color} alCambiar={setColor} />
       </View>
-      <View style={{ gap: 8 }}>
-        <Etiqueta>Es tarjeta de crédito</Etiqueta>
-        <Segmentos<'no' | 'si'> opciones={[['no', 'No'], ['si', 'Sí']]} valor={credito} alCambiar={setCredito} />
+    </View>
+  );
+
+  const secDigitos = (
+    <View style={{ gap: 8 }}>
+      <Etiqueta derecha={<Texto tam={13} color={c.tenue}>Opcional</Texto>}>Últimos 4 dígitos de la tarjeta</Etiqueta>
+      <Campo value={terminacion} onChangeText={(t) => setTerminacion(t.replace(/\D/g, '').slice(0, 4))} placeholder="1234" keyboardType="number-pad" maxLength={4} />
+      <Texto tam={12} color={c.tenue}>Para reconocer los avisos del banco y los pagos con Apple Pay.</Texto>
+    </View>
+  );
+
+  const secCorte = (
+    <View style={{ gap: 8 }}>
+      <GrillaDias valor={corte} alCambiar={(v) => { setCorte(v); setError(''); }} />
+      {reglas?.fechas && (
+        <Texto tam={12} color={c.tenue}>{banco?.nombre} publica el {reglas.fechas.corte} para esta tarjeta. Pon el de tu estado de cuenta: puede ser otro.</Texto>
+      )}
+    </View>
+  );
+
+  const secPago = (
+    <View style={{ gap: 8 }}>
+      <GrillaDias valor={pago} alCambiar={setPago} />
+      {reglas?.dias_para_pagar && pago === null && (
+        <Texto tam={12} color={c.tenue}>Sin elegirlo, la app toma {reglas.dias_para_pagar} días después del corte, como dice el banco.</Texto>
+      )}
+    </View>
+  );
+
+  const secLimite = (
+    <View style={{ gap: 8 }}>
+      <CampoMonto valor={limite} alCambiar={(v) => { setLimite(v); setError(''); }} moneda={moneda} accessibilityLabel="Límite de crédito" />
+      {comoSobregiro ? <Texto tam={12} color={c.tenue}>{comoSobregiro}</Texto> : null}
+    </View>
+  );
+
+  const secSaldo = (
+    <View style={{ gap: 8 }}>
+      <MontoGrande valor={saldo} alCambiar={setSaldo} moneda={moneda} />
+      {esTarjeta
+        ? <Texto tam={12} color={c.tenue} centro>El saldo de hoy en tu banca. Si lo dejas vacío, queda en $0.</Texto>
+        : <Segmentos<'no' | 'si'> opciones={[['no', 'A favor'], ['si', 'En contra (deuda)']]} valor={negativo} alCambiar={setNegativo} />}
+    </View>
+  );
+
+  const secYappy = (
+    <View style={{ gap: 8 }}>
+      <Segmentos<'no' | 'si'> opciones={[['no', 'No'], ['si', 'Sí']]} valor={yappy} alCambiar={setYappy} />
+      <Texto tam={12} color={c.tenue}>Los Yappy que te lleguen al correo se anotan en esta cuenta.</Texto>
+    </View>
+  );
+
+  const secInicio = verInicio && corteAnt ? (
+    <View style={{ gap: 12 }}>
+      <Texto tam={13} color={c.tenue} style={{ lineHeight: 18 }}>
+        Del estado de cuenta del {fechaCorta(corteAnt)}. Con el saldo al corte basta: la app saca lo de después con lo que debes hoy.
+      </Texto>
+      <View style={{ gap: 6 }}>
+        <Etiqueta>Saldo al corte</Etiqueta>
+        <CampoMonto valor={alCorteTxt} alCambiar={(v) => { setAlCorteTxt(v); setError(''); }} moneda={moneda} accessibilityLabel="Saldo al corte"
+          placeholder={resumenInicio?.sale === 'corte' && !resumenInicio.error ? `${dinero0(resumenInicio.alCorte)} (sale solo)` : undefined} />
       </View>
-      <View style={{ gap: 10 }}>
-        <Etiqueta derecha={<Texto tam={13} color={c.tenue}>Opcional</Texto>}>Banco</Etiqueta>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-          <Ficha texto="Ninguno" activa={bancoId === null} alto={36} onPress={() => elegirBanco(null)} />
-          {(catalogo?.bancos ?? []).map((b) => <Ficha key={b.id} texto={b.nombre} activa={b.id === bancoId} alto={36} onPress={() => elegirBanco(b.id)} />)}
-          <Ficha texto="Otro banco" activa={bancoId === OTRO} alto={36} onPress={() => elegirBanco(OTRO)} />
-        </View>
-        {bancoId === OTRO && (
-          <View style={{ gap: 10 }}>
-            {esTarjeta ? (
-              <DosCampos
-                izquierda={['Nombre del banco', <Campo value={otroBanco} onChangeText={setOtroBanco} placeholder="Ej: BAC" />]}
-                derecha={['Nombre de la tarjeta', <Campo value={otraTarjeta} onChangeText={setOtraTarjeta} placeholder="Ej: Visa Oro" />]} />
-            ) : (
-              <Campo value={otroBanco} onChangeText={setOtroBanco} placeholder="Nombre del banco (ej: BAC)" accessibilityLabel="Nombre del banco" />
-            )}
-            <TarjetaMedida banco={otroBanco.trim() || 'Tu banco'} nombre={(esTarjeta && otraTarjeta.trim()) || nombre.trim() || (esTarjeta ? 'Tarjeta de crédito' : 'Tarjeta de débito')}
-              diseno={disenoConColor(color)} clase={esTarjeta ? 'credito' : 'debito'} terminacion={terminacion} />
-            <Texto tam={12} color={c.tenue}>
-              {esTarjeta ? 'Ese banco todavía no está en la app: abajo pones las reglas de tu tarjeta y la app calcula con ellas.' : 'Ese banco todavía no está en la app: no se calculan sus intereses ni cargos.'}
-            </Texto>
-          </View>
-        )}
-        {banco && !esTarjeta && (
-          <View style={{ gap: 14 }}>
-            <View style={{ gap: 8 }}>
-              <Etiqueta>Tipo de cuenta</Etiqueta>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-                {productos.map((p) => <Ficha key={p.id} texto={p.nombre} activa={p.id === productoId} alto={36} onPress={() => setProductoId(p.id === productoId ? null : p.id)} />)}
-              </View>
+      <View style={{ gap: 6 }}>
+        <Etiqueta derecha={<Texto tam={13} color={c.tenue}>Opcional</Texto>}>Lo que pagaste después del corte</Etiqueta>
+        <CampoMonto valor={pagosTxt} alCambiar={(v) => { setPagosTxt(v); setError(''); }} moneda={moneda} accessibilityLabel="Pagos después del corte" />
+      </View>
+      <View style={{ gap: 6 }}>
+        <Etiqueta derecha={<Texto tam={13} color={c.tenue}>O en vez del saldo al corte</Texto>}>Compras después del corte</Etiqueta>
+        <CampoMonto valor={despuesTxt} alCambiar={(v) => { setDespuesTxt(v); setError(''); }} moneda={moneda} accessibilityLabel="Compras después del corte"
+          placeholder={resumenInicio?.sale === 'compras' && !resumenInicio.error ? `${dinero0(resumenInicio.compras)} (sale solo)` : undefined} />
+      </View>
+      {resumenInicio && (
+        <Texto tam={13} color={resumenInicio.error ? c.alerta : undefined} style={{ lineHeight: 18 }}>
+          {resumenInicio.error ?? `Al corte: ${dinero0(resumenInicio.alCorte)} · después: compras ${dinero0(resumenInicio.compras)}, pagos ${dinero0(resumenInicio.pagos)}.`}
+        </Texto>
+      )}
+    </View>
+  ) : null;
+
+  const secReglas = (
+    <View style={{ gap: 14 }}>
+      <Texto tam={13} color={c.tenue} style={{ lineHeight: 18 }}>Del estado de cuenta o de la tabla de tarifas de tu banco. Todo es opcional.</Texto>
+      <CampoRegla rotulo="Pago mínimo">
+        <DosCampos
+          izquierda={['% del saldo al corte', <Campo value={pctMin} onChangeText={setPctMin} placeholder="Ej: 3" keyboardType="decimal-pad" accessibilityLabel="Porcentaje del pago mínimo" />]}
+          derecha={['Nunca menos de', <CampoMonto valor={pisoMin} alCambiar={setPisoMin} moneda={moneda} placeholder="Ej: $20.00" accessibilityLabel="Pago mínimo en dólares" />]} />
+      </CampoRegla>
+      <CampoRegla rotulo="Interés anual (%)">
+        <Campo value={tasa} onChangeText={setTasa} placeholder="Ej: 54" keyboardType="decimal-pad" accessibilityLabel="Interés anual" />
+      </CampoRegla>
+      <CampoRegla rotulo="Cargo por pago atrasado">
+        <CampoMonto valor={atrasado} alCambiar={setAtrasado} moneda={moneda} accessibilityLabel="Cargo por pago atrasado" />
+      </CampoRegla>
+      <CampoRegla rotulo="Sobregiro">
+        <DosCampos
+          izquierda={['% del límite sin cargo', <Campo value={pctSobregiro} onChangeText={setPctSobregiro} placeholder="Ej: 5" keyboardType="decimal-pad" accessibilityLabel="Porcentaje de sobregiro sin cargo" />]}
+          derecha={['Cargo si te pasas', <CampoMonto valor={cargoSobregiro} alCambiar={setCargoSobregiro} moneda={moneda} accessibilityLabel="Cargo por sobregiro" />]} />
+      </CampoRegla>
+      <CampoRegla rotulo="Días para pagar después del corte" ayuda="Si tu banco da un plazo en días. Con un día de pago elegido, manda ese.">
+        <Campo value={diasPagar} onChangeText={(t) => setDiasPagar(t.replace(/\D/g, '').slice(0, 2))} placeholder="Ej: 25" keyboardType="number-pad" accessibilityLabel="Días para pagar" />
+      </CampoRegla>
+      {!reglas?.pago_minimo && (
+        <CampoRegla rotulo="O el pago mínimo de este corte" ayuda="Cópialo del estado de cuenta si no pones el %.">
+          <CampoMonto valor={minimo} alCambiar={setMinimo} moneda={moneda} accessibilityLabel="Pago mínimo" />
+        </CampoRegla>
+      )}
+    </View>
+  );
+
+  // --- Lo que falta: no frena, pero se dice qué no se va a poder calcular -------------------------------------
+  const fechaPagoForm = esTarjeta && corte !== null
+    ? cicloTarjeta({ ...(inicial ?? { id: '', nombre: '', color: '', saldo_inicial: 0, orden: 0 }), es_credito: true, dia_corte: corte, dia_pago: pago }, hoy, reglas?.dias_para_pagar)?.fechaPago ?? null
+    : null;
+  const nombreBanco = banco ? [banco.nombre, (esTarjeta || debito) ? tarjeta && nombreCorto(tarjeta.nombre) : productos.find((p) => p.id === productoId)?.nombre].filter(Boolean).join(' · ')
+    : bancoId === OTRO ? [otroBanco.trim() || 'Otro banco', esTarjeta ? otraTarjeta.trim() : ''].filter(Boolean).join(' · ') : '';
+  const resumenReglas = reglas && !delCatalogo
+    ? [reglas.pago_minimo && `${reglas.pago_minimo.porcentaje}%`, reglas.tasa_anual != null && `${reglas.tasa_anual}% anual`].filter(Boolean).join(' · ') : '';
+  const faltan: [string, string][] = esTarjeta ? [
+    ...(!reglas?.pago_minimo && !minimo.trim() ? [['Pago mínimo', 'Elige el banco y la tarjeta, o pon el % en sus reglas'] as [string, string]] : []),
+    ...(!fechaPagoForm ? [['Fecha de pago', 'Elige el día de pago'] as [string, string]] : []),
+    ...(reglas?.tasa_anual == null ? [['Interés si no pagas el total', 'Falta la tasa del banco'] as [string, string]] : []),
+    ...(verInicio && !resumenInicio && (saldo.trim() ? aCentavos(saldo) : 0) > 0 ? [['Lo del último corte', 'Pon el saldo al corte del estado de cuenta'] as [string, string]] : []),
+  ] : [];
+
+  // --- Crear: por pasos. Solo frena lo esencial (nombre; en la tarjeta, día de corte y límite) ----------------
+  type Paso = { id: string; titulo: string; sub?: string; cuerpo: ReactNode; opcional?: boolean; vacio?: boolean; listo?: () => string | null };
+  const pasos: Paso[] = !inicial ? [
+    { id: 'tipo', titulo: '¿Qué vas a agregar?', cuerpo: secTipo },
+    { id: 'banco', titulo: esTarjeta ? '¿De qué banco es tu tarjeta?' : '¿De qué banco es?', sub: esTarjeta ? 'Con el banco y la tarjeta, la app calcula el mínimo y la fecha de pago.' : 'Con el banco, la app calcula intereses y cargos.',
+      cuerpo: secBanco, opcional: true, vacio: bancoId === null },
+    { id: 'nombre', titulo: 'Ponle nombre', cuerpo: <View style={{ gap: 16 }}>{secNombre}{(esTarjeta || debito || bancoId === OTRO) && secDigitos}</View>,
+      listo: () => (nombre.trim() ? null : 'Ponle un nombre a la cuenta') },
+    ...(esTarjeta ? [
+      { id: 'corte', titulo: '¿Qué día corta?', sub: 'Está en tu estado de cuenta: «Estado de cuenta de…».', cuerpo: (
+        <View style={{ gap: 18 }}>{secCorte}<View style={{ gap: 8 }}><Etiqueta derecha={<Texto tam={13} color={c.tenue}>Opcional</Texto>}>¿Y qué día pagas?</Etiqueta>{secPago}</View></View>),
+        listo: () => (corte !== null ? null : 'Elige el día de corte') },
+      { id: 'limite', titulo: 'Límite y deuda de hoy', cuerpo: (
+        <View style={{ gap: 18 }}><View style={{ gap: 8 }}><Etiqueta>Límite de crédito</Etiqueta>{secLimite}</View>
+          <View style={{ gap: 8 }}><Etiqueta>Lo que debes hoy</Etiqueta>{secSaldo}</View></View>),
+        listo: () => { const l = aCentavos(limite); return limite.trim() && l > 0 ? null : 'Pon el límite de crédito de la tarjeta'; } },
+      ...(secInicio ? [{ id: 'inicio', titulo: '¿Tienes el estado de cuenta a mano?', sub: 'Así el mínimo sale del saldo al corte y no de todo lo que debes. Puedes hacerlo después.',
+        cuerpo: secInicio, opcional: true, vacio: !resumenInicio, listo: () => resumenInicio?.error ?? null }] : []),
+      ...(verPropias ? [{ id: 'reglas', titulo: 'Reglas de tu tarjeta', sub: 'Con el % del mínimo, la app lo calcula en cada corte.', cuerpo: secReglas, opcional: true,
+        vacio: !propiasAhora?.pago_minimo && !propiasAhora?.tasa_anual && !minimo.trim() }] : []),
+    ] : [
+      { id: 'saldo', titulo: '¿Con cuánto empieza?', sub: 'Si lo dejas vacío, empieza en $0.', cuerpo: (
+        <View style={{ gap: 18 }}>{secSaldo}<View style={{ gap: 8 }}><Etiqueta>Mi Yappy está en esta cuenta</Etiqueta>{secYappy}</View></View>) },
+    ]),
+    { id: 'resumen', titulo: 'Todo listo', cuerpo: null },
+  ] : [];
+  const [paso, setPaso] = useState(0);
+  const pasoActual = pasos[Math.min(paso, pasos.length - 1)];
+  function siguiente() {
+    const problema = pasoActual?.listo?.();
+    if (problema) return setError(problema);
+    setError('');
+    setPaso((p) => Math.min(p + 1, pasos.length - 1));
+  }
+  const irA = (id: string) => { const i = pasos.findIndex((x) => x.id === id); if (i >= 0) { setError(''); setPaso(i); } };
+
+  // El resumen antes de crear: lo puesto, lo que falta y qué no se va a poder calcular por eso.
+  const filasResumen: [string, string, string][] = [
+    ['tipo', 'Tipo', esTarjeta ? 'Tarjeta de crédito' : 'Cuenta normal'],
+    ['banco', 'Banco', nombreBanco || 'Sin banco'],
+    ['nombre', 'Nombre', nombre.trim()],
+    ...(esTarjeta ? [
+      ['corte', 'Corte', corte !== null ? `día ${corte}` : ''] as [string, string, string],
+      ['corte', 'Pago', fechaPagoForm ? (pago ? `día ${pago}` : `${fechaCorta(fechaPagoForm)} (del banco)`) : 'Falta'] as [string, string, string],
+      ['limite', 'Límite', limite.trim() ? dinero0(aCentavos(limite)) : ''] as [string, string, string],
+      ['limite', 'Debes hoy', dinero0(saldo.trim() ? aCentavos(saldo) : 0)] as [string, string, string],
+      ...(secInicio ? [['inicio', 'Al corte', resumenInicio && !resumenInicio.error ? dinero0(resumenInicio.alCorte) : 'Falta'] as [string, string, string]] : []),
+    ] : [['saldo', 'Saldo', `${negativo === 'si' ? '−' : ''}${dinero0(saldo.trim() ? aCentavos(saldo) : 0)}`] as [string, string, string]]),
+    ...(terminacion ? [['nombre', 'Termina en', terminacion] as [string, string, string]] : []),
+  ];
+  const resumen = (
+    <View style={{ gap: 14 }}>
+      <View style={{ backgroundColor: c.suave, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 4 }}>
+        {filasResumen.map(([id, r, v], i) => (
+          <Pressable key={`${r}${i}`} onPress={() => irA(id)} accessibilityLabel={`Cambiar ${r}`}
+            style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 40, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: c.linea, opacity: pressed ? 0.6 : 1 })}>
+            <Texto tam={14} color={c.tenue} style={{ flex: 1 }}>{r}</Texto>
+            <Texto num tam={15} peso="medio" color={v === 'Falta' ? c.tenue : undefined}>{v}</Texto>
+          </Pressable>
+        ))}
+      </View>
+      {faltan.length > 0 && (
+        <View style={{ gap: 6 }}>
+          <Texto tam={13} peso="medio" color={c.tenue}>Sin esto, la app no lo puede calcular (se agrega después en «Editar cuenta»):</Texto>
+          {faltan.map(([que, como]) => (
+            <View key={que} style={{ flexDirection: 'row', gap: 8 }}>
+              <View style={{ width: 5, height: 5, borderRadius: 3, marginTop: 7, backgroundColor: c.tenue }} />
+              <Texto tam={13} color={c.tenue} style={{ flex: 1, lineHeight: 18 }}><Texto tam={13} peso="medio">{que}</Texto>: {como}.</Texto>
             </View>
-            {tarjetas.length > 0 && (
-              <View style={{ gap: 8 }}>
-                <Etiqueta>Tarjeta de débito</Etiqueta>
-                <ElegirTarjetaBanco banco={banco.nombre} tarjetas={tarjetas} valor={tarjetaId} alCambiar={elegirTarjeta} clase="debito"
-                  terminacion={terminacion} color={color} ninguna="No tengo tarjeta de débito" />
-              </View>
-            )}
-            {debito && membresiaDe && (
-              <View style={{ gap: 8 }}>
-                <Etiqueta>Membresía</Etiqueta>
-                <Segmentos<'mensual' | 'anual'> opciones={[['mensual', `Mensual ${dinero0(membresiaDe.mensual)}`], ['anual', `Anual ${dinero0(membresiaDe.anual)}`]]}
-                  valor={membresia} alCambiar={setMembresia} />
-              </View>
-            )}
-            {debito && segurosDe.length > 0 && (
-              <View style={{ gap: 8 }}>
-                <Etiqueta>Seguro contra fraude</Etiqueta>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-                  <Ficha texto="Ninguno" activa={!seguroId} alto={36} onPress={() => setSeguroId(null)} />
-                  {segurosDe.map((sg) => <Ficha key={sg.id} texto={`${sg.nombre.replace('Seguro contra fraude ', '')} · ${dinero0(sg.mensual)}/mes`} activa={sg.id === seguroId} alto={36} onPress={() => setSeguroId(sg.id)} />)}
-                </View>
-              </View>
-            )}
-          </View>
-        )}
-        {banco && esTarjeta && (
-          <View style={{ gap: 10 }}>
-            <Etiqueta>Tu tarjeta</Etiqueta>
-            <ElegirTarjetaBanco banco={banco.nombre} tarjetas={tarjetas} valor={tarjetaId} alCambiar={elegirCredito} clase="credito"
-              terminacion={terminacion} color={color} ninguna="No está aquí" />
-            {delCatalogo && (
-              <>
-                <View style={{ backgroundColor: c.suave, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 4 }}>
-                  {filasReglas(delCatalogo).map(([r, v], i) => <FilaRegla key={r} rotulo={r} valor={v} primera={i === 0} />)}
-                </View>
-                <Texto tam={12} color={c.tenue}>
-                  De la tabla de tarifas de {banco.nombre}{delCatalogo.verificado ? ` (revisada el ${fechaCorta(delCatalogo.verificado)} ${delCatalogo.verificado.slice(0, 4)})` : ''}. Con esto la app calcula el pago mínimo, la fecha de pago y el sobregiro.
-                </Texto>
-              </>
-            )}
-            {!tarjeta && tarjetas.length > 0 && (
-              <Texto tam={12} color={c.tenue}>Si tu tarjeta no está en la pila, pon abajo sus reglas.</Texto>
-            )}
-          </View>
-        )}
-      </View>
-      {esTarjeta && (
-        <View style={{ gap: 8 }}>
-          <Etiqueta>Día de corte</Etiqueta>
-          <GrillaDias valor={corte} alCambiar={setCorte} />
-          {reglas?.fechas && (
-            <Texto tam={13} color={c.tenue}>
-              {banco?.nombre} publica para esta tarjeta el corte el {reglas.fechas.corte} y el pago el {reglas.fechas.pago}. Pon el de tu estado de cuenta: puede ser otro.
-            </Texto>
-          )}
+          ))}
         </View>
       )}
-      <View style={{ gap: 8 }}>
-        <Etiqueta>{esTarjeta ? 'Lo que debes hoy' : 'Saldo con el que empieza'}</Etiqueta>
-        <MontoGrande valor={saldo} alCambiar={setSaldo} moneda={moneda} />
-        {esTarjeta && <Texto tam={13} color={c.tenue}>El saldo actual que muestra tu banca, con todo lo de después del corte.</Texto>}
-        {!esTarjeta && <Segmentos<'no' | 'si'> opciones={[['no', 'A favor'], ['si', 'En contra (deuda)']]} valor={negativo} alCambiar={setNegativo} />}
-      </View>
-      {verInicio && corteAnt && (
-        <View style={{ gap: 10, backgroundColor: c.suave, borderRadius: 14, padding: 14 }}>
-          <Texto tam={15} peso="semi">¿Cuánto era al corte del {fechaCorta(corteAnt)}?</Texto>
-          <Texto tam={13} color={c.tenue} style={{ lineHeight: 18 }}>
-            Lo que el banco hizo efectivo después del corte (aunque lo hayas hecho antes) entra en el corte siguiente. Pon el saldo al corte o las compras de después (la app saca el otro con lo que debes hoy) y, si pagaste algo después del corte, cuánto. No hace falta anotarlo uno por uno.
-          </Texto>
-          <View style={{ gap: 6 }}>
-            <Etiqueta>Saldo al corte (estado de cuenta)</Etiqueta>
-            <CampoMonto valor={alCorteTxt} alCambiar={(v) => { setAlCorteTxt(v); setError(''); }} moneda={moneda} accessibilityLabel="Saldo al corte"
-              placeholder={resumenInicio?.sale === 'corte' && !resumenInicio.error ? `${dinero0(resumenInicio.alCorte)} (sale solo)` : undefined} />
-          </View>
-          <View style={{ gap: 6 }}>
-            <Etiqueta>Compras que se hicieron efectivas después del corte</Etiqueta>
-            <CampoMonto valor={despuesTxt} alCambiar={(v) => { setDespuesTxt(v); setError(''); }} moneda={moneda} accessibilityLabel="Compras después del corte"
-              placeholder={resumenInicio?.sale === 'compras' && !resumenInicio.error ? `${dinero0(resumenInicio.compras)} (sale solo)` : undefined} />
-            <Texto tam={13} color={c.tenue}>Compras y cargos que el banco cobró después del corte, aunque los hayas hecho antes.</Texto>
-          </View>
-          <View style={{ gap: 6 }}>
-            <Etiqueta derecha={<Texto tam={13} color={c.tenue}>Opcional</Texto>}>Pagos a la tarjeta después del corte</Etiqueta>
-            <CampoMonto valor={pagosTxt} alCambiar={(v) => { setPagosTxt(v); setError(''); }} moneda={moneda} accessibilityLabel="Pagos después del corte" />
-            <Texto tam={13} color={c.tenue}>Por ejemplo, el mínimo si ya lo pagaste. Cuenta como pagado en este corte.</Texto>
-          </View>
-          {resumenInicio && (
-            <Texto tam={13} color={resumenInicio.error ? c.alerta : undefined} style={{ lineHeight: 18 }}>
-              {resumenInicio.error
-                ?? `Al corte debías ${dinero0(resumenInicio.alCorte)} · después: compras ${dinero0(resumenInicio.compras)}, pagos ${dinero0(resumenInicio.pagos)}. De aquí en adelante, anota cada compra y pago nuevo de la tarjeta.`}
-            </Texto>
-          )}
+    </View>
+  );
+
+  // Crear la cuenta: en el último paso.
+  if (!inicial && pasoActual) {
+    const ultimo = pasoActual.id === 'resumen';
+    const textoSigue = ultimo ? 'Crear cuenta' : pasoActual.opcional && pasoActual.vacio ? 'Saltar' : 'Siguiente';
+    return (
+      <Hoja titulo={esTarjeta ? 'Nueva tarjeta' : 'Nueva cuenta'} alCerrar={alCerrar}
+        pie={(
+          <>
+            <TextoError texto={error} />
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              {paso > 0 && <BotonSuave onPress={() => { setError(''); setPaso((p) => p - 1); }} style={{ flex: 1 }}>Atrás</BotonSuave>}
+              <BotonPrincipal onPress={ultimo ? guardar : siguiente} style={{ flex: 2 }}>{textoSigue}</BotonPrincipal>
+            </View>
+          </>
+        )}>
+        <View style={{ flexDirection: 'row', gap: 6, justifyContent: 'center' }}>
+          {pasos.map((x, i) => <View key={x.id} style={{ width: 22, height: 4, borderRadius: 2, backgroundColor: i <= paso ? c.acento : c.linea }} />)}
         </View>
-      )}
-      {esTarjeta && (
+        <View style={{ gap: 4 }}>
+          <Texto tam={22} peso="semi">{pasoActual.titulo}</Texto>
+          {pasoActual.sub ? <Texto tam={13} color={c.tenue} style={{ lineHeight: 18 }}>{pasoActual.sub}</Texto> : null}
+        </View>
+        {ultimo ? resumen : pasoActual.cuerpo}
+      </Hoja>
+    );
+  }
+
+  // --- Editar: lo esencial arriba y lo opcional en filas cerradas que muestran su valor (opción A) -------------
+  const fila = (id: string, texto: string, valor: string, cuerpo: ReactNode, primera = false) => (
+    <Desplegable key={id} texto={texto} valor={valor} abierto={abierta === id} primera={primera}
+      alTocar={() => setAbierta((a) => (a === id ? null : id))}>{cuerpo}</Desplegable>
+  );
+  const foto = esTarjeta && tarjeta ? urlImagen(tarjeta) : null;
+  return (
+    <Hoja titulo="Editar cuenta" alCerrar={alCerrar}
+      pie={(
         <>
-          <View style={{ gap: 8 }}>
-            <Etiqueta derecha={<Texto tam={13} color={c.tenue}>Opcional</Texto>}>Día de pago</Etiqueta>
-            <GrillaDias valor={pago} alCambiar={setPago} />
-            {reglas?.dias_para_pagar && pago === null && (
-              <Texto tam={13} color={c.tenue}>Sin elegirlo, la app toma {reglas.dias_para_pagar} días después del corte, como dice el banco.</Texto>
-            )}
-          </View>
-          <View style={{ gap: 8 }}>
-            <Etiqueta derecha={<Texto tam={13} color={c.tenue}>Opcional</Texto>}>Límite de crédito</Etiqueta>
-            <CampoMonto valor={limite} alCambiar={setLimite} moneda={moneda} accessibilityLabel="Límite de crédito" />
-            <Texto tam={13} color={c.tenue}>{comoSobregiro ? `Para ver lo disponible. ${comoSobregiro}` : 'Para ver cuánto te queda disponible.'}</Texto>
-          </View>
-          {verPropias && (
-            <View style={{ gap: 14, backgroundColor: c.suave, borderRadius: 14, padding: 14 }}>
-              <View style={{ gap: 4 }}>
-                <Texto tam={15} peso="semi">Reglas de tu tarjeta</Texto>
-                <Texto tam={13} color={c.tenue} style={{ lineHeight: 18 }}>
-                  Cópialas de tu estado de cuenta o de la tabla de tarifas de tu banco. Todas son opcionales; con el % del pago mínimo la app lo calcula en cada corte.
-                </Texto>
-              </View>
-              <CampoRegla rotulo="Pago mínimo" ayuda="Por ejemplo, 3% y nunca menos de $20.">
-                <DosCampos
-                  izquierda={['% del saldo al corte', <Campo value={pctMin} onChangeText={setPctMin} placeholder="Ej: 3" keyboardType="decimal-pad" style={{ backgroundColor: c.tarjeta }} accessibilityLabel="Porcentaje del pago mínimo" />]}
-                  derecha={['Nunca menos de', <CampoMonto valor={pisoMin} alCambiar={setPisoMin} moneda={moneda} placeholder="Ej: $20.00" accessibilityLabel="Pago mínimo en dólares" style={{ backgroundColor: c.tarjeta }} />]} />
-              </CampoRegla>
-              <CampoRegla rotulo="Interés anual (%)" ayuda="Para estimar cuánto cobra el banco si no pagas el total.">
-                <Campo value={tasa} onChangeText={setTasa} placeholder="Ej: 54" keyboardType="decimal-pad" accessibilityLabel="Interés anual" style={{ backgroundColor: c.tarjeta }} />
-              </CampoRegla>
-              <CampoRegla rotulo="Cargo por pago atrasado">
-                <CampoMonto valor={atrasado} alCambiar={setAtrasado} moneda={moneda} accessibilityLabel="Cargo por pago atrasado" style={{ backgroundColor: c.tarjeta }} />
-              </CampoRegla>
-              <CampoRegla rotulo="Sobregiro" ayuda="Cuánto % del límite te deja pasar sin cargo, y lo que cobra al corte si te pasas de ahí.">
-                <DosCampos
-                  izquierda={['% del límite sin cargo', <Campo value={pctSobregiro} onChangeText={setPctSobregiro} placeholder="Ej: 5" keyboardType="decimal-pad" style={{ backgroundColor: c.tarjeta }} accessibilityLabel="Porcentaje de sobregiro sin cargo" />]}
-                  derecha={['Cargo si te pasas', <CampoMonto valor={cargoSobregiro} alCambiar={setCargoSobregiro} moneda={moneda} accessibilityLabel="Cargo por sobregiro" style={{ backgroundColor: c.tarjeta }} />]} />
-              </CampoRegla>
-              <CampoRegla rotulo="Días para pagar después del corte" ayuda="Si tu banco da un plazo en días y no un día fijo. Si eliges arriba el día de pago, manda ese.">
-                <Campo value={diasPagar} onChangeText={(t) => setDiasPagar(t.replace(/\D/g, '').slice(0, 2))} placeholder="Ej: 25" keyboardType="number-pad" accessibilityLabel="Días para pagar" style={{ backgroundColor: c.tarjeta }} />
-              </CampoRegla>
-            </View>
-          )}
-          {!reglas?.pago_minimo && (
-            <View style={{ gap: 8 }}>
-              <Etiqueta derecha={<Texto tam={13} color={c.tenue}>Opcional</Texto>}>Pago mínimo de este corte</Etiqueta>
-              <CampoMonto valor={minimo} alCambiar={setMinimo} moneda={moneda} accessibilityLabel="Pago mínimo" />
-              <Texto tam={13} color={c.tenue}>Cópialo de tu estado de cuenta. Con el % del pago mínimo en las reglas, la app lo calcula sola.</Texto>
-            </View>
-          )}
+          <TextoError texto={error} />
+          <BotonPrincipal onPress={guardar}>Guardar cambios</BotonPrincipal>
+          {cuentas.length > 1
+            ? <BotonBorrar texto="Borrar cuenta" onPress={borrar} />
+            : <Texto tam={13} color={c.tenue} centro style={{ paddingVertical: 8 }}>No se puede borrar: es la única cuenta. Crea otra primero.</Texto>}
         </>
+      )}>
+      {esTarjeta && (tarjeta || bancoId === OTRO) && (
+        <TarjetaMedida banco={banco?.nombre ?? (otroBanco.trim() || 'Tu banco')} nombre={tarjeta ? nombreCorto(tarjeta.nombre) : (otraTarjeta.trim() || nombre.trim() || 'Tarjeta de crédito')}
+          diseno={tarjeta?.diseno ?? disenoConColor(color)} clase="credito" terminacion={terminacion} imagen={foto} />
       )}
       <View style={{ gap: 8 }}>
-        <Etiqueta derecha={<Texto tam={13} color={c.tenue}>Opcional</Texto>}>Últimos 4 dígitos de la tarjeta</Etiqueta>
-        <Campo value={terminacion} onChangeText={(t) => setTerminacion(t.replace(/\D/g, '').slice(0, 4))} placeholder="1234" keyboardType="number-pad" maxLength={4} />
-        <Texto tam={13} color={c.tenue}>Para reconocer los avisos del banco que llegan al correo.</Texto>
+        <Etiqueta>Nombre</Etiqueta>
+        <Campo value={nombre} onChangeText={(t) => { setNombre(t); setError(''); }} placeholder="Ej: Efectivo, Banco, Ahorros" />
       </View>
-      {!esTarjeta && (
-        <View style={{ gap: 8 }}>
-          <Etiqueta>Mi Yappy está en esta cuenta</Etiqueta>
-          <Segmentos<'no' | 'si'> opciones={[['no', 'No'], ['si', 'Sí']]} valor={yappy} alCambiar={setYappy} />
-          <Texto tam={13} color={c.tenue}>Los Yappy que te lleguen al correo se anotan en esta cuenta.</Texto>
+      {esTarjeta && (
+        <View style={{ backgroundColor: c.suave, borderRadius: 14 }}>
+          {fila('corte', 'Día de corte', corte !== null ? String(corte) : 'Elegir', secCorte, true)}
+          {fila('limite', 'Límite de crédito', limite.trim() ? dinero0(aCentavos(limite)) : 'Poner', secLimite)}
         </View>
+      )}
+      <View style={{ gap: 8 }}>
+        <Etiqueta>{esTarjeta ? 'Lo que debías al crearla' : 'Saldo con el que empezó'}</Etiqueta>
+        {secSaldo}
+      </View>
+      <Etiqueta>Opcional</Etiqueta>
+      <View style={{ backgroundColor: c.suave, borderRadius: 14 }}>
+        {fila('banco', esTarjeta ? 'Banco y tarjeta' : 'Banco', nombreBanco || 'Agregar', secBanco, true)}
+        {esTarjeta && fila('pago', 'Día de pago', pago ? String(pago) : fechaPagoForm ? `${fechaCorta(fechaPagoForm)} (del banco)` : 'Agregar', secPago)}
+        {secInicio && fila('inicio', `Saldo al corte del ${fechaCorta(corteAnt!)}`, resumenInicio && !resumenInicio.error ? dinero0(resumenInicio.alCorte) : 'Agregar', secInicio)}
+        {verPropias && fila('reglas', 'Reglas de tu tarjeta', resumenReglas || (minimo.trim() ? `mínimo ${dinero0(aCentavos(minimo))}` : 'Agregar'), secReglas)}
+        {fila('digitos', 'Últimos 4 dígitos', terminacion || 'Agregar', secDigitos)}
+        {fila('color', 'Color', ' ', <Colores valor={color} alCambiar={setColor} />)}
+        {!esTarjeta && fila('yappy', 'Mi Yappy está en esta cuenta', yappy === 'si' ? 'Sí' : 'No', secYappy)}
+        {fila('tipo', 'Tipo', esTarjeta ? 'Tarjeta de crédito' : 'Cuenta normal', secTipo)}
+      </View>
+      {esTarjeta && faltan.length > 0 && (
+        <Texto tam={12} color={c.tenue} style={{ lineHeight: 17 }}>
+          Sin calcular por falta de datos: {faltan.map(([q]) => q.toLowerCase()).join(', ')}.
+        </Texto>
       )}
     </Hoja>
   );

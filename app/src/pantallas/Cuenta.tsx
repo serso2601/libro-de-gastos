@@ -284,6 +284,14 @@ function ResumenTarjeta({ cuenta, fondo, tinta }: { cuenta: TCuenta; fondo: stri
   const pagoAtrasado = reglas?.pago_atrasado ?? 0;
   const regla = reglas?.pago_minimo;
 
+  // Lo que no se puede calcular porque a la tarjeta le falta información: una línea, con «Completar».
+  const sinDatos = [
+    ...(estado && estado.minimo === null ? ['el pago mínimo'] : []),
+    ...(!fechaPago ? ['la fecha de pago'] : []),
+    ...(!cuenta.limite ? ['lo disponible'] : []),
+    ...(tasa === null ? ['el interés'] : []),
+  ];
+
   // Lo que está pasando hoy (no definiciones): va debajo de las cifras, una nota por línea.
   const notas: { texto: string; alerta?: boolean }[] = [];
   if (cerca > 0) notas.push({ texto: `${neto(cerca, d.moneda)} de compras de los últimos días antes del corte pueden pasar al siguiente.` });
@@ -380,6 +388,12 @@ function ResumenTarjeta({ cuenta, fondo, tinta }: { cuenta: TCuenta; fondo: stri
               <Ficha texto="Sí, es ese" activa={false} alto={34} onPress={() => confirmar(estado.minimo!)} />
               <Ficha texto="Es otro" activa={false} alto={34} onPress={() => abrir({ tipo: 'minimo', cuenta })} />
             </View>
+          </View>
+        )}
+        {sinDatos.length > 0 && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, borderTopWidth: 1, borderTopColor: c.linea, marginTop: 6, paddingTop: 8 }}>
+            <Texto tam={13} color={c.tenue} style={{ flex: 1, lineHeight: 18 }}>Sin datos para calcular: {sinDatos.join(', ')}.</Texto>
+            <Enlace tam={13} onPress={() => abrir({ tipo: 'cuenta', inicial: cuenta })}>Completar</Enlace>
           </View>
         )}
         <Notas items={notas} />

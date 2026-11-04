@@ -18,7 +18,7 @@ const PASOS: Paso[] = [
   { icono: 'calendario', titulo: 'El mes en un calendario', texto: 'Cada día muestra en verde lo que entró y en rojo lo que salió. Toca un día para ver sus movimientos; el + anota en ese día.' },
   { icono: 'lista', titulo: 'Movimientos', texto: 'Arriba de la lista sale lo que todavía falta este mes (lo que se repite); cuando llega su día pasa a la lista. Al lado, los Gráficos.' },
   { icono: 'presupuesto', titulo: 'Presupuesto y cuentas', texto: 'El presupuesto va en cuadros que se llenan con lo que gastas; toca uno para ver sus compras. Puede ser por semana, cada 2 semanas, por quincena o por mes (toca el periodo arriba). En Cuentas están todas tus cuentas y cada forma de ver tu saldo.' },
-  { icono: 'cuentas', titulo: 'Tarjeta de crédito', texto: 'Al crear o editar una cuenta, marca «Es tarjeta de crédito» y su día de corte. Elige tu banco y toca tu tarjeta en la pila; si tu banco no está, elige «Otro banco» y pon las reglas de tu tarjeta. Verás cuánto debes, el mínimo y lo gastado en el corte; el pago te lo sugiere la app y solo se anota si lo confirmas.' },
+  { icono: 'cuentas', titulo: 'Tarjeta de crédito', texto: 'Al crear una cuenta, elige «Tarjeta de crédito» y sigue los pasos: banco y tarjeta, día de corte y límite (lo demás es opcional). Al anotar con ella sale Compra · Pago · Sacar dinero; el pago te lo sugiere la app y solo se anota si lo confirmas.' },
   { icono: 'mas', titulo: 'Anotar', texto: 'El botón negro del centro anota un gasto, un ingreso o una transferencia.' },
 ];
 
