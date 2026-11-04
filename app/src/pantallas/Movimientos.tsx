@@ -22,6 +22,14 @@ type Filtro = 'todos' | 'gasto' | 'ingreso' | 'transferencia';
 type Vista = 'lista' | 'graficos';
 const VISTAS: [Vista, string][] = [['lista', 'Lista'], ['graficos', 'Gráficos']];
 const FILTROS: [Filtro, string][] = [['todos', 'Todos'], ['gasto', 'Gastos'], ['ingreso', 'Ingresos'], ['transferencia', 'Transferencias']];
+/**
+ * Con tarjetas de crédito: «Todas» = lo gastado de verdad (las compras con tarjeta son gasto; pagarla es una
+ * transferencia y no cuenta). «Sin tarjetas» = lo que se movió en las cuentas normales: no salen las compras con
+ * tarjeta y el pago de la tarjeta sí cuenta como «Salió» (ese día el dinero salió de la cuenta); sacar dinero de la
+ * tarjeta a una cuenta cuenta como «Entró».
+ */
+type ConTarjetas = 'todas' | 'sin';
+const CON_TARJETAS: [ConTarjetas, string][] = [['todas', 'Todas'], ['sin', 'Sin tarjetas']];
 
 /**
  * Movimientos: la lista y los Gráficos. Arriba de la lista va lo que todavía se va a anotar solo en
@@ -38,6 +46,10 @@ export function Movimientos() {
   const { c, colorCuenta } = useTema();
   const { dosColumnas, margen } = useDisposicion();
   const [filtro, setFiltro] = useState<Filtro>('todos');
+  const [conTarjetas, setConTarjetas] = useState<ConTarjetas>('todas');
+  const credito = useMemo(() => new Set(d.cuentas.filter((x) => x.es_credito).map((x) => x.id)), [d.cuentas]);
+  const hayTarjetas = credito.size > 0;
+  const sinTarjetas = hayTarjetas && conTarjetas === 'sin';
   const [busqueda, setBusqueda] = useState('');
   const [limite, setLimite] = useState(80);
   // Quien llega con `vista` cae directo en Gráficos; el parámetro se limpia para que tocar la pestaña
@@ -56,10 +68,12 @@ export function Movimientos() {
     const q = busqueda.trim().toLowerCase();
     const nombreCat = new Map(d.categorias.map((x) => [x.id, x.nombre.toLowerCase()]));
     const nombreCuenta = new Map(d.cuentas.map((x) => [x.id, x.nombre.toLowerCase()]));
-    return (m: Movimiento | Proximo) => (filtro === 'todos' || m.tipo === filtro)
+    // Sin tarjetas: solo lo que toca alguna cuenta normal (las compras con tarjeta no salen).
+    const tocaNormal = (m: Movimiento | Proximo) => !credito.has(m.cuenta_id) || (!!m.cuenta_destino_id && !credito.has(m.cuenta_destino_id));
+    return (m: Movimiento | Proximo) => (!sinTarjetas || tocaNormal(m)) && (filtro === 'todos' || m.tipo === filtro)
       && (!q || m.nota.toLowerCase().includes(q) || (nombreCat.get(m.categoria_id ?? '') ?? '').includes(q)
         || (nombreCuenta.get(m.cuenta_id) ?? '').includes(q));
-  }, [d.categorias, d.cuentas, filtro, busqueda]);
+  }, [d.categorias, d.cuentas, filtro, busqueda, sinTarjetas, credito]);
 
   const grupos = useMemo(() => {
     const filtrados = d.movimientos.filter(coincide).sort(ordenarPorFecha);
@@ -96,13 +110,33 @@ export function Movimientos() {
   }
   const nombreCuenta = (id: string) => d.cuentas.find((x) => x.id === id)?.nombre ?? '';
 
-  const salio = sumar(delMesActual, 'gasto');
-  const entro = sumar(delMesActual, 'ingreso');
+  // Con «Sin tarjetas», el pago de una tarjeta sale de la cuenta normal y lo que se saca de la tarjeta entra a ella.
+  const normalesDelMes = sinTarjetas ? delMesActual.filter((m) => !credito.has(m.cuenta_id)) : delMesActual;
+  const transf = (de: boolean, a: boolean) => !sinTarjetas ? 0 : delMesActual.reduce((s, m) => s + (m.tipo === 'transferencia'
+    && credito.has(m.cuenta_id) === de && !!m.cuenta_destino_id && credito.has(m.cuenta_destino_id) === a ? m.monto : 0), 0);
+  const salio = sumar(normalesDelMes, 'gasto') + transf(false, true);
+  const entro = sumar(normalesDelMes, 'ingreso') + transf(true, false);
   const mesNombre = mayuscula(MESES[Number(mesActual.slice(5, 7)) - 1]);
+
+  // «Todas · Sin tarjetas», chico, arriba de lo que entró y salió (y de los gráficos): solo si hay tarjetas.
+  const alcance = hayTarjetas ? (
+    <View style={{ flexDirection: 'row', gap: 6 }}>
+      {CON_TARJETAS.map(([id, texto]) => {
+        const activo = conTarjetas === id;
+        return (
+          <Pressable key={id} onPress={() => setConTarjetas(id)} accessibilityState={{ selected: activo }}
+            style={{ height: 28, paddingHorizontal: 12, borderRadius: 14, backgroundColor: activo ? c.boton : c.suave, justifyContent: 'center' }}>
+            <Texto tam={12} peso={activo ? 'semi' : 'medio'} color={activo ? c.sobreBoton : c.tenue}>{texto}</Texto>
+          </Pressable>
+        );
+      })}
+    </View>
+  ) : null;
 
   const lista = (
     <>
-      <Tarjeta style={{ flexDirection: 'row', paddingVertical: 12, paddingHorizontal: 16, gap: 16 }}>
+      <Tarjeta style={{ flexDirection: 'row', flexWrap: 'wrap', paddingVertical: 12, paddingHorizontal: 16, gap: 16 }}>
+        {alcance && <View style={{ width: '100%', marginBottom: -4 }}>{alcance}</View>}
         <View style={{ flex: 1, gap: 2 }}>
           <Texto tam={13} color={c.tenue}>Salió</Texto>
           <Num tam={22} color={salio ? c.gasto : undefined} lineas={1}>{neto(salio, d.moneda)}</Num>
@@ -230,12 +264,12 @@ export function Movimientos() {
       {dosColumnas ? (
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 36 }}>
           <View style={{ flex: 6, minWidth: 0, gap: 12 }}>{lista}</View>
-          <View style={{ flex: 5, minWidth: 0, gap: 12 }}><ContenidoGraficos /></View>
+          <View style={{ flex: 5, minWidth: 0, gap: 12 }}><ContenidoGraficos sinTarjetas={sinTarjetas} /></View>
         </View>
       ) : (
         <>
           <Segmentos opciones={VISTAS} valor={vista} alCambiar={setVista} />
-          {vista === 'graficos' ? <ContenidoGraficos /> : lista}
+          {vista === 'graficos' ? <>{alcance}<ContenidoGraficos sinTarjetas={sinTarjetas} /></> : lista}
         </>
       )}
     </Marco>

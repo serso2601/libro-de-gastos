@@ -10,8 +10,14 @@ import { useTema } from '@/ui/tema';
 import { Deslizar } from '@/ui/deslizar';
 
 /** Los gráficos del mes: dona por categoría, barras de 6 meses y este mes contra el anterior. Sin marco: vive dentro de Movimientos. */
-export function ContenidoGraficos() {
-  const d = useDatos();
+/** `sinTarjetas`: solo lo de las cuentas normales (lo gastado con tarjetas de crédito no cuenta). */
+export function ContenidoGraficos({ sinTarjetas = false }: { sinTarjetas?: boolean }) {
+  const datos = useDatos();
+  const d = useMemo(() => {
+    if (!sinTarjetas) return datos;
+    const credito = new Set(datos.cuentas.filter((x) => x.es_credito).map((x) => x.id));
+    return { ...datos, movimientos: datos.movimientos.filter((m) => !credito.has(m.cuenta_id)) };
+  }, [datos, sinTarjetas]);
   const mes = useMes();
   const { c } = useTema();
 
