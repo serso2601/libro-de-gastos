@@ -67,8 +67,7 @@ compilación de la app pasan; **nada se vio todavía en pantalla**.
    estaba apagada (salió «tiempo de espera agotado»); las demás no salió nada. Lo más probable: la automatización
    «Transacción» solo tiene marcada la tarjeta de débito y se pagó con otra; o «Preguntar antes de ejecutar» prendido.
    Arreglado del lado de la PC (4/nov): un pago sin comercio o con un monto raro ya no se rechaza (queda en «Por
-   revisar»), y **cada pedido del iPhone queda en `datos
-egistros\entradas.log`** (no se borra al reiniciar; la página
+   revisar»), y **cada pedido del iPhone queda en `datos\registros\entradas.log`** (no se borra al reiniciar; la página
    de estado muestra el último). **Falta**: revisar en el iPhone las tarjetas marcadas en la automatización y
    «Ejecutar inmediatamente», pagar algo y ver «Último pedido del iPhone» en la página de estado.
 4. **Cargos del banco**: reglas de membresía ($2.68) y seguro ($1.05) el día 3 en la cuenta de BG. Ver que el
