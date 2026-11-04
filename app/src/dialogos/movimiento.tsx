@@ -126,9 +126,10 @@ export function DialogoMovimiento({ inicial, tipoInicial = 'gasto', fechaInicial
       setTipo('ingreso');
       ponerCategoria('ingreso');
       if (nota.startsWith('Pago de ')) setNota('');
-    } else if (accion === 'sacar') {
+    } else if (accion === 'sacar' && normales.some((x) => x.id !== id)) {
+      // Una transferencia normal: hacia otra cuenta normal (hacia una tarjeta sería un pago).
       setTipo('transferencia');
-      if (destino === id || !destino) setDestino(cuentas.find((x) => x.id !== id)?.id ?? '');
+      setDestino(unaNormal(id, destino));
     } else {
       setTipo('gasto');
     }
