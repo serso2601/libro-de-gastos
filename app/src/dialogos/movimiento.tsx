@@ -15,6 +15,9 @@ import { abrirHoja, anunciarBorrado, anunciarNuevo, BAJA_LA_HOJA } from '@/ui/vi
 import { Desplegable, ElegirCategoria, ElegirCuenta, ElegirFecha } from './piezas';
 
 const TIPOS: [TipoMovimiento, string][] = [['gasto', 'Gasto'], ['ingreso', 'Ingreso'], ['transferencia', 'Transferencia']];
+/** Con una tarjeta de crédito: comprar con ella, pagarla desde una cuenta normal o sacar dinero de ella a una cuenta. */
+type Accion = 'compra' | 'pago' | 'sacar';
+const ACCIONES: [Accion, string][] = [['compra', 'Compra'], ['pago', 'Pago'], ['sacar', 'Sacar dinero']];
 type Repetir = 'no' | Frecuencia;
 const REPETIR: [Repetir, string][] = [['no', 'No'], ...FRECUENCIAS];
 
@@ -52,38 +55,83 @@ export function DialogoMovimiento({ inicial, tipoInicial = 'gasto', fechaInicial
   // Mientras la hoja está abierta (y un rato después), las listas de atrás acomodan sus filas con resorte.
   useEffect(() => abrirHoja(), []);
 
-  // En una tarjeta de crédito no entra dinero como «ingreso»: lo que entra es un pago desde otra cuenta. «Pago» es
-  // una transferencia hacia la tarjeta, con las fichas de total, lo del corte y mínimo.
+  // La hoja tiene dos formas y siempre sale de las cuentas elegidas (así cambiar de pestaña no la pierde):
+  // - Normal (Gasto · Ingreso · Transferencia), con cuentas normales.
+  // - Tarjeta (Compra · Pago · Sacar dinero), cuando la cuenta es una tarjeta de crédito o la transferencia va hacia
+  //   una. Compra = gasto en la tarjeta; Pago = de una cuenta normal hacia la tarjeta; Sacar dinero = de la tarjeta a
+  //   una cuenta (Kash a tu cuenta, avance de efectivo). A una tarjeta no le entra «ingreso»: lo que entra es un pago.
   const esCredito = (id: string) => !!cuentas.find((x) => x.id === id)?.es_credito;
-  const [modoPago, setModoPago] = useState(() => (inicial?.tipo ?? tipoPendiente) === 'transferencia' && esCredito(destino));
-  const etiquetaPago = modoPago || (tipo !== 'transferencia' && esCredito(cuenta));
-  const tipos: [TipoMovimiento, string][] = TIPOS.map(([t, txt]) => [t, t === 'ingreso' && etiquetaPago ? 'Pago' : txt]);
-  const origenDePago = (tarjeta: string) => cuentas.find((x) => !x.es_credito && x.id !== tarjeta)?.id ?? cuenta;
+  const normales = cuentas.filter((x) => !x.es_credito);
+  const enTarjeta = esCredito(cuenta);
+  const haciaTarjeta = tipo === 'transferencia' && !enTarjeta && esCredito(destino);
+  const modoTarjeta = enTarjeta || haciaTarjeta;
+  const tarjetaId = enTarjeta ? cuenta : haciaTarjeta ? destino : '';
+  const accion: Accion | null = !modoTarjeta ? null : haciaTarjeta ? 'pago' : tipo === 'gasto' ? 'compra' : tipo === 'transferencia' ? 'sacar' : null;
+  /** La cuenta normal desde la que se paga o hacia la que se saca: la que ya estaba, si es normal; si no, la primera. */
+  const unaNormal = (aparte: string, preferida?: string) =>
+    normales.find((x) => x.id === preferida && x.id !== aparte)?.id ?? normales.find((x) => x.id !== aparte)?.id ?? '';
+  const ponerCategoria = (t: TipoMovimiento) => {
+    if (t !== 'transferencia' && categorias.find((x) => x.id === categoria)?.tipo !== t) setCategoria(primeraDe(t));
+  };
+  const notaDePago = (tarjeta: string) => {
+    if (!nota.trim() || nota.startsWith('Pago de ')) setNota(`Pago de ${cuentas.find((x) => x.id === tarjeta)?.nombre ?? ''}`);
+  };
 
-  /** Pasa la hoja a «pago de la tarjeta»: hacia la tarjeta, desde la primera cuenta que no es de crédito. */
-  function comoPago(tarjeta: string) {
-    setTipo('transferencia');
-    setModoPago(true);
-    setDestino(tarjeta);
-    setCuenta(origenDePago(tarjeta));
-    const nombre = cuentas.find((x) => x.id === tarjeta)?.nombre ?? '';
-    if (!nota.trim()) setNota(`Pago de ${nombre}`);
+  /** Pasa la hoja a una acción de la tarjeta `tarjeta`. */
+  function hacer(a: Accion, tarjeta: string) {
+    setError('');
+    if (a === 'compra') {
+      setTipo('gasto');
+      setCuenta(tarjeta);
+      ponerCategoria('gasto');
+    } else if (a === 'pago') {
+      const desde = unaNormal(tarjeta, enTarjeta ? destino : cuenta);
+      if (!desde) return setError('Para pagar la tarjeta necesitas una cuenta que no sea de crédito');
+      setTipo('transferencia');
+      setCuenta(desde);
+      setDestino(tarjeta);
+      notaDePago(tarjeta);
+    } else {
+      setTipo('transferencia');
+      setCuenta(tarjeta);
+      setDestino(unaNormal(tarjeta, haciaTarjeta ? cuenta : destino) || cuentas.find((x) => x.id !== tarjeta)?.id || '');
+      if (nota.startsWith('Pago de ')) setNota('');
+    }
   }
 
   function cambiarTipo(t: TipoMovimiento) {
     setError('');
-    if (t === 'ingreso' && !editando && etiquetaPago) {
-      if (!modoPago) comoPago(cuenta);
-      return;
-    }
-    setModoPago(false);
     setTipo(t);
-    if (t !== 'transferencia' && categorias.find((x) => x.id === categoria)?.tipo !== t) setCategoria(primeraDe(t));
+    ponerCategoria(t);
+    if (t === 'transferencia' && (!destino || destino === cuenta)) setDestino(cuentas.find((x) => x.id !== cuenta)?.id ?? '');
   }
 
-  /** Elegir la cuenta: un ingreso que cae en una tarjeta de crédito se vuelve pago de esa tarjeta. */
+  /** Forma normal: elegir una tarjeta como cuenta pasa a la forma de tarjeta, con la acción que corresponde. */
   function elegirCuenta(id: string) {
-    if (tipo === 'ingreso' && !editando && esCredito(id)) return comoPago(id);
+    setError('');
+    if (!esCredito(id)) {
+      setCuenta(id);
+      if (tipo === 'transferencia' && destino === id) setDestino(cuentas.find((x) => x.id !== id)?.id ?? '');
+      return;
+    }
+    hacer(tipo === 'gasto' ? 'compra' : tipo === 'ingreso' ? 'pago' : 'sacar', id);
+  }
+
+  /** Forma de tarjeta: cambiar de tarjeta, o elegir una cuenta normal y volver a la forma normal. */
+  function elegirTarjeta(id: string) {
+    setError('');
+    if (esCredito(id)) return hacer(accion ?? 'compra', id);
+    // Con una cuenta normal: la compra sigue como gasto, el pago como ingreso y sacar dinero como transferencia.
+    if (accion === 'pago') {
+      setTipo('ingreso');
+      ponerCategoria('ingreso');
+      if (nota.startsWith('Pago de ')) setNota('');
+    } else if (accion === 'sacar') {
+      setTipo('transferencia');
+      if (destino === id || !destino) setDestino(cuentas.find((x) => x.id !== id)?.id ?? '');
+    } else {
+      setTipo('gasto');
+    }
     setCuenta(id);
   }
 
@@ -167,9 +215,7 @@ export function DialogoMovimiento({ inicial, tipoInicial = 'gasto', fechaInicial
   function comoPagoDeTarjeta() {
     if (!pareceTarjeta) return;
     Haptics.selectionAsync();
-    const origen = esCredito(cuenta) ? origenDePago(pareceTarjeta.id) : cuenta;
-    comoPago(pareceTarjeta.id);
-    setCuenta(origen);
+    hacer('pago', pareceTarjeta.id);
   }
   const destinoInicialTarjeta = cuentas.some((x) => x.id === destinoInicial && x.es_credito);
 
@@ -182,7 +228,9 @@ export function DialogoMovimiento({ inicial, tipoInicial = 'gasto', fechaInicial
     <Hoja titulo={editando ? 'Editar' : pendiente ? 'Por revisar' : 'Anotar'} alCerrar={alCerrar}
       derecha={editando ? <Pressable onPress={borrar} hitSlop={10}><Texto tam={17} color={c.alerta}>Borrar</Texto></Pressable> : undefined}
       pie={<><TextoError texto={error} /><BotonPrincipal onPress={guardar}>{textoGuardar}</BotonPrincipal></>}>
-      <Segmentos opciones={tipos} valor={modoPago ? 'ingreso' : tipo} alCambiar={cambiarTipo} />
+      {modoTarjeta
+        ? <Segmentos<Accion | ''> opciones={ACCIONES} valor={accion ?? ''} alCambiar={(a) => a && hacer(a, tarjetaId)} />
+        : <Segmentos opciones={TIPOS} valor={tipo} alCambiar={cambiarTipo} />}
 
       {opcionesPago.length > 0 && (
         <View style={{ gap: 6 }}>
@@ -219,8 +267,24 @@ export function DialogoMovimiento({ inicial, tipoInicial = 'gasto', fechaInicial
 
       {tipo !== 'transferencia' && <ElegirCategoria tipo={tipo} valor={categoria} alCambiar={setCategoria} fecha={fecha} />}
 
-      <ElegirCuenta rotulo={modoPago ? 'Pagas desde' : tipo === 'transferencia' ? 'Desde' : 'Cuenta'} valor={cuenta} alCambiar={elegirCuenta} solo={modoPago ? (x) => !x.es_credito : undefined} />
-      {tipo === 'transferencia' && <ElegirCuenta rotulo={modoPago ? 'Tarjeta que pagas' : 'Hacia'} valor={destino} alCambiar={setDestino} solo={modoPago ? (x) => !!x.es_credito : undefined} />}
+      {modoTarjeta ? (
+        <>
+          <ElegirCuenta rotulo="Tarjeta" valor={tarjetaId} alCambiar={elegirTarjeta} />
+          {accion === 'pago' && <ElegirCuenta rotulo="Pagas desde" valor={cuenta} alCambiar={setCuenta} solo={(x) => !x.es_credito} />}
+          {accion === 'sacar' && <ElegirCuenta rotulo="Hacia" valor={destino} alCambiar={setDestino} solo={(x) => x.id !== tarjetaId} />}
+          {accion === 'sacar' && (
+            <Texto tam={13} color={c.tenue}>Sacar dinero de la tarjeta suele llevar comisión del banco: anótala aparte como compra.</Texto>
+          )}
+          {accion === null && (
+            <Texto tam={13} color={c.tenue}>Está anotado como ingreso en la tarjeta: cuenta como pago. Elige arriba qué fue.</Texto>
+          )}
+        </>
+      ) : (
+        <>
+          <ElegirCuenta rotulo={tipo === 'transferencia' ? 'Desde' : 'Cuenta'} valor={cuenta} alCambiar={elegirCuenta} />
+          {tipo === 'transferencia' && <ElegirCuenta rotulo="Hacia" valor={destino} alCambiar={setDestino} solo={(x) => x.id !== cuenta} />}
+        </>
+      )}
 
       {!editando && !pendiente && (
         <View style={{ backgroundColor: c.suave, borderRadius: 14 }}>
